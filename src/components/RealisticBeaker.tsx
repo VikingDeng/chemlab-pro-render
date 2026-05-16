@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { GlassProps } from './BeakerGlass';
+import type { GlassProps, ReactionParticle } from './BeakerGlass';
 
 function seededValue(seed: string | number, offset: number) {
   let hash = 0;
@@ -54,6 +54,7 @@ export const RealisticBeaker: React.FC<GlassProps> = ({
   // Darker shade for edge depth, keeping transparency
   const depthColor = `rgba(${Math.max(0, r - 30)}, ${Math.max(0, g - 30)}, ${Math.max(0, b - 30)}, ${a + 0.1})`;
   const isPrecipitate = reactionType?.includes('precipitate');
+  const reactionParticles: ReactionParticle[] = particles;
 
   return (
     <div style={{ width, height, position: 'relative' }} className="group">
@@ -221,7 +222,7 @@ export const RealisticBeaker: React.FC<GlassProps> = ({
               )}
 
               {/* Particles / Bubbles / Brownian Motion */}
-              {isReacting && particles.map(p => {
+              {isReacting && reactionParticles.map(p => {
                 const isGas = reactionType?.includes('gas');
                 const isBoil = reactionType?.includes('gas_boil');
                 const wobbleX1 = (seededValue(p.id, 1) - 0.5) * 40;
