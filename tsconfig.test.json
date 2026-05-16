@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["node", "react"],
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": false,
+    "outDir": "./.test-dist",
+    "rootDir": ".",
+    "strict": true,
+    "jsx": "react-jsx"
+  },
+  "include": ["tests/**/*.ts", "src/challengeGuidance.ts", "src/agentHeuristics.ts", "src/chemEngine.ts"]
+}

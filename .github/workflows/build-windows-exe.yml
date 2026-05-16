@@ -1,0 +1,36 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  windows-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Create delivery env file
+        shell: pwsh
+        run: |
+          @"
+          PORT=8787
+          LLM_PROVIDER=mimo
+          LLM_API_URL=https://token-plan-cn.xiaomimimo.com/v1
+          LLM_MODEL=mimo-v2.5-pro
+          LLM_API_KEY=${{ secrets.MIMO_API_KEY }}
+          VITE_LAVOISIER_API_URL=/api/lavoisier
+          "@ | Set-Content -Path .env -Encoding utf8
+      - name: Build portable EXE
+        run: npm run package:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChemLab-Pro-Windows-Portable
+          path: release/*.exe
