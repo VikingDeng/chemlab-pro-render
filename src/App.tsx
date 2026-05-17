@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { RotateCcw } from 'lucide-react'
-import { Beaker, FlaskConical, Flame, TestTubes, TestTube, Pipette, Gauge, Menu, X, ChevronUp, ChevronDown, Droplets, Thermometer, PenTool, Blend, Cable } from 'lucide-react'
+import { Beaker, FlaskConical, Flame, TestTubes, TestTube, Pipette, Gauge, Menu, X, ChevronUp, ChevronDown, Droplets, Thermometer, PenTool, Blend, Cable, BookOpen } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { EquipmentCard } from './EquipmentCard'
 import { ReagentShelf } from './ReagentShelf'
@@ -443,35 +443,68 @@ function buildDiscoveryCards(items: PlacedItem[]): DiscoveryCardView[] {
   }));
 }
 
-function DiscoveryAtlas({ cards }: { cards: DiscoveryCardView[] }) {
+function DiscoveryAtlasModal({ cards, onClose }: { cards: DiscoveryCardView[]; onClose: () => void }) {
   const unlockedCount = cards.filter(card => card.unlocked).length;
 
   return (
-    <section data-panel="discovery-atlas" className="shrink-0 overflow-hidden rounded-[18px] border border-white/8 bg-[rgba(255,255,255,0.035)] px-3 py-2">
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <div className="text-[13px] font-semibold text-[#e2e8f0]">反应图鉴</div>
-        <div className="rounded-full border border-[#22d3ee]/20 bg-[#22d3ee]/10 px-2 py-0.5 text-[10px] font-mono text-[#67e8f9]">
-          {unlockedCount}/{cards.length}
-        </div>
-      </div>
-      <div className="flex gap-2 overflow-x-auto overflow-y-hidden pb-1 [scrollbar-width:thin]">
-        {cards.map(card => (
-          <div
-            key={card.id}
-            className={`relative h-[44px] min-w-[118px] overflow-hidden rounded-[14px] border px-2.5 py-1.5 transition-all ${card.unlocked ? 'border-white/14 bg-white/[0.055]' : 'border-white/6 bg-black/10 opacity-55 grayscale'}`}
-          >
-            <div
-              className={`absolute inset-y-2 left-2 w-1 rounded-full ${card.unlocked ? 'opacity-100' : 'opacity-25'}`}
-              style={{ backgroundColor: card.accent, boxShadow: card.unlocked ? `0 0 14px ${card.accent}` : undefined }}
-            />
-            <div className="pl-3">
-              <div className="truncate text-[11px] font-semibold text-[#f8fafc]">{card.unlocked ? card.title : '待发现'}</div>
-              <div className="mt-0.5 truncate font-mono text-[10px] text-[#94a3b8]">{card.unlocked ? card.formula : '???'}</div>
-            </div>
+    <motion.div
+      className="fixed inset-0 z-[360] flex items-center justify-center px-4 py-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/62 backdrop-blur-[10px]" />
+      <motion.section
+        data-panel="discovery-atlas"
+        className="relative flex max-h-[min(720px,calc(100vh-48px))] w-full max-w-[760px] flex-col overflow-hidden rounded-[28px] border border-white/12 bg-[#080d18]/95 shadow-[0_34px_90px_rgba(2,6,23,0.66)]"
+        initial={{ y: 20, scale: 0.97 }}
+        animate={{ y: 0, scale: 1 }}
+        exit={{ y: 14, scale: 0.98 }}
+        transition={{ type: 'spring', stiffness: 360, damping: 32 }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/8 px-5 py-4">
+          <div>
+            <div className="text-[18px] font-semibold text-white">反应图鉴</div>
+            <div className="mt-0.5 text-[12px] text-[#64748b]">已发现 {unlockedCount}/{cards.length}</div>
           </div>
-        ))}
-      </div>
-    </section>
+          <button
+            type="button"
+            aria-label="关闭反应图鉴"
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[#94a3b8] transition-colors hover:border-white/18 hover:text-white"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {cards.map(card => (
+              <div
+                key={card.id}
+                className={`relative min-h-[136px] overflow-hidden rounded-[20px] border px-4 py-4 transition-all ${card.unlocked ? 'border-white/14 bg-white/[0.055]' : 'border-white/6 bg-black/14 opacity-60 grayscale'}`}
+              >
+                <div
+                  className={`absolute inset-x-4 top-0 h-1 rounded-b-full ${card.unlocked ? 'opacity-100' : 'opacity-25'}`}
+                  style={{ backgroundColor: card.accent, boxShadow: card.unlocked ? `0 0 20px ${card.accent}` : undefined }}
+                />
+                <div className="flex h-full flex-col justify-between gap-4">
+                  <div>
+                    <div className="text-[13px] font-semibold text-[#f8fafc]">{card.unlocked ? card.title : '待发现'}</div>
+                    <div className="mt-2 font-mono text-[16px] font-semibold text-white">{card.unlocked ? card.formula : '???'}</div>
+                  </div>
+                  <div className="text-[12px] leading-relaxed text-[#94a3b8]">
+                    {card.unlocked ? card.hint : '完成反应后自动解锁'}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </motion.section>
+    </motion.div>
   );
 }
 
@@ -738,6 +771,7 @@ function App() {
   // Custom Toast State
   const [toast, setToast] = useState<{id: string, message: string} | null>(null);
   const [discoveryToast, setDiscoveryToast] = useState<DiscoveryCardView | null>(null);
+  const [atlasOpen, setAtlasOpen] = useState(false);
 
   const showToast = useCallback((message: string) => {
     const id = createRuntimeId('toast');
@@ -1554,6 +1588,7 @@ function App() {
   const primaryAgentContainerId = primaryAgentContainer?.id || null;
   const challengeInsight = useMemo(() => computeChallengeInsight(activeChallenge, placedItems), [activeChallenge, placedItems]);
   const discoveryCards = useMemo(() => buildDiscoveryCards(placedItems), [placedItems]);
+  const unlockedDiscoveryCount = useMemo(() => discoveryCards.filter(card => card.unlocked).length, [discoveryCards]);
   const challengeNextAction = challengeInsight?.checklist.find(item => !item.done)?.label || null;
   const challengeGuideTargetId = gameMode === 'challenge' && activeChallenge ? primaryAgentContainerId : null;
   const challengeQuickReagent = challengeNextAction && challengeInsight
@@ -1928,6 +1963,15 @@ function App() {
     const timer = window.setTimeout(() => setAgentHasFreshUpdate(false), 0);
     return () => window.clearTimeout(timer);
   }, [agentExpanded]);
+
+  useEffect(() => {
+    if (!atlasOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAtlasOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [atlasOpen]);
 
   useEffect(() => {
     if (!agentExpanded) return;
@@ -2418,6 +2462,15 @@ function App() {
               任务挑战
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => setAtlasOpen(true)}
+            className="flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 text-[13px] text-[#cbd5e1] transition-colors hover:border-[#22d3ee]/30 hover:bg-[#22d3ee]/10 hover:text-[#67e8f9]"
+          >
+            <BookOpen size={14} />
+            <span>图鉴</span>
+            <span className="font-mono text-[11px] text-[#67e8f9]">{unlockedDiscoveryCount}/{discoveryCards.length}</span>
+          </button>
           </div>
           <div className="flex items-center gap-6 text-[14px]">
             <div className="flex items-center gap-2">
@@ -3260,7 +3313,7 @@ function App() {
               </div>
             </button>
             
-            <div className={`flex-1 min-h-0 gap-3 overflow-hidden ${isTablet ? 'flex flex-col' : 'grid grid-rows-[minmax(0,1.12fr)_auto_minmax(0,0.88fr)]'} ${!isTablet || bottomSheetOpen ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200 delay-100`}>
+            <div className={`flex-1 min-h-0 gap-3 overflow-hidden ${isTablet ? 'flex flex-col' : 'grid grid-rows-[minmax(0,1.25fr)_minmax(0,0.75fr)]'} ${!isTablet || bottomSheetOpen ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200 delay-100`}>
               {isTablet && (
                 <div className="glass-panel p-1 flex items-center gap-1 shrink-0">
                   <button
@@ -3289,7 +3342,6 @@ function App() {
                   showUnknownSamples={gameMode === 'challenge'}
                 />
               </div>
-              {!isTablet && <DiscoveryAtlas cards={discoveryCards} />}
               <div className={`${isTablet && activeRightPanelTab !== 'logs' ? 'hidden' : 'flex'} min-h-0 flex-col overflow-hidden ${isTablet ? 'flex-1' : ''}`}>
                 <ObservationLog className="h-full" />
               </div>
@@ -3499,6 +3551,12 @@ function App() {
             <div className="text-[#64748b] hidden 2xl:block">拖拽器材到实验台，拖拽试剂到容器中</div>
           </div>
         </footer>
+
+        <AnimatePresence>
+          {atlasOpen && (
+            <DiscoveryAtlasModal cards={discoveryCards} onClose={() => setAtlasOpen(false)} />
+          )}
+        </AnimatePresence>
       </div>
     </>
   )
