@@ -410,6 +410,25 @@ function resolveLlmConfig() {
   return { provider, model, apiKey, baseUrl }
 }
 
+function shouldDisableThinking(llm) {
+  return llm.provider.toLowerCase() === 'mimo' && llm.model.toLowerCase() === 'mimo-v2.5'
+}
+
+function buildChatCompletionBody(llm, messages) {
+  const body = {
+    model: llm.model,
+    temperature: 0.35,
+    max_tokens: parsePositiveInteger(process.env.LLM_MAX_TOKENS, 260),
+    messages,
+  }
+
+  if (shouldDisableThinking(llm)) {
+    body.chat_template_kwargs = { enable_thinking: false }
+  }
+
+  return body
+}
+
 function buildLlmInstruction(contextDigest) {
   return [
     '你是“拉瓦锡”，一个面向化学实验平台的智能化学家助手。',
@@ -470,12 +489,7 @@ async function callConfiguredLlm(input, fallback) {
         Authorization: `Bearer ${llm.apiKey}`,
       },
       signal: controller.signal,
-      body: JSON.stringify({
-        model: llm.model,
-        temperature: 0.35,
-        max_tokens: parsePositiveInteger(process.env.LLM_MAX_TOKENS, 260),
-        messages,
-      }),
+      body: JSON.stringify(buildChatCompletionBody(llm, messages)),
     })
   } catch (error) {
     if (error?.name === 'AbortError') {
@@ -491,12 +505,16 @@ async function callConfiguredLlm(input, fallback) {
   }
 
   const payload = await response.json()
-  const content = payload?.choices?.[0]?.message?.content
+  const choice = payload?.choices?.[0]
+  const content = choice?.message?.content
   const parsed = extractJsonObject(typeof content === 'string' ? content : '')
   if (!parsed) {
     const plainText = typeof content === 'string' && content.trim() ? content.trim() : ''
     if (!plainText) {
-      throw new Error('LLM 返回为空')
+      const reason = choice?.finish_reason === 'length'
+        ? 'LLM 只返回了推理过程，未输出最终答案'
+        : 'LLM 返回为空'
+      throw new Error(reason)
     }
     return polishLlmResponse({
       ...fallback,
