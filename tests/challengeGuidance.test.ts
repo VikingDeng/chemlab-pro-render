@@ -30,17 +30,22 @@ function makeContainer(name: string, chemState: ChemState, overrides: Partial<Ch
   }
 }
 
-function makeChallenge(id: 'c1' | 'c2' | 'c3', completed = false): ActiveChallenge {
-  const copy = {
+type TestChallengeId = 'c1' | 'c2' | 'c3' | 'c4' | 'c5' | 'c6'
+
+function makeChallenge(id: TestChallengeId, completed = false): ActiveChallenge {
+  const copy: Record<TestChallengeId, [string, string]> = {
     c1: ['制备蓝色沉淀', '制备蓝绿色 Cu(OH)₂ 沉淀'],
-    c2: ['制备血红络合物', '制备血红色 Fe(SCN)₃ 络合物'],
-    c3: ['制备紫色有机层', '制备紫色有机层'],
-  }[id]
+    c2: ['制备白色沉淀', '制备白色 AgCl 沉淀'],
+    c3: ['制备血红络合物', '制备血红色 Fe(SCN)₃ 络合物'],
+    c4: ['制备气泡', '制备二氧化碳气泡'],
+    c5: ['制备紫色有机层', '制备紫色有机层'],
+    c6: ['制备褪色反应', '制备高锰酸钾褪色体系'],
+  }
 
   return {
     id,
-    title: copy[0],
-    target: copy[1],
+    title: copy[id][0],
+    target: copy[id][1],
     completed,
   }
 }
@@ -66,26 +71,60 @@ test('c1 混合硫酸铜和氢氧化钠后完成蓝色沉淀制备', () => {
   assert.equal(getChallengeInsight(makeChallenge('c1'), items)?.progressValue, 100)
 })
 
-test('c2 混合氯化铁和硫氰化钾后完成血红络合物制备', () => {
+test('c2 混合硝酸银和盐酸后完成白色沉淀制备', () => {
+  let state = createEmptyState()
+  state = mixReagent(state, '硝酸银', 20).newState
+  state = mixReagent(state, '盐酸', 20).newState
+
+  const items = [makeContainer('烧杯', state, { state: 'precipitate_ag' })]
+
+  assert.equal(isChallengeCompleted(makeChallenge('c2'), items), true)
+  assert.equal(getChallengeInsight(makeChallenge('c2'), items)?.progressValue, 100)
+})
+
+test('c3 混合氯化铁和硫氰化钾后完成血红络合物制备', () => {
   let state = createEmptyState()
   state = mixReagent(state, '氯化铁', 12).newState
   state = mixReagent(state, '硫氰化钾', 36).newState
 
   const items = [makeContainer('烧杯', state, { state: 'complex_fe_scn' })]
 
-  assert.equal(isChallengeCompleted(makeChallenge('c2'), items), true)
-  assert.equal(getChallengeInsight(makeChallenge('c2'), items)?.progressValue, 100)
+  assert.equal(isChallengeCompleted(makeChallenge('c3'), items), true)
+  assert.equal(getChallengeInsight(makeChallenge('c3'), items)?.progressValue, 100)
 })
 
-test('c3 形成含碘紫色有机层后完成制备', () => {
+test('c4 混合碳酸钠和盐酸后完成气泡制备', () => {
+  let state = createEmptyState()
+  state = mixReagent(state, '碳酸钠', 20).newState
+  state = mixReagent(state, '盐酸', 40).newState
+
+  const items = [makeContainer('烧杯', state, { state: 'gas_co2' })]
+
+  assert.equal(isChallengeCompleted(makeChallenge('c4'), items), true)
+  assert.equal(getChallengeInsight(makeChallenge('c4'), items)?.progressValue, 100)
+})
+
+test('c5 形成含碘紫色有机层后完成制备', () => {
   let state = createEmptyState()
   state = mixReagent(state, '碘水 (I₂ aq)', 12).newState
   state = mixReagent(state, '四氯化碳 (CCl₄)', 8).newState
 
   const items = [makeContainer('烧杯', state)]
 
-  assert.equal(isChallengeCompleted(makeChallenge('c3'), items), true)
-  assert.equal(getChallengeInsight(makeChallenge('c3'), items)?.progressValue, 100)
+  assert.equal(isChallengeCompleted(makeChallenge('c5'), items), true)
+  assert.equal(getChallengeInsight(makeChallenge('c5'), items)?.progressValue, 100)
+})
+
+test('c6 草酸酸性还原高锰酸钾后完成褪色任务', () => {
+  let state = createEmptyState()
+  state = mixReagent(state, '高锰酸钾', 20).newState
+  state = mixReagent(state, '草酸 (H₂C₂O₄)', 60).newState
+  state = mixReagent(state, '硫酸', 40).newState
+
+  const items = [makeContainer('烧杯', state, { state: 'redox_kmno4' })]
+
+  assert.equal(isChallengeCompleted(makeChallenge('c6'), items), true)
+  assert.equal(getChallengeInsight(makeChallenge('c6'), items)?.progressValue, 100)
 })
 
 test('拖拽任务主试剂到对应容器时返回成功型提示', () => {
@@ -159,7 +198,7 @@ test('挑战目标进度使用新的制备任务文案', () => {
   const goal = buildGoalProgress({
     items: [],
     gameMode: 'challenge',
-    activeChallenge: makeChallenge('c2'),
+    activeChallenge: makeChallenge('c3'),
   })
 
   assert.equal(goal.title, '制备血红络合物')

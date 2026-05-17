@@ -104,13 +104,15 @@ type FloatingAgentPosition = {
   y: number;
 };
 
-type MissionPreset = 'prepCu' | 'prepFe' | 'prepIodine';
+type MissionPreset = 'prepCu' | 'prepAg' | 'prepFe' | 'prepCo2' | 'prepIodine' | 'prepMn';
 
 type MissionBrief = {
   title: string;
   reagents: string[];
   accent: 'cyan' | 'rose' | 'emerald' | 'amber' | 'violet';
   preset: MissionPreset;
+  challengeId: string;
+  target: string;
 };
 
 type AgentDragState = {
@@ -128,8 +130,11 @@ const AGENT_ORB_HEIGHT = 84;
 const AGENT_FLOATING_MARGIN = 14;
 const AGENT_REQUEST_TIMEOUT_MS = 18000;
 const PREP_CU_TARGET = '制备蓝绿色 Cu(OH)₂ 沉淀';
+const PREP_AG_TARGET = '制备白色 AgCl 沉淀';
 const PREP_FE_TARGET = '制备血红色 Fe(SCN)₃ 络合物';
+const PREP_CO2_TARGET = '制备二氧化碳气泡';
 const PREP_IODINE_TARGET = '制备紫色有机层';
+const PREP_MN_TARGET = '制备高锰酸钾褪色体系';
 const AGENT_SPECIES_LABELS: Record<string, string> = {
   HCl: '盐酸',
   H2SO4: '硫酸',
@@ -171,20 +176,51 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
     reagents: ['硫酸铜', '氢氧化钠', '氨水'],
     accent: 'cyan',
     preset: 'prepCu',
+    challengeId: 'c1',
+    target: PREP_CU_TARGET,
+  },
+  prepAg: {
+    title: '制备白色沉淀',
+    reagents: ['硝酸银', '盐酸', '氨水'],
+    accent: 'emerald',
+    preset: 'prepAg',
+    challengeId: 'c2',
+    target: PREP_AG_TARGET,
   },
   prepFe: {
     title: '制备血红络合物',
     reagents: ['氯化铁', '硫氰化钾', '氢氧化钠'],
     accent: 'rose',
     preset: 'prepFe',
+    challengeId: 'c3',
+    target: PREP_FE_TARGET,
+  },
+  prepCo2: {
+    title: '制备气泡',
+    reagents: ['碳酸钠', '盐酸', '甲基橙'],
+    accent: 'amber',
+    preset: 'prepCo2',
+    challengeId: 'c4',
+    target: PREP_CO2_TARGET,
   },
   prepIodine: {
     title: '制备紫色有机层',
     reagents: ['碘水', '四氯化碳', '正己烷'],
     accent: 'violet',
     preset: 'prepIodine',
+    challengeId: 'c5',
+    target: PREP_IODINE_TARGET,
+  },
+  prepMn: {
+    title: '制备褪色反应',
+    reagents: ['高锰酸钾', '草酸', '硫酸'],
+    accent: 'amber',
+    preset: 'prepMn',
+    challengeId: 'c6',
+    target: PREP_MN_TARGET,
   },
 };
+const MISSION_SEQUENCE: MissionPreset[] = ['prepCu', 'prepAg', 'prepFe', 'prepCo2', 'prepIodine', 'prepMn'];
 
 type PointerLike = {
   clientX?: number;
@@ -211,8 +247,9 @@ function clampAgentPosition(position: FloatingAgentPosition, viewportWidth: numb
 
 function getDefaultAgentPosition(viewportWidth: number, viewportHeight: number): FloatingAgentPosition {
   const preferredBottom = viewportWidth >= 768 ? 86 : 76;
+  const avoidRightPanel = viewportWidth >= 1180 ? 360 : 0;
   return clampAgentPosition({
-    x: viewportWidth - AGENT_ORB_WIDTH,
+    x: viewportWidth - AGENT_ORB_WIDTH - avoidRightPanel,
     y: viewportHeight - AGENT_ORB_HEIGHT - preferredBottom,
   }, viewportWidth, viewportHeight);
 }
@@ -884,12 +921,18 @@ function App() {
       Object.keys(continuousAudioRef.current).forEach(id => stopSound(id));
 
       setPlacedItems([]);
+      placedItemsRef.current = [];
       setBrokenGlass([]);
       if (gameMode === 'challenge') {
         setActiveChallenge(null);
       }
       setFocusedItemId(null); // Clear focus
       setTemperatureHistory([]);
+      setAgentMessages([]);
+      setAgentRemoteHeadline('');
+      setAgentRemoteSummary('');
+      setAgentSuggestedPrompts([]);
+      setAgentHasFreshUpdate(false);
       syncReadouts(null);
       
       // Dispatch an event to clear logs if needed or just log the cleanup
@@ -926,47 +969,30 @@ function App() {
 
     let nextItems: PlacedItem[] = [];
     let nextFocusedId: string | null = null;
-    if (preset === 'prepCu') {
-      const beaker = createWorkspaceItem('beaker', '烧杯', centerX, centerY + 82);
-      nextItems = [beaker];
-      nextFocusedId = beaker.id;
-      setGameMode('challenge');
-      setActiveChallenge({
-        id: 'c1',
-        title: '制备蓝色沉淀',
-        target: PREP_CU_TARGET,
-        completed: false
-      });
-    } else if (preset === 'prepFe') {
-      const beaker = createWorkspaceItem('beaker', '烧杯', centerX, centerY + 82);
-      nextItems = [beaker];
-      nextFocusedId = beaker.id;
-      setGameMode('challenge');
-      setActiveChallenge({
-        id: 'c2',
-        title: '制备血红络合物',
-        target: PREP_FE_TARGET,
-        completed: false
-      });
-    } else {
-      const beaker = createWorkspaceItem('beaker', '烧杯', centerX, centerY + 82);
-      nextItems = [beaker];
-      nextFocusedId = beaker.id;
-      setGameMode('challenge');
-      setActiveChallenge({
-        id: 'c3',
-        title: '制备紫色有机层',
-        target: PREP_IODINE_TARGET,
-        completed: false
-      });
-    }
+    const mission = MISSION_BRIEFS[preset];
+    const beaker = createWorkspaceItem('beaker', '烧杯', centerX, centerY + 82);
+    nextItems = [beaker];
+    nextFocusedId = beaker.id;
+    setGameMode('challenge');
+    setActiveChallenge({
+      id: mission.challengeId,
+      title: mission.title,
+      target: mission.target,
+      completed: false
+    });
 
     if (placedItems.length > 0 || brokenGlass.length > 0) {
       saveSnapshot();
       Object.keys(continuousAudioRef.current).forEach(id => stopSound(id));
     }
 
+    setAgentMessages([]);
+    setAgentRemoteHeadline('');
+    setAgentRemoteSummary('');
+    setAgentSuggestedPrompts([]);
+    setAgentHasFreshUpdate(false);
     setPlacedItems(nextItems);
+    placedItemsRef.current = nextItems;
     setBrokenGlass([]);
     setFocusedItemId(nextFocusedId);
     setTemperatureHistory([]);
@@ -988,12 +1014,18 @@ function App() {
     }
 
     setPlacedItems([]);
+    placedItemsRef.current = [];
     setBrokenGlass([]);
     setFocusedItemId(null);
     setTemperatureHistory([]);
     setEquations([]);
     setActiveDrop(null);
     setActiveChallenge(null);
+    setAgentMessages([]);
+    setAgentRemoteHeadline('');
+    setAgentRemoteSummary('');
+    setAgentSuggestedPrompts([]);
+    setAgentHasFreshUpdate(false);
     syncReadouts(null);
     setGameMode('challenge');
   };
@@ -1489,10 +1521,10 @@ function App() {
   const agentSkillPrompts = useMemo(() => {
     const localPrompts = [
       ...(challengeInsight?.suggestedPrompts || []),
-      ...(primaryAgentContainer ? [`分析${primaryAgentContainer.name}当前状态`] : []),
+      ...(primaryAgentContainer ? ['分析当前容器'] : []),
       ...(dragGuide?.kind === 'reagent' && dragGuide.targetId && dragGuide.name ? [`${dragGuide.name}加到当前容器会怎样`] : []),
     ];
-    return dedupePromptStrings([...localPrompts, ...agentSuggestedPrompts]).slice(0, 5);
+    return dedupePromptStrings([...localPrompts, ...agentSuggestedPrompts]).slice(0, 3);
   }, [agentSuggestedPrompts, challengeInsight, dragGuide, primaryAgentContainer]);
   const agentDockSide = useMemo(() => {
     return agentPosition.x + AGENT_ORB_WIDTH / 2 >= agentViewport.width / 2 ? 'right' : 'left';
@@ -1513,9 +1545,15 @@ function App() {
     const trimmed = query.trim();
     if (!trimmed) return;
     const shouldOpenPanel = options?.includeUserMessage !== false;
-    const primaryContainer = primaryAgentContainerId
-      ? placedItems.find(item => item.id === primaryAgentContainerId)
-      : null;
+    const liveItems = placedItemsRef.current.length > 0 ? placedItemsRef.current : placedItems;
+    const liveFocusedId = focusedItemIdRef.current;
+    const primaryContainer = (primaryAgentContainerId
+      ? liveItems.find(item => item.id === primaryAgentContainerId)
+      : null)
+      || (liveFocusedId ? liveItems.find(item => item.id === liveFocusedId && LIQUID_CONTAINER_TYPES.has(item.type)) : null)
+      || liveItems.find(item => LIQUID_CONTAINER_TYPES.has(item.type) && getTotalLiquidVolume(item.chemState) > 0)
+      || liveItems.find(item => LIQUID_CONTAINER_TYPES.has(item.type))
+      || null;
 
 	    agentAbortControllerRef.current?.abort();
 	    const controller = new AbortController();
@@ -1542,7 +1580,7 @@ function App() {
         ...agentMessages.slice(-5).map(message => ({ role: message.role, text: message.text })),
         ...(options?.includeUserMessage === false ? [] : [{ role: 'user' as const, text: trimmed }]),
       ];
-      const containers = placedItems
+      const containers = liveItems
         .filter(item => LIQUID_CONTAINER_TYPES.has(item.type))
         .slice(0, 8)
         .map(item => ({
@@ -1627,10 +1665,12 @@ function App() {
           : '远程对话已接线',
       };
 
-      appendAgentMessage(normalized.reply);
+      if (!options?.silent) {
+        appendAgentMessage(normalized.reply);
+      }
       setAgentRemoteHeadline(normalized.headline || '');
       setAgentRemoteSummary(normalized.reply);
-      setAgentSuggestedPrompts(normalized.suggestedPrompts?.length ? normalized.suggestedPrompts.slice(0, 5) : ['下一步', '解释现象', '有风险吗']);
+      setAgentSuggestedPrompts(normalized.suggestedPrompts?.length ? normalized.suggestedPrompts.slice(0, 3) : ['下一步', '解释现象', '有风险吗']);
       setAgentStatusLabel(normalized.statusLabel || '在线');
       runAgentToolCalls(normalized.toolCalls);
 	    } catch (error) {
@@ -1803,13 +1843,10 @@ function App() {
     const digest = `${agentLastEvent.kind}|${agentState.headline}|${agentState.risks.join('|')}`;
     if (lastAgentConversationDigestRef.current === digest) return;
     lastAgentConversationDigestRef.current = digest;
-
-    const proactivePrompt = agentLastEvent.kind === 'reaction'
-      ? '实验刚出现了新的变化，请根据上下文用两三句话说明现象、风险和最推荐的下一步。'
-      : '实验读数刚更新，请根据上下文用一句话提醒最重要的风险或观察点。';
-
-    void requestLavoisierApi(proactivePrompt, { silent: true, includeUserMessage: false });
-  }, [agentLastEvent, agentState.headline, agentState.risks, requestLavoisierApi]);
+    const reacted = agentLastEvent.kind === 'reaction' ? (agentLastEvent.reacted || '').trim() : '';
+    setAgentRemoteHeadline(agentState.headline);
+    setAgentRemoteSummary(reacted || agentState.suggestion);
+  }, [agentLastEvent, agentState.headline, agentState.risks, agentState.suggestion]);
 
   useEffect(() => {
     const handleAgentReaction = (e: Event) => {
@@ -1848,8 +1885,14 @@ function App() {
     const successMessage = activeChallenge.id === 'c1'
       ? '完成：蓝色沉淀已出现'
       : activeChallenge.id === 'c2'
+      ? '完成：白色沉淀已出现'
+      : activeChallenge.id === 'c3'
       ? '完成：血红色已出现'
-      : '完成：紫色有机层已出现';
+      : activeChallenge.id === 'c4'
+      ? '完成：气泡已出现'
+      : activeChallenge.id === 'c5'
+      ? '完成：紫色有机层已出现'
+      : '完成：紫色褪去';
     showToast(successMessage);
     setTimeout(() => {
       setActiveChallenge(c => c?.id === activeChallenge.id ? { ...c, completed: true } : c);
@@ -1925,7 +1968,7 @@ function App() {
         showInlineContainerHint({ ...hint, targetId: collisionItem.id });
       }, 0);
 
-      return currentItems.map(item => {
+      const nextItems = currentItems.map(item => {
         if (item.id === collisionItem.id) {
               return { 
                 ...item, 
@@ -1936,6 +1979,8 @@ function App() {
         }
         return item;
       });
+      placedItemsRef.current = nextItems;
+      return nextItems;
     });
 
     setActiveDrop(null);
@@ -2373,11 +2418,8 @@ function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        const nextPreset: MissionPreset = activeChallenge.id === 'c1'
-                          ? 'prepFe'
-                          : activeChallenge.id === 'c2'
-                          ? 'prepIodine'
-                          : 'prepCu';
+                        const currentIndex = MISSION_SEQUENCE.findIndex(preset => MISSION_BRIEFS[preset].challengeId === activeChallenge.id);
+                        const nextPreset = MISSION_SEQUENCE[(currentIndex + 1 + MISSION_SEQUENCE.length) % MISSION_SEQUENCE.length];
                         launchQuickStart(nextPreset);
                         showToast(`下一关：${MISSION_BRIEFS[nextPreset].title}`);
                       }}
@@ -2484,9 +2526,10 @@ function App() {
             </AnimatePresence>
 
             {placedItems.length === 0 && brokenGlass.length === 0 && gameMode === 'challenge' ? (
-              <div className="flex w-full max-w-[880px] flex-col items-center px-4 pt-[120px] sm:pt-0">
+              <div className="flex w-full max-w-[980px] flex-col items-center px-4 pt-[120px] sm:pt-0">
                 <div className={`grid w-full grid-cols-1 gap-3 md:grid-cols-3 ${isTablet ? 'pl-24' : ''}`}>
-                  {Object.values(MISSION_BRIEFS).map(mission => {
+                  {MISSION_SEQUENCE.map((preset, index) => {
+                    const mission = MISSION_BRIEFS[preset];
                     const accent = getMissionAccentClasses(mission.accent);
                     return (
                       <button
@@ -2496,6 +2539,7 @@ function App() {
                         className={`group relative overflow-hidden rounded-[22px] border bg-[rgba(7,11,23,0.62)] p-4 text-left backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:bg-[rgba(15,23,42,0.72)] ${accent.ring}`}
                       >
                         <div className={`absolute right-4 top-4 h-2.5 w-2.5 rounded-full ${accent.dot}`} />
+                        <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">关卡 {String(index + 1).padStart(2, '0')}</div>
                         <div className="text-[15px] font-semibold text-[#f8fafc]">{mission.title}</div>
                         <div className="mt-4 flex flex-wrap gap-1.5">
                           {mission.reagents.slice(0, 4).map(reagent => (
@@ -3213,7 +3257,7 @@ function App() {
                 }
               }}
               aria-label="拖动或展开拉瓦锡助手"
-              title={agentHasFreshUpdate ? (agentRemoteHeadline || '有新消息') : '问拉瓦锡'}
+              title={agentHasFreshUpdate ? (agentRemoteHeadline || '实验有变化') : '问拉瓦锡'}
               className={`group relative h-[84px] w-[84px] rounded-full border border-white/12 bg-[rgba(8,12,24,0.84)] backdrop-blur-xl overflow-visible shadow-[0_18px_42px_rgba(2,6,23,0.38)] select-none touch-none transition-transform hover:scale-[1.03] ${agentIsDragging ? 'cursor-grabbing scale-[1.04]' : 'cursor-grab'}`}
               style={{ boxShadow: `${agentIntentMeta.orbGlow}, 0 18px 42px rgba(2,6,23,0.38)` }}
             >
@@ -3236,7 +3280,7 @@ function App() {
               </span>
               {!agentExpanded && !agentError && (
                 <span className={`pointer-events-none absolute top-1/2 -translate-y-1/2 ${agentDockSide === 'right' ? 'right-[calc(100%+12px)]' : 'left-[calc(100%+12px)]'} rounded-[16px] border border-white/8 bg-[rgba(7,11,23,0.9)] px-3 py-2 text-[12px] text-[#cbd5e1] shadow-[0_12px_30px_rgba(2,6,23,0.32)] backdrop-blur-xl opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap`}>
-                  {agentHasFreshUpdate ? '有新消息' : '问拉瓦锡'}
+                  {agentHasFreshUpdate ? '实验有变化' : '问拉瓦锡'}
                 </span>
               )}
               {agentHasFreshUpdate && !agentExpanded && (

@@ -288,21 +288,21 @@ function buildContextDigest(context = {}) {
 }
 
 function buildSuggestedPrompts(contextDigest) {
-  const prompts = ['解释一下刚才的现象', '现在最推荐的下一步是什么？', '当前有没有安全风险？', '帮我总结实验状态']
+  const prompts = ['下一步', '解释现象', '安全风险']
 
   if (contextDigest.focusedContainer?.name) {
-    prompts.unshift(`帮我重点分析 ${contextDigest.focusedContainer.name}`)
+    prompts.unshift('分析当前容器')
   }
 
   if (contextDigest.intent === 'titration') {
-    prompts.unshift('现在是否应该继续滴定？')
+    prompts.unshift('继续滴定吗')
   } else if (contextDigest.intent === 'extraction') {
-    prompts.unshift('现在该转移哪一层？')
+    prompts.unshift('看哪一层')
   } else if (contextDigest.intent === 'heating') {
-    prompts.unshift('加热还要继续吗？')
+    prompts.unshift('继续加热吗')
   }
 
-  return Array.from(new Set(prompts)).slice(0, 5)
+  return Array.from(new Set(prompts)).slice(0, 3)
 }
 
 function buildToolCalls(message, contextDigest) {
@@ -340,54 +340,68 @@ function formatSpeciesList(species) {
     .join('、')
 }
 
+function inferChemExplanation(contextDigest) {
+  const focusedSpecies = contextDigest.focusedContainer?.species || []
+  const allSpecies = [
+    ...focusedSpecies,
+    ...contextDigest.containers.flatMap((container) => container.species || []),
+  ]
+  const labels = allSpecies.map((entry) => `${entry.formula || ''} ${entry.label || ''}`).join(' ')
+  const eventText = `${contextDigest.lastEvent?.name || ''} ${contextDigest.lastEvent?.reacted || ''} ${labels}`
+
+  if (/Cu\\(OH\\)2|氢氧化铜|蓝绿|CuSO4|硫酸铜/.test(eventText)) {
+    return '蓝绿色絮状物来自 Cu²⁺ 与 OH⁻ 生成难溶 Cu(OH)₂；继续少量加碱即可观察沉淀增多。'
+  }
+  if (/AgCl|氯化银|硝酸银|白色/.test(eventText)) {
+    return '白色浑浊来自 Ag⁺ 与 Cl⁻ 生成难溶 AgCl；这是典型沉淀反应。'
+  }
+  if (/Fe\\(SCN\\)3|硫氰|血红|变红/.test(eventText)) {
+    return '血红色来自 Fe³⁺ 与 SCN⁻ 形成 Fe(SCN)₃ 络合物；颜色越深通常代表络合物越多。'
+  }
+  if (/CO2|二氧化碳|冒泡|气泡|碳酸钠/.test(eventText)) {
+    return '气泡主要是碳酸盐遇酸释放 CO₂；加酸越快，冒泡会越明显。'
+  }
+  if (/I2_org|有机相碘|紫色|四氯化碳|分层/.test(eventText)) {
+    return '紫色层来自碘更容易进入有机相；静置后看颜色最深的那一层。'
+  }
+  if (/MnSO4|高锰酸钾|褪色|草酸|KMnO4/.test(eventText)) {
+    return '紫色褪去是 MnO₄⁻ 在酸性条件下被草酸还原；同时可能产生 CO₂ 气泡。'
+  }
+  return ''
+}
+
 function buildFallbackReply(message, contextDigest) {
-  const parts = []
   const focused = contextDigest.focusedContainer
-
-  if (focused) {
-    const stats = [
-      typeof focused.volume === 'number' ? `${focused.volume.toFixed(1)} mL` : null,
-      typeof focused.temperature === 'number' ? `${focused.temperature.toFixed(1)} °C` : null,
-      typeof focused.ph === 'number' ? `pH ${focused.ph.toFixed(2)}` : null,
-      typeof focused.pressure === 'number' ? `${focused.pressure.toFixed(2)} atm` : null,
-    ].filter(Boolean)
-    parts.push(`我正在关注 ${focused.name}，当前读数约为 ${stats.join(' · ')}。`)
-    const speciesText = formatSpeciesList(focused.species)
-    if (speciesText) {
-      parts.push(`已知容器内主要物质：${speciesText}。`)
-    } else {
-      parts.push('当前没有拿到明确的已加入试剂列表；我不会臆测具体离子或沉淀。')
-    }
-  } else {
-    parts.push('我还没有锁定主容器，也没有足够信息判断具体实验体系。')
-  }
-
-  if (contextDigest.lastEvent?.kind === 'reaction') {
-    const reacted = typeof contextDigest.lastEvent.reacted === 'string' ? contextDigest.lastEvent.reacted.trim() : ''
-    parts.push(reacted ? `最近一次关键现象是：${reacted}。` : '最近发生了新的反应现象，建议先复核颜色、沉淀和温度变化。')
-  } else if (contextDigest.lastEvent?.kind === 'readout') {
-    parts.push('最近更新的是实时读数，当前更适合根据温度、pH 和压力来决定下一步。')
-  }
+  const speciesText = focused ? formatSpeciesList(focused.species) : ''
+  const explanation = inferChemExplanation(contextDigest)
+  const asksExplanation = message.includes('为什么') || message.includes('解释') || /why|explain/i.test(message)
+  const asksSafety = asksForSafety(message)
 
   if (contextDigest.risks.length > 0) {
-    parts.push(`最需要优先处理的风险是：${contextDigest.risks[0]}。`)
-  } else if (message.includes('危险') || message.includes('风险') || message.includes('安全')) {
-    parts.push('当前读数没有显示温度、压力或满量风险；仍建议小体积加料、避免飞溅，并保持护目镜和手套。')
-  } else if (!hasConcreteExperimentContext(contextDigest)) {
-    parts.push('先聚焦一个容器或查看观察日志，我才能给出具体下一步。')
-  } else {
-    parts.push(`当前只可确定操作倾向接近${inferIntentLabel(contextDigest.intent)}，具体体系以容器物质和观察日志为准。`)
+    return `先处理风险：${contextDigest.risks[0]}。暂停加料，观察温度、压力和容器余量。`
   }
 
-  if (message.includes('为什么') || message.includes('解释')) {
-    parts.push('如果现象和预期不一致，优先检查加入顺序、浓度差异、分层是否稳定以及是否存在持续加热。')
-  } else if (message.includes('危险') || message.includes('风险') || message.includes('安全')) {
-    parts.push('先避免一次性大量加料，保持容器留有余量，并持续观察压力与温度是否继续上升。')
-  } else {
-    parts.push('下一步建议是先做一次小步操作，再根据新现象决定是否继续放大。')
+  if (asksSafety) {
+    return speciesText
+      ? `${focused?.name || '当前容器'}里主要有 ${speciesText}；当前读数未显示满量、高温或高压风险。继续小体积加料，避免飞溅。`
+      : '当前没有足够信息判断特定风险；读数未显示满量、高温或高压风险。继续小体积加料，佩戴护目镜和手套。'
   }
 
-  return parts.join(' ')
+  if (explanation && asksExplanation) {
+    return explanation
+  }
+
+  if (explanation) {
+    return `${explanation} 下一步小体积补加目标试剂，观察颜色或沉淀是否继续增强。`
+  }
+
+  if (speciesText) {
+    return `${focused?.name || '当前容器'}里主要有 ${speciesText}。下一步先少量加入目标试剂，再看颜色、沉淀或分层变化。`
+  }
+
+  return focused
+    ? `${focused.name}当前没有明确试剂记录；我不会猜具体离子。先加入本关推荐试剂中的第一种。`
+    : '还没有锁定主容器；先选择一个烧杯开始。'
 }
 
 function buildFallbackResponse(input) {
@@ -425,6 +439,17 @@ function normalizeAssistantText(text) {
     .replace(/\s*\n+\s*/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim()
+}
+
+function compactAssistantText(text, maxChars = 180) {
+  const normalized = normalizeAssistantText(text)
+  if (!normalized) return ''
+  const sentences = normalized.match(/[^。！？.!?]+[。！？.!?]?/g) || [normalized]
+  let compact = sentences.slice(0, 2).join('').trim()
+  if (compact.length > maxChars) {
+    compact = `${compact.slice(0, maxChars).replace(/[，,；;：:]?[^，,；;：:。！？.!?]*$/, '')}。`
+  }
+  return compact || normalized.slice(0, maxChars)
 }
 
 function collectGroundingText(contextDigest, message) {
@@ -465,8 +490,8 @@ function shouldSkipLlm(input, contextDigest) {
 }
 
 function polishLlmResponse(response, fallback, contextDigest, message) {
-  const reply = normalizeAssistantText(response?.reply)
-  const headline = normalizeAssistantText(response?.headline)
+  const reply = compactAssistantText(response?.reply)
+  const headline = compactAssistantText(response?.headline, 80)
   const hasInternalLeak = INTERNAL_REPLY_PATTERNS.some((pattern) => pattern.test(reply) || pattern.test(headline))
   const hasUnsupportedTerms = hasUnsupportedGroundingTerms(reply, contextDigest, message)
 
@@ -511,7 +536,7 @@ function buildLlmInstruction(contextDigest, fallback) {
     '如果上下文没有明确试剂或主容器，就说“还没拿到具体体系/需要先聚焦容器或查看日志”，不要编造实验。',
     '不要把内部字段名或调试信息说给用户：禁止输出“risks为空”“context显示”“localSignals”“沙盒模式下风险较低”等表述。可改写为“当前读数未显示温度、压力或满量风险”。',
     '安全建议必须先基于当前读数和已知物质；未知物质时只给通用 PPE、小体积加料、通风、避免飞溅建议。',
-    'reply 字段要像产品内助手，不要像报告：禁止 Markdown、粗体、项目符号和长编号清单；一般用 2-4 句短句，必要时用分号压缩。',
+    'reply 字段要像产品内助手，不要像报告：禁止 Markdown、粗体、项目符号和长编号清单；最多 2 句，总长尽量低于 160 个中文字符。',
     '必须输出 JSON 对象，不要输出 Markdown，不要输出代码块。',
     'JSON 结构：{"reply": string, "headline": string, "suggestedPrompts": string[], "toolCalls": Array<{"type": "focus_container"|"open_logs"|"open_reagents"|"save_note", "targetId"?: string, "note"?: string}>, "statusLabel"?: string}',
     `当前上下文摘要：${JSON.stringify(contextDigest)}`,
@@ -572,7 +597,7 @@ async function callConfiguredLlm(input, fallback) {
       body: JSON.stringify({
         model: llm.model,
         temperature: 0.35,
-        max_tokens: parsePositiveInteger(process.env.LLM_MAX_TOKENS, 512),
+        max_tokens: parsePositiveInteger(process.env.LLM_MAX_TOKENS, 260),
         messages,
       }),
     })
