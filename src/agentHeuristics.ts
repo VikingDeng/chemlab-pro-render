@@ -172,15 +172,15 @@ export function inferAgentState({
   }
 
   if (challengeInsight && !challengeCompleted) {
-    suggestion = `任务建议：${challengeInsight.nextHint}`
+    suggestion = challengeInsight.nextHint
     const remainingChecklist = challengeInsight.checklist.filter(item => !item.done).map(item => item.label)
-    const reagentHints = challengeInsight.primaryReagents.slice(0, 2).map(name => `优先尝试 ${name}`)
+    const reagentHints = challengeInsight.primaryReagents.slice(0, 2)
     nextSteps = dedupeStrings([...remainingChecklist, ...reagentHints]).slice(0, 3)
     if (nextSteps.length === 0) {
       nextSteps = dedupeStrings(challengeInsight.suggestedPrompts).slice(0, 3)
     }
     if (intent === 'exploration') {
-      headline = `拉瓦锡判断：${challengeInsight.progressLabel}`
+      headline = activeChallenge?.title ? `拉瓦锡：${activeChallenge.title}` : `拉瓦锡：${challengeInsight.progressLabel}`
     }
   }
 

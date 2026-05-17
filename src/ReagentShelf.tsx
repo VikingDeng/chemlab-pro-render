@@ -30,6 +30,8 @@ const REAGENT_GROUPS: ReagentGroup[] = [
     description: '适合中和、滴定与配制基础体系。',
     items: [
       { category: '基础酸碱', dot: '#facc15', name: '盐酸', badgeFormula: <>HCl · 1M</> },
+      { category: '基础酸碱', dot: '#f8fafc', name: '硫酸', badgeFormula: <>H₂SO₄ · 0.5M</> },
+      { category: '基础酸碱', dot: '#fef3c7', name: '硝酸', badgeFormula: <>HNO₃ · 1M</> },
       { category: '基础酸碱', dot: '#3b82f6', name: '氢氧化钠', badgeFormula: <>NaOH · 1M</> },
       { category: '基础酸碱', dot: '#60a5fa', name: '氨水', badgeFormula: <>NH₃·H₂O · 1M</> },
     ],
@@ -43,7 +45,9 @@ const REAGENT_GROUPS: ReagentGroup[] = [
       { category: '金属盐', dot: '#e2e8f0', name: '硝酸银', badgeFormula: <>AgNO₃ · 0.1M</> },
       { category: '金属盐', dot: '#eab308', name: '氯化铁', badgeFormula: <>FeCl₃ · 0.5M</> },
       { category: '金属盐', dot: '#a3e635', name: '硫酸亚铁', badgeFormula: <>FeSO₄ · 0.5M</> },
+      { category: '金属盐', dot: '#f8fafc', name: '氯化钡', badgeFormula: <>BaCl₂ · 0.5M</> },
       { category: '金属盐', dot: '#f8fafc', name: '碳酸钠', badgeFormula: <>Na₂CO₃ · 1M</> },
+      { category: '金属盐', dot: '#fee2e2', name: '硫氰化钾', badgeFormula: <>KSCN · 0.5M</> },
     ],
   },
   {
@@ -54,6 +58,7 @@ const REAGENT_GROUPS: ReagentGroup[] = [
       { category: '氧化还原', dot: '#a855f7', name: '高锰酸钾', badgeFormula: <>KMnO₄ · 0.01M</> },
       { category: '氧化还原', dot: '#ffffff', name: '双氧水', badgeFormula: <>H₂O₂ · 1M</> },
       { category: '氧化还原', dot: '#f1f5f9', name: '草酸 (H₂C₂O₄)', badgeFormula: <>H₂C₂O₄ · 0.5M</> },
+      { category: '氧化还原', dot: '#fef9c3', name: '葡萄糖 (Glucose)', badgeFormula: <>Glucose · 0.5M</> },
     ],
   },
   {
@@ -62,6 +67,7 @@ const REAGENT_GROUPS: ReagentGroup[] = [
     description: '聚焦有机相、分层与碘萃取相关试剂。',
     items: [
       { category: '萃取/有机', dot: '#ffffff', name: '四氯化碳 (CCl₄)', badgeFormula: <>CCl₄ · 纯</> },
+      { category: '萃取/有机', dot: '#e0f2fe', name: '正己烷 (Hexane)', badgeFormula: <>Hexane · 纯</> },
       { category: '萃取/有机', dot: '#a8a29e', name: '碘水 (I₂ aq)', badgeFormula: <>I₂ · 0.05M</> },
       { category: '萃取/有机', dot: '#2e0a2e', name: '碘单质 (I₂ 固体)', badgeFormula: <>I₂ · 升华相变</> },
     ],
@@ -163,7 +169,7 @@ export function ReagentShelf({
               ? 'border-[#22d3ee]/35 bg-[#22d3ee]/14 text-[#67e8f9]'
               : 'border-[#c084fc]/30 bg-[#a855f7]/14 text-[#e9d5ff]'}`}
             >
-              {isHighlighted ? '任务相关' : '可尝试'}
+              {isHighlighted ? '推荐' : '可试'}
             </span>
           </div>
         )}
@@ -216,7 +222,7 @@ export function ReagentShelf({
       <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-4 pr-2">
         {hasMissionHighlights && (
           <section className="rounded-2xl border border-[#22d3ee]/16 bg-[rgba(34,211,238,0.05)] px-3 py-3">
-            <div className="mb-2 text-[11px] font-semibold text-[#67e8f9]">任务试剂</div>
+            <div className="mb-2 text-[11px] font-semibold text-[#67e8f9]">推荐试剂</div>
             <div className="flex flex-wrap gap-2">
               {highlightedReagents.map(name => (
                 <span key={name} className="px-2 py-1 rounded-full border border-[#22d3ee]/25 bg-[#22d3ee]/10 text-[11px] text-[#67e8f9]">

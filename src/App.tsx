@@ -104,7 +104,7 @@ type FloatingAgentPosition = {
   y: number;
 };
 
-type MissionPreset = 'titration' | 'salt' | 'redox';
+type MissionPreset = 'prepCu' | 'prepFe' | 'prepIodine';
 
 type MissionBrief = {
   title: string;
@@ -127,8 +127,9 @@ const AGENT_ORB_WIDTH = 84;
 const AGENT_ORB_HEIGHT = 84;
 const AGENT_FLOATING_MARGIN = 14;
 const AGENT_REQUEST_TIMEOUT_MS = 18000;
-const TITRATION_TARGET = '使用滴定管与指示剂（酚酞/甲基橙），制备出精确的 100mL (±1mL)，pH = 7.00 (±0.05) 的中性溶液';
-const EXTRACTION_TARGET = '从混合水溶液中，利用分液漏斗/容器，完全萃取出深紫色的碘有机相';
+const PREP_CU_TARGET = '制备蓝绿色 Cu(OH)₂ 沉淀';
+const PREP_FE_TARGET = '制备血红色 Fe(SCN)₃ 络合物';
+const PREP_IODINE_TARGET = '制备紫色有机层';
 const AGENT_SPECIES_LABELS: Record<string, string> = {
   HCl: '盐酸',
   H2SO4: '硫酸',
@@ -165,23 +166,23 @@ const AGENT_SPECIES_LABELS: Record<string, string> = {
   Cl2: '氯气',
 };
 const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
-  titration: {
-    title: '精密酸碱滴定',
-    reagents: ['盐酸', '氢氧化钠', '酚酞', '甲基橙'],
+  prepCu: {
+    title: '制备蓝色沉淀',
+    reagents: ['硫酸铜', '氢氧化钠', '氨水'],
+    accent: 'cyan',
+    preset: 'prepCu',
+  },
+  prepFe: {
+    title: '制备血红络合物',
+    reagents: ['氯化铁', '硫氰化钾', '氢氧化钠'],
     accent: 'rose',
-    preset: 'titration',
+    preset: 'prepFe',
   },
-  salt: {
-    title: '沉淀与盐生成',
-    reagents: ['硝酸银', '氯化钠', '盐酸', '氢氧化钠'],
-    accent: 'emerald',
-    preset: 'salt',
-  },
-  redox: {
-    title: '加热与氧化还原观察',
-    reagents: ['双氧水', '高锰酸钾', '铜片', '硝酸银'],
-    accent: 'amber',
-    preset: 'redox',
+  prepIodine: {
+    title: '制备紫色有机层',
+    reagents: ['碘水', '四氯化碳', '正己烷'],
+    accent: 'violet',
+    preset: 'prepIodine',
   },
 };
 
@@ -884,6 +885,9 @@ function App() {
 
       setPlacedItems([]);
       setBrokenGlass([]);
+      if (gameMode === 'challenge') {
+        setActiveChallenge(null);
+      }
       setFocusedItemId(null); // Clear focus
       setTemperatureHistory([]);
       syncReadouts(null);
@@ -922,35 +926,39 @@ function App() {
 
     let nextItems: PlacedItem[] = [];
     let nextFocusedId: string | null = null;
-    if (preset === 'titration') {
-      const beaker = createWorkspaceItem('beaker', '烧杯', centerX - 90, centerY + 80);
-      const burette = createWorkspaceItem('burette', '滴定管', centerX + 170, centerY - 10);
-      nextItems = [beaker, burette];
+    if (preset === 'prepCu') {
+      const beaker = createWorkspaceItem('beaker', '烧杯', centerX, centerY + 82);
+      nextItems = [beaker];
       nextFocusedId = beaker.id;
       setGameMode('challenge');
       setActiveChallenge({
         id: 'c1',
-        title: '精密酸碱滴定',
-        target: TITRATION_TARGET,
+        title: '制备蓝色沉淀',
+        target: PREP_CU_TARGET,
         completed: false
       });
-    } else if (preset === 'salt') {
-      const leftBeaker = createWorkspaceItem('beaker', '烧杯', centerX - 150, centerY + 70);
-      const rightBeaker = createWorkspaceItem('beaker', '烧杯', centerX + 150, centerY + 70);
-      const glassrod = createWorkspaceItem('glassrod', '玻璃棒', centerX, centerY + 110);
-      nextItems = [leftBeaker, rightBeaker, glassrod];
-      nextFocusedId = leftBeaker.id;
-      setGameMode('sandbox');
-      setActiveChallenge(null);
+    } else if (preset === 'prepFe') {
+      const beaker = createWorkspaceItem('beaker', '烧杯', centerX, centerY + 82);
+      nextItems = [beaker];
+      nextFocusedId = beaker.id;
+      setGameMode('challenge');
+      setActiveChallenge({
+        id: 'c2',
+        title: '制备血红络合物',
+        target: PREP_FE_TARGET,
+        completed: false
+      });
     } else {
-      const flask = createWorkspaceItem('flask', '锥形瓶', centerX - 110, centerY + 70);
-      const flame = createWorkspaceItem('flame', '酒精灯', centerX - 110, centerY + 170);
-      const testtube = createWorkspaceItem('testtube', '试管', centerX + 120, centerY + 30);
-      const thermometer = createWorkspaceItem('thermometer', '温度计', centerX + 10, centerY + 30);
-      nextItems = [flask, flame, testtube, thermometer];
-      nextFocusedId = flask.id;
-      setGameMode('sandbox');
-      setActiveChallenge(null);
+      const beaker = createWorkspaceItem('beaker', '烧杯', centerX, centerY + 82);
+      nextItems = [beaker];
+      nextFocusedId = beaker.id;
+      setGameMode('challenge');
+      setActiveChallenge({
+        id: 'c3',
+        title: '制备紫色有机层',
+        target: PREP_IODINE_TARGET,
+        completed: false
+      });
     }
 
     if (placedItems.length > 0 || brokenGlass.length > 0) {
@@ -969,6 +977,24 @@ function App() {
   };
 
   const openChallengeMode = () => {
+    if (gameMode === 'challenge' && (placedItems.length === 0 || activeChallenge)) {
+      setGameMode('challenge');
+      return;
+    }
+
+    if (placedItems.length > 0 || brokenGlass.length > 0) {
+      saveSnapshot();
+      Object.keys(continuousAudioRef.current).forEach(id => stopSound(id));
+    }
+
+    setPlacedItems([]);
+    setBrokenGlass([]);
+    setFocusedItemId(null);
+    setTemperatureHistory([]);
+    setEquations([]);
+    setActiveDrop(null);
+    setActiveChallenge(null);
+    syncReadouts(null);
     setGameMode('challenge');
   };
 
@@ -1139,7 +1165,13 @@ function App() {
   }, [stopSound]);
 
   function emitReactionOutcome(reagentName: string, result: ReactionResult) {
-    if (result.reactionType.includes('precipitate') || result.reactionType.includes('gas') || result.reactionType === 'neutralize') {
+    if (
+      result.reactionType.includes('precipitate')
+      || result.reactionType.includes('gas')
+      || result.reactionType.includes('complex')
+      || result.reactionType.includes('redox')
+      || result.reactionType === 'neutralize'
+    ) {
       playSound('reaction');
     } else {
       playSound('pour');
@@ -1813,9 +1845,12 @@ function App() {
 
     pendingChallengeCompletionRef.current = activeChallenge.id;
     playSound('reaction');
-    showToast(activeChallenge.id === 'c1'
-      ? '🎉 恭喜！完美完成了使用指示剂的酸碱滴定！'
-      : '🎉 恭喜！完美完成了碘的有机萃取！');
+    const successMessage = activeChallenge.id === 'c1'
+      ? '完成：蓝色沉淀已出现'
+      : activeChallenge.id === 'c2'
+      ? '完成：血红色已出现'
+      : '完成：紫色有机层已出现';
+    showToast(successMessage);
     setTimeout(() => {
       setActiveChallenge(c => c?.id === activeChallenge.id ? { ...c, completed: true } : c);
     }, 0);
@@ -2171,7 +2206,10 @@ function App() {
             <div className="h-4 w-[1px] bg-[rgba(255,255,255,0.15)]"></div>
             <div className="flex bg-[rgba(255,255,255,0.05)] rounded-lg p-0.5 border border-white/10">
             <button 
-              onClick={() => setGameMode('sandbox')}
+              onClick={() => {
+                setGameMode('sandbox');
+                setActiveChallenge(null);
+              }}
               className={`px-3 py-1 rounded-md text-[13px] transition-all ${gameMode === 'sandbox' ? 'bg-[#22d3ee]/20 text-[#22d3ee] shadow-[0_0_10px_rgba(34,211,238,0.2)]' : 'hover:text-white text-[#94a3b8]'}`}
             >
               自由实验
@@ -2208,7 +2246,7 @@ function App() {
           {/* LEFT SIDEBAR - Desktop (Fixed) & Tablet (Collapsed/Overlay) */}
           <aside className={`h-full flex flex-col shrink-0 transition-all duration-250 ease-out z-30 ${isTablet ? (sidebarOpen ? 'absolute left-3 top-0 bottom-0 w-[260px] glass-panel shadow-2xl p-4 pointer-events-auto' : 'absolute left-3 top-0 bottom-0 w-0 overflow-hidden p-0 pointer-events-none') : 'w-[260px] glass-panel p-4'}`}>
             <div className={`flex items-center justify-between mb-4 ${isTablet && !sidebarOpen ? 'opacity-0' : 'opacity-100'}`}>
-              <h2 className="text-[#e2e8f0] text-[16px] font-semibold">器材库</h2>
+              <h2 className="text-[#e2e8f0] text-[16px] font-semibold">{gameMode === 'challenge' ? '可用器材' : '器材库'}</h2>
               <button 
                 className={`text-[#94a3b8] hover:text-[#e2e8f0] transition-colors ${!isTablet && 'hidden'}`}
                 onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -2218,16 +2256,20 @@ function App() {
             </div>
             
             <div className={`flex-1 overflow-y-auto space-y-0 pb-4 -mx-4 px-4 ${isTablet && !sidebarOpen ? 'opacity-0' : 'opacity-100'}`}>
-              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'beaker', '烧杯')} icon={<Beaker size={20} />} name="烧杯" subtitle="250ml 硼硅玻璃" collapsed={isTablet && !sidebarOpen} />
-              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'flask', '锥形瓶')} icon={<FlaskConical size={20} />} name="锥形瓶" subtitle="500ml" state="hover" collapsed={isTablet && !sidebarOpen} />
-              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'flame', '酒精灯')} icon={<Flame size={20} />} name="酒精灯" subtitle="加热装备" collapsed={isTablet && !sidebarOpen} />
-              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'glassrod', '玻璃棒')} icon={<PenTool size={20} />} name="玻璃棒" subtitle="搅拌与引流" collapsed={isTablet && !sidebarOpen} />
-              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'burette', '滴定管')} icon={<Blend size={20} />} name="滴定管" subtitle="50mL 精密" collapsed={isTablet && !sidebarOpen} />
-              <EquipmentCard dragType="funnel" onDragEnd={(e, i) => handleDragEnd(e, i, 'funnel', '过滤漏斗')} icon={<FlaskConical size={20} className="rotate-180" />} name="过滤漏斗" subtitle="固液分离" collapsed={isTablet && !sidebarOpen} />
-              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'tube', '蒸馏管')} icon={<Cable size={20} />} name="蒸馏导管" subtitle="连接容器" collapsed={isTablet && !sidebarOpen} />
-              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'testtubes', '试管架')} icon={<TestTubes size={20} />} name="试管架" subtitle="6 孔" collapsed={isTablet && !sidebarOpen} />
+              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'beaker', '烧杯')} icon={<Beaker size={20} />} name="烧杯" subtitle="250ml" collapsed={isTablet && !sidebarOpen} />
+              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'glassrod', '玻璃棒')} icon={<PenTool size={20} />} name="玻璃棒" subtitle="搅拌" collapsed={isTablet && !sidebarOpen} />
               <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'testtube', '试管')} icon={<TestTube size={20} />} name="试管" subtitle="20mL" collapsed={isTablet && !sidebarOpen} />
-              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'pipette', '移液管')} icon={<Pipette size={20} />} name="移液管" subtitle="10ml 刻度" collapsed={isTablet && !sidebarOpen} />
+              {gameMode !== 'challenge' && (
+                <>
+                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'flask', '锥形瓶')} icon={<FlaskConical size={20} />} name="锥形瓶" subtitle="500ml" state="hover" collapsed={isTablet && !sidebarOpen} />
+                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'flame', '酒精灯')} icon={<Flame size={20} />} name="酒精灯" subtitle="加热装备" collapsed={isTablet && !sidebarOpen} />
+                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'burette', '滴定管')} icon={<Blend size={20} />} name="滴定管" subtitle="50mL 精密" collapsed={isTablet && !sidebarOpen} />
+                  <EquipmentCard dragType="funnel" onDragEnd={(e, i) => handleDragEnd(e, i, 'funnel', '过滤漏斗')} icon={<FlaskConical size={20} className="rotate-180" />} name="过滤漏斗" subtitle="固液分离" collapsed={isTablet && !sidebarOpen} />
+                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'tube', '蒸馏管')} icon={<Cable size={20} />} name="蒸馏导管" subtitle="连接容器" collapsed={isTablet && !sidebarOpen} />
+                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'testtubes', '试管架')} icon={<TestTubes size={20} />} name="试管架" subtitle="6 孔" collapsed={isTablet && !sidebarOpen} />
+                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'pipette', '移液管')} icon={<Pipette size={20} />} name="移液管" subtitle="10ml 刻度" collapsed={isTablet && !sidebarOpen} />
+                </>
+              )}
             </div>
           </aside>
 
@@ -2331,14 +2373,13 @@ function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        setActiveChallenge({
-                          id: 'c2',
-                          title: '碘的液液萃取',
-                          target: EXTRACTION_TARGET,
-                          completed: false,
-                        });
-                        clearWorkspace();
-                        showToast('下一关：碘的液液萃取');
+                        const nextPreset: MissionPreset = activeChallenge.id === 'c1'
+                          ? 'prepFe'
+                          : activeChallenge.id === 'c2'
+                          ? 'prepIodine'
+                          : 'prepCu';
+                        launchQuickStart(nextPreset);
+                        showToast(`下一关：${MISSION_BRIEFS[nextPreset].title}`);
                       }}
                       className="shrink-0 rounded-full border border-[#f43f5e]/35 bg-[#f43f5e]/12 px-3 py-1.5 text-[11px] font-semibold text-[#fda4af] hover:bg-[#f43f5e]/20 transition-colors"
                     >
@@ -2464,7 +2505,7 @@ function App() {
                           ))}
                         </div>
                         <div className="mt-5 flex justify-end">
-                          <span className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${accent.button}`}>开始</span>
+                          <span className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${accent.button}`}>开始制备</span>
                         </div>
                       </button>
                     );

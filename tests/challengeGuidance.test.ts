@@ -30,72 +30,72 @@ function makeContainer(name: string, chemState: ChemState, overrides: Partial<Ch
   }
 }
 
-function makeChallenge(id: 'c1' | 'c2', completed = false): ActiveChallenge {
-  return id === 'c1'
-    ? {
-        id,
-        title: '精密酸碱滴定',
-        target: '使用滴定管与指示剂制备中性溶液',
-        completed,
-      }
-    : {
-        id,
-        title: '高级萃取挑战',
-        target: '完全萃取出深紫色的碘有机相',
-        completed,
-      }
+function makeChallenge(id: 'c1' | 'c2' | 'c3', completed = false): ActiveChallenge {
+  const copy = {
+    c1: ['制备蓝色沉淀', '制备蓝绿色 Cu(OH)₂ 沉淀'],
+    c2: ['制备血红络合物', '制备血红色 Fe(SCN)₃ 络合物'],
+    c3: ['制备紫色有机层', '制备紫色有机层'],
+  }[id]
+
+  return {
+    id,
+    title: copy[0],
+    target: copy[1],
+    completed,
+  }
 }
 
-test('c1 挑战在未放置容器时给出建系提示', () => {
+test('c1 制备任务在未放置容器时给出单容器提示', () => {
   const insight = getChallengeInsight(makeChallenge('c1'), [])
 
   assert.ok(insight)
   assert.equal(insight?.progressValue, 0)
-  assert.match(insight?.nextHint ?? '', /目标容器|酸\/碱/)
-  assert.deepEqual(insight?.primaryReagents, ['盐酸', '氢氧化钠', '酚酞指示剂', '甲基橙指示剂'])
+  assert.match(insight?.nextHint ?? '', /烧杯/)
+  assert.deepEqual(insight?.primaryReagents, ['硫酸铜', '氢氧化钠'])
+  assert.deepEqual(insight?.secondaryReagents, ['氨水', '盐酸'])
 })
 
-test('c1 挑战在 100mL 且 pH 约等于 7 并加入指示剂时判定完成', () => {
+test('c1 混合硫酸铜和氢氧化钠后完成蓝色沉淀制备', () => {
   let state = createEmptyState()
-  state = mixReagent(state, '盐酸', 49.5).newState
-  state = mixReagent(state, '氢氧化钠', 49.5).newState
-  state = mixReagent(state, '酚酞指示剂', 1).newState
+  state = mixReagent(state, '硫酸铜', 20).newState
+  state = mixReagent(state, '氢氧化钠', 20).newState
 
-  const items = [
-    makeContainer('烧杯', state),
-    makeContainer('滴定管', createEmptyState(), { type: 'burette' }),
-  ]
+  const items = [makeContainer('烧杯', state, { state: 'precipitate_cu' })]
 
   assert.equal(isChallengeCompleted(makeChallenge('c1'), items), true)
   assert.equal(getChallengeInsight(makeChallenge('c1'), items)?.progressValue, 100)
 })
 
-test('c2 挑战在有机层富集碘后判定完成', () => {
-  const items = [
-    makeContainer('锥形瓶', {
-      ...createEmptyState(),
-      volume: 30,
-      organicVolume: 20,
-      organicColor: 'rgba(128,0,128,0.7)',
-      moles: {
-        I2: 0.00008,
-        I2_org: 0.0012,
-      },
-    }, { type: 'flask' }),
-  ]
+test('c2 混合氯化铁和硫氰化钾后完成血红络合物制备', () => {
+  let state = createEmptyState()
+  state = mixReagent(state, '氯化铁', 12).newState
+  state = mixReagent(state, '硫氰化钾', 36).newState
+
+  const items = [makeContainer('烧杯', state, { state: 'complex_fe_scn' })]
 
   assert.equal(isChallengeCompleted(makeChallenge('c2'), items), true)
   assert.equal(getChallengeInsight(makeChallenge('c2'), items)?.progressValue, 100)
 })
 
-test('拖拽盐酸到偏碱容器时返回成功型提示', () => {
+test('c3 形成含碘紫色有机层后完成制备', () => {
   let state = createEmptyState()
-  state = mixReagent(state, '氢氧化钠', 30).newState
+  state = mixReagent(state, '碘水 (I₂ aq)', 12).newState
+  state = mixReagent(state, '四氯化碳 (CCl₄)', 8).newState
 
-  const hint = buildDragProximityHint(makeChallenge('c1'), makeContainer('烧杯', state), '盐酸')
+  const items = [makeContainer('烧杯', state)]
+
+  assert.equal(isChallengeCompleted(makeChallenge('c3'), items), true)
+  assert.equal(getChallengeInsight(makeChallenge('c3'), items)?.progressValue, 100)
+})
+
+test('拖拽任务主试剂到对应容器时返回成功型提示', () => {
+  let state = createEmptyState()
+  state = mixReagent(state, '硫酸铜', 15).newState
+
+  const hint = buildDragProximityHint(makeChallenge('c1'), makeContainer('烧杯', state), '氢氧化钠')
 
   assert.equal(hint.tone, 'success')
-  assert.match(hint.title, /更需要酸|拉低 pH/)
+  assert.match(hint.title, /沉淀/)
 })
 
 test('反应提示会带出 pH 和温度增量', () => {
@@ -117,8 +117,8 @@ test('挑战模式下的轻量建议复用 challenge insight 的下一步提示'
   })
 
   assert.equal(agentState.intent, 'exploration')
-  assert.match(agentState.suggestion, /目标容器|酸\/碱/)
-  assert.equal(agentState.goal?.title, '精密酸碱滴定')
+  assert.match(agentState.suggestion, /烧杯/)
+  assert.equal(agentState.goal?.title, '制备蓝色沉淀')
 })
 
 test('滴定场景在偏碱时给出盐酸微调建议', () => {
@@ -155,16 +155,16 @@ test('高温且接近满量程时优先输出风险警告', () => {
   assert.ok(agentState.risks.some((risk: string) => /满量|温度偏高/.test(risk)))
 })
 
-test('挑战目标进度使用共享 challenge insight 文案', () => {
+test('挑战目标进度使用新的制备任务文案', () => {
   const goal = buildGoalProgress({
     items: [],
     gameMode: 'challenge',
     activeChallenge: makeChallenge('c2'),
   })
 
-  assert.equal(goal.title, '高级萃取挑战')
+  assert.equal(goal.title, '制备血红络合物')
   assert.equal(goal.status, 'in_progress')
-  assert.match(goal.progress, /双相|萃取/)
+  assert.match(goal.progress, /氯化铁|硫氰化钾|烧杯/)
 })
 
 test('反应事件优先进入轻量建议解释文案', () => {
