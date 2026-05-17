@@ -331,95 +331,18 @@ function buildToolCalls(message, contextDigest) {
   return toolCalls.slice(0, 3)
 }
 
-function formatSpeciesList(species) {
-  if (!Array.isArray(species) || species.length === 0) return ''
-  return species
-    .slice(0, 5)
-    .map((entry) => entry.label || entry.formula)
-    .filter(Boolean)
-    .join('、')
-}
-
-function inferChemExplanation(contextDigest) {
-  const focusedSpecies = contextDigest.focusedContainer?.species || []
-  const allSpecies = [
-    ...focusedSpecies,
-    ...contextDigest.containers.flatMap((container) => container.species || []),
-  ]
-  const labels = allSpecies.map((entry) => `${entry.formula || ''} ${entry.label || ''}`).join(' ')
-  const eventText = `${contextDigest.lastEvent?.name || ''} ${contextDigest.lastEvent?.reacted || ''} ${labels}`
-
-  if (/Cu\\(OH\\)2|氢氧化铜|蓝绿|CuSO4|硫酸铜/.test(eventText)) {
-    return '蓝绿色絮状物来自 Cu²⁺ 与 OH⁻ 生成难溶 Cu(OH)₂；继续少量加碱即可观察沉淀增多。'
-  }
-  if (/AgCl|氯化银|硝酸银|白色/.test(eventText)) {
-    return '白色浑浊来自 Ag⁺ 与 Cl⁻ 生成难溶 AgCl；这是典型沉淀反应。'
-  }
-  if (/Fe\\(SCN\\)3|硫氰|血红|变红/.test(eventText)) {
-    return '血红色来自 Fe³⁺ 与 SCN⁻ 形成 Fe(SCN)₃ 络合物；颜色越深通常代表络合物越多。'
-  }
-  if (/CO2|二氧化碳|冒泡|气泡|碳酸钠/.test(eventText)) {
-    return '气泡主要是碳酸盐遇酸释放 CO₂；加酸越快，冒泡会越明显。'
-  }
-  if (/I2_org|有机相碘|紫色|四氯化碳|分层/.test(eventText)) {
-    return '紫色层来自碘更容易进入有机相；静置后看颜色最深的那一层。'
-  }
-  if (/MnSO4|高锰酸钾|褪色|草酸|KMnO4/.test(eventText)) {
-    return '紫色褪去是 MnO₄⁻ 在酸性条件下被草酸还原；同时可能产生 CO₂ 气泡。'
-  }
-  return ''
-}
-
-function buildFallbackReply(message, contextDigest) {
-  const focused = contextDigest.focusedContainer
-  const speciesText = focused ? formatSpeciesList(focused.species) : ''
-  const explanation = inferChemExplanation(contextDigest)
-  const asksExplanation = message.includes('为什么') || message.includes('解释') || /why|explain/i.test(message)
-  const asksSafety = asksForSafety(message)
-
-  if (contextDigest.risks.length > 0) {
-    return `先处理风险：${contextDigest.risks[0]}。暂停加料，观察温度、压力和容器余量。`
-  }
-
-  if (asksSafety) {
-    return speciesText
-      ? `${focused?.name || '当前容器'}里主要有 ${speciesText}；当前读数未显示满量、高温或高压风险。继续小体积加料，避免飞溅。`
-      : '当前没有足够信息判断特定风险；读数未显示满量、高温或高压风险。继续小体积加料，佩戴护目镜和手套。'
-  }
-
-  if (explanation && asksExplanation) {
-    return explanation
-  }
-
-  if (explanation) {
-    return `${explanation} 下一步小体积补加目标试剂，观察颜色或沉淀是否继续增强。`
-  }
-
-  if (speciesText) {
-    return `${focused?.name || '当前容器'}里主要有 ${speciesText}。下一步先少量加入目标试剂，再看颜色、沉淀或分层变化。`
-  }
-
-  return focused
-    ? `${focused.name}当前没有明确试剂记录；我不会猜具体离子。先加入本关推荐试剂中的第一种。`
-    : '还没有锁定主容器；先选择一个烧杯开始。'
-}
-
 function buildFallbackResponse(input) {
-  const message = typeof input.message === 'string' ? input.message.trim() : ''
   const contextDigest = buildContextDigest(input.context)
-  const hasGroundedContext = hasConcreteExperimentContext(contextDigest) || Boolean(contextDigest.focusedContainer)
-  const headlineBase = contextDigest.risks[0]
-    ? `拉瓦锡警告：${contextDigest.risks[0]}`
-    : hasGroundedContext
-      ? `拉瓦锡判断：当前更接近${inferIntentLabel(contextDigest.intent)}阶段。`
-      : '拉瓦锡提醒：还没拿到具体实验体系。'
-
+  const llmConfig = resolveLlmConfig()
+  const hasLlmConfig = Boolean(llmConfig.apiKey && llmConfig.model && llmConfig.baseUrl)
   return {
-    reply: buildFallbackReply(message, contextDigest),
-    headline: headlineBase,
+    reply: hasLlmConfig
+      ? '拉瓦锡 LLM 暂时没有返回可用答案，请重试一次。'
+      : '拉瓦锡 LLM 还没接通，请配置 LLM_API_KEY、LLM_MODEL 和 LLM_API_URL。',
+    headline: hasLlmConfig ? '拉瓦锡：等待 LLM 回复' : '拉瓦锡：LLM 未连接',
     suggestedPrompts: buildSuggestedPrompts(contextDigest),
-    toolCalls: buildToolCalls(message, contextDigest),
-    statusLabel: '后端已就绪 · 待接入 LLM',
+    toolCalls: buildToolCalls(typeof input.message === 'string' ? input.message : '', contextDigest),
+    statusLabel: hasLlmConfig ? 'LLM 暂无可用回复' : 'LLM 未连接',
   }
 }
 
@@ -452,54 +375,13 @@ function compactAssistantText(text, maxChars = 180) {
   return compact || normalized.slice(0, maxChars)
 }
 
-function collectGroundingText(contextDigest, message) {
-  return JSON.stringify({
-    message,
-    challenge: contextDigest.challenge,
-    lastEvent: contextDigest.lastEvent,
-    focusedSpecies: contextDigest.focusedContainer?.species || [],
-    containerSpecies: contextDigest.containers.flatMap((container) => container.species || []),
-  })
-}
-
-function hasConcreteExperimentContext(contextDigest) {
-  if (contextDigest.focusedContainer?.species?.length) return true
-  if (contextDigest.containers.some((container) => container.species?.length)) return true
-  if (contextDigest.lastEvent?.name || contextDigest.lastEvent?.reacted) return true
-  return Boolean(contextDigest.challenge?.target)
-}
-
-function asksForSafety(message) {
-  return /危险|风险|安全|防护|hazard|risk|safety/i.test(message)
-}
-
-function hasUnsupportedGroundingTerms(text, contextDigest, message) {
-  if (!text) return false
-  const groundingText = collectGroundingText(contextDigest, message)
-  return GROUNDING_TERMS.some(({ key, patterns }) => {
-    const mentioned = patterns.some((pattern) => pattern.test(text))
-    if (!mentioned) return false
-    return !new RegExp(key, 'i').test(groundingText) && !patterns.some((pattern) => pattern.test(groundingText))
-  })
-}
-
-function shouldSkipLlm(input, contextDigest) {
-  const message = typeof input.message === 'string' ? input.message.trim() : ''
-  if (asksForSafety(message)) return true
-  return !hasConcreteExperimentContext(contextDigest)
-}
-
-function polishLlmResponse(response, fallback, contextDigest, message) {
+function polishLlmResponse(response, fallback) {
   const reply = compactAssistantText(response?.reply)
   const headline = compactAssistantText(response?.headline, 80)
   const hasInternalLeak = INTERNAL_REPLY_PATTERNS.some((pattern) => pattern.test(reply) || pattern.test(headline))
-  const hasUnsupportedTerms = hasUnsupportedGroundingTerms(reply, contextDigest, message)
 
-  if (!reply || hasInternalLeak || hasUnsupportedTerms) {
-    return {
-      ...fallback,
-      statusLabel: response?.statusLabel || fallback.statusLabel,
-    }
+  if (!reply || hasInternalLeak) {
+    throw new Error('LLM 回复未通过校验')
   }
 
   return {
@@ -528,7 +410,7 @@ function resolveLlmConfig() {
   return { provider, model, apiKey, baseUrl }
 }
 
-function buildLlmInstruction(contextDigest, fallback) {
+function buildLlmInstruction(contextDigest) {
   return [
     '你是“拉瓦锡”，一个面向化学实验平台的智能化学家助手。',
     '你需要结合实验上下文、最近对话和可用 skill，给出简洁、可执行、具备化学解释的建议。',
@@ -540,7 +422,7 @@ function buildLlmInstruction(contextDigest, fallback) {
     '必须输出 JSON 对象，不要输出 Markdown，不要输出代码块。',
     'JSON 结构：{"reply": string, "headline": string, "suggestedPrompts": string[], "toolCalls": Array<{"type": "focus_container"|"open_logs"|"open_reagents"|"save_note", "targetId"?: string, "note"?: string}>, "statusLabel"?: string}',
     `当前上下文摘要：${JSON.stringify(contextDigest)}`,
-    `若信息不足，也至少要保持与这个兜底判断一致：${JSON.stringify(fallback)}`,
+    '信息不足时也必须保持像真人助手：说明缺哪类实验信息，并提出一个最小可执行动作；不要输出模板化兜底话术。',
   ].join('\n')
 }
 
@@ -565,15 +447,9 @@ async function callConfiguredLlm(input, fallback) {
   }
 
   const contextDigest = buildContextDigest(input.context)
-  if (shouldSkipLlm(input, contextDigest)) {
-    return {
-      ...fallback,
-      statusLabel: '已按当前读数判断',
-    }
-  }
 
   const messages = [
-    { role: 'system', content: buildLlmInstruction(contextDigest, fallback) },
+    { role: 'system', content: buildLlmInstruction(contextDigest) },
     ...sanitizeConversation(input.conversation).map((entry) => ({ role: entry.role, content: entry.text })),
     { role: 'user', content: typeof input.message === 'string' ? input.message.trim() : '' },
   ]
@@ -626,7 +502,7 @@ async function callConfiguredLlm(input, fallback) {
       ...fallback,
       reply: plainText,
       statusLabel: `LLM 已接入 · ${llm.provider}/${llm.model}`,
-    }, fallback, contextDigest, typeof input.message === 'string' ? input.message.trim() : '')
+    }, fallback)
   }
 
   return polishLlmResponse({
@@ -637,7 +513,7 @@ async function callConfiguredLlm(input, fallback) {
       : fallback.suggestedPrompts,
     toolCalls: sanitizeToolCalls(Array.isArray(parsed.toolCalls) ? parsed.toolCalls : fallback.toolCalls),
     statusLabel: `LLM 已接入 · ${llm.provider}/${llm.model}`,
-  }, fallback, contextDigest, typeof input.message === 'string' ? input.message.trim() : '')
+  }, fallback)
 }
 
 async function generateLavoisierResponse(input) {
@@ -646,10 +522,12 @@ async function generateLavoisierResponse(input) {
     const llmResponse = await callConfiguredLlm(input, fallback)
     return llmResponse || fallback
   } catch (error) {
-    console.warn('[lavoisier-api] llm fallback:', error instanceof Error ? error.message : error)
+    console.warn('[lavoisier-api] llm error:', error instanceof Error ? error.message : error)
     return {
       ...fallback,
-      statusLabel: '本地判断 · LLM 暂时无响应',
+      reply: `拉瓦锡 LLM 暂时无响应：${error instanceof Error ? error.message : '未知错误'}。`,
+      headline: '拉瓦锡：LLM 暂时无响应',
+      statusLabel: 'LLM 暂时无响应',
     }
   }
 }
@@ -681,7 +559,7 @@ export function createLavoisierServer() {
       name: 'lavoisier-api',
       provider: llmConfig.provider,
       model: llmConfig.model || null,
-      statusLabel: configured ? `LLM 配置已检测 · ${llmConfig.provider}/${llmConfig.model}` : '后端已启动 · 待接入 LLM',
+      statusLabel: configured ? `LLM 配置已检测 · ${llmConfig.provider}/${llmConfig.model}` : 'LLM 未连接',
     })
     return
   }

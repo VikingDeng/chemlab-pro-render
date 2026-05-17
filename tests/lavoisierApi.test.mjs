@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
+import { createServer } from 'node:http'
 import { test } from 'node:test'
 
 process.env.LLM_API_KEY = ''
 process.env.LLM_MODEL = ''
 process.env.LLM_API_URL = ''
+process.env.LLM_PROVIDER = ''
 
 const { createLavoisierServer } = await import('../server/index.mjs')
 
@@ -34,7 +36,11 @@ async function postJson(baseUrl, payload) {
   return response.json()
 }
 
-test('Lavoisier refuses to invent a concrete chemistry system without container species', async () => {
+test('Lavoisier does not fake a chemistry answer when LLM is not configured', async () => {
+  process.env.LLM_API_KEY = ''
+  process.env.LLM_MODEL = ''
+  process.env.LLM_API_URL = ''
+  process.env.LLM_PROVIDER = ''
   const server = createLavoisierServer()
   const baseUrl = await listen(server)
   try {
@@ -46,19 +52,43 @@ test('Lavoisier refuses to invent a concrete chemistry system without container 
       },
     })
 
-    assert.match(data.reply, /没有锁定主容器|没有足够信息|不会臆测/)
-    assert.doesNotMatch(data.reply, /risks为空|Fe|亚铁|沙盒模式|context|localSignals|\*\*|•|^\s*1[.)、]/m)
+    assert.match(data.reply, /LLM.*(没接通|未连接)/)
+    assert.doesNotMatch(data.reply, /risks为空|Fe|亚铁|沙盒模式|context|localSignals|硫酸|氯化钠|H2O|\*\*|•|^\s*1[.)、]/m)
   } finally {
     await close(server)
   }
 })
 
-test('Lavoisier uses known species when the focused container provides them', async () => {
+test('Lavoisier uses the configured LLM response instead of local chemistry fallback', async () => {
+  const fakeLlm = createServer(async (req, res) => {
+    if (req.method !== 'POST' || req.url !== '/chat/completions') {
+      res.writeHead(404).end()
+      return
+    }
+    let body = ''
+    for await (const chunk of req) body += chunk
+    const parsed = JSON.parse(body)
+    assert.equal(parsed.model, 'fake-mimo')
+    const content = JSON.stringify({
+      reply: '氯化银沉淀来自 Ag⁺ 和 Cl⁻ 结合形成难溶 AgCl；先静置观察白色絮状物是否继续下沉。',
+      headline: '拉瓦锡：白色沉淀已形成',
+      suggestedPrompts: ['下一步', '解释现象'],
+      toolCalls: [],
+    })
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ choices: [{ message: { content } }] }))
+  })
+  const fakeUrl = await listen(fakeLlm)
+  process.env.LLM_API_KEY = 'test-key'
+  process.env.LLM_MODEL = 'fake-mimo'
+  process.env.LLM_API_URL = fakeUrl
+  process.env.LLM_PROVIDER = 'openai-compatible'
+
   const server = createLavoisierServer()
   const baseUrl = await listen(server)
   try {
     const data = await postJson(baseUrl, {
-      message: '请检查当前实验风险，并给出安全操作建议。',
+      message: '请解释当前实验现象和背后的化学原因。',
       context: {
         mode: 'sandbox',
         focusedContainer: {
@@ -79,10 +109,15 @@ test('Lavoisier uses known species when the focused container provides them', as
       },
     })
 
-    assert.match(data.reply, /氯化银沉淀/)
-    assert.match(data.reply, /硝酸/)
-    assert.doesNotMatch(data.reply, /\*\*|•|^\s*1[.)、]/m)
+    assert.match(data.reply, /氯化银沉淀来自 Ag⁺ 和 Cl⁻/)
+    assert.equal(data.statusLabel, 'LLM 已接入 · openai-compatible/fake-mimo')
+    assert.doesNotMatch(data.reply, /LLM 未连接|没接通|\*\*|•|^\s*1[.)、]/m)
   } finally {
+    process.env.LLM_API_KEY = ''
+    process.env.LLM_MODEL = ''
+    process.env.LLM_API_URL = ''
+    process.env.LLM_PROVIDER = ''
     await close(server)
+    await close(fakeLlm)
   }
 })

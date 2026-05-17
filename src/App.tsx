@@ -254,15 +254,6 @@ function getDefaultAgentPosition(viewportWidth: number, viewportHeight: number):
   }, viewportWidth, viewportHeight);
 }
 
-function snapAgentPosition(position: FloatingAgentPosition, viewportWidth: number, viewportHeight: number): FloatingAgentPosition {
-  const clamped = clampAgentPosition(position, viewportWidth, viewportHeight);
-  const centerX = clamped.x + AGENT_ORB_WIDTH / 2;
-  return {
-    x: centerX >= viewportWidth / 2 ? viewportWidth - AGENT_ORB_WIDTH : 0,
-    y: clamped.y,
-  };
-}
-
 function getAgentIntentMeta(intent: AgentIntent) {
   switch (intent) {
     case 'titration':
@@ -1759,7 +1750,7 @@ function App() {
     }
 
     if (dragState.dragging) {
-      setAgentPosition(current => snapAgentPosition(current, agentViewport.width, agentViewport.height));
+      setAgentPosition(current => clampAgentPosition(current, agentViewport.width, agentViewport.height));
       resetAgentDragState();
       return;
     }
@@ -1777,7 +1768,7 @@ function App() {
     }
 
     if (dragState.dragging) {
-      setAgentPosition(current => snapAgentPosition(current, agentViewport.width, agentViewport.height));
+      setAgentPosition(current => clampAgentPosition(current, agentViewport.width, agentViewport.height));
     }
 
     resetAgentDragState();
@@ -2396,7 +2387,7 @@ function App() {
 
             {/* Challenge HUD */}
             {gameMode === 'challenge' && activeChallenge && challengeInsight && (
-              <div className="absolute top-[104px] left-1/2 z-[55] w-[min(760px,calc(100%-32px))] -translate-x-1/2 rounded-[18px] border border-[#f43f5e]/22 bg-[rgba(7,11,23,0.82)] px-3 py-2 shadow-[0_16px_44px_rgba(2,6,23,0.34)] backdrop-blur-xl">
+              <div className="absolute top-[128px] left-1/2 z-[55] w-[min(760px,calc(100%-32px))] -translate-x-1/2 rounded-[18px] border border-[#f43f5e]/22 bg-[rgba(7,11,23,0.82)] px-3 py-2 shadow-[0_16px_44px_rgba(2,6,23,0.34)] backdrop-blur-xl">
                 <div className="flex items-center gap-3">
                   <div className="min-w-[132px] shrink-0">
                     <div className="text-[13px] font-semibold leading-tight text-[#f8fafc]">{activeChallenge.title}</div>
