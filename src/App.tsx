@@ -640,7 +640,7 @@ function App() {
   }, [setToast]);
 
   // Play Mode State
-  const [gameMode, setGameMode] = useState<'sandbox' | 'challenge' | 'hardcore'>('sandbox');
+  const [gameMode, setGameMode] = useState<'sandbox' | 'challenge'>('sandbox');
   const [activeChallenge, setActiveChallenge] = useState<{id: string, title: string, target: string, completed: boolean, targetId?: string} | null>(null);
 
   // Focused item for dashboard readouts
@@ -1908,23 +1908,11 @@ function App() {
       const collisionItem = currentItems.find(i => i.id === activeDrop.targetId);
       if (!collisionItem) return currentItems;
 
-      // Ensure we don't overflow completely
       const absoluteMax = getContainerCapacity(collisionItem.type);
       const currentTotalVolume = getTotalLiquidVolume(collisionItem.chemState);
-      if (gameMode !== 'hardcore' && currentTotalVolume + dropVolume > absoluteMax) {
+      if (currentTotalVolume + dropVolume > absoluteMax) {
         showToast(`🚫 该容器已装入 ${currentTotalVolume.toFixed(1)}mL，无法再加入 ${dropVolume}mL (最大容量 ${absoluteMax}mL)`);
         return currentItems;
-      }
-      
-      // In hardcore mode, overflowing the container breaks it due to weight/spill hazard
-      if (gameMode === 'hardcore' && currentTotalVolume + dropVolume > absoluteMax * 1.1) {
-        saveSnapshot(currentItems, brokenGlass);
-        playSound('break', 0, collisionItem.id);
-        showToast("💥 危险操作：液体严重溢出导致平台短路/容器破碎！");
-        setBrokenGlass(prev => [...prev, { id: collisionItem.id, x: collisionItem.x, y: collisionItem.y, color: getChemColor(collisionItem.chemState) }]);
-        setActiveDrop(null);
-        stopSound(collisionItem.id);
-        return currentItems.filter(i => i.id !== collisionItem.id);
       }
 
       // Thermal shock logic
@@ -2255,15 +2243,6 @@ function App() {
               className={`px-3 py-1 rounded-md text-[13px] transition-all ${gameMode === 'challenge' ? 'bg-[#f43f5e]/20 text-[#f43f5e] shadow-[0_0_10px_rgba(244,63,94,0.2)]' : 'hover:text-white text-[#94a3b8]'}`}
             >
               任务挑战
-            </button>
-            <button 
-              onClick={() => {
-                setGameMode('hardcore');
-                showToast("⚠️ 硬核危险模式：移除体积保护，极易发生爆炸！");
-              }}
-              className={`px-3 py-1 rounded-md text-[13px] transition-all ${gameMode === 'hardcore' ? 'bg-[#eab308]/20 text-[#eab308] shadow-[0_0_10px_rgba(234,179,8,0.2)]' : 'hover:text-white text-[#94a3b8]'}`}
-            >
-              危险边界
             </button>
           </div>
           </div>
