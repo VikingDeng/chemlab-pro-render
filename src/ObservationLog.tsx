@@ -10,12 +10,16 @@ export interface LogEntry {
   type: LogType;
 }
 
+export interface ObservationLogProps {
+  className?: string;
+}
+
 function getCurrentTimeString() {
   const now = new Date();
   return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 }
 
-export function ObservationLog() {
+export function ObservationLog({ className = '' }: ObservationLogProps) {
   const [logs, setLogs] = useState<LogEntry[]>(() => [
     {
       id: 'system-ready',
@@ -151,7 +155,7 @@ export function ObservationLog() {
   }, [isNearBottom, logs, scrollToBottom]);
 
   return (
-    <div className="flex-1 flex flex-col shrink-0 relative p-4 glass-panel min-h-[300px]">
+    <div data-panel="observation-log" className={`flex flex-1 min-h-0 flex-col overflow-hidden relative p-4 glass-panel ${className}`}>
       <div className="shrink-0 mb-3 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-[#e2e8f0] font-semibold flex items-center gap-2 shrink-0">

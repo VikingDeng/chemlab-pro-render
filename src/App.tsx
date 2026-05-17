@@ -447,18 +447,18 @@ function DiscoveryAtlas({ cards }: { cards: DiscoveryCardView[] }) {
   const unlockedCount = cards.filter(card => card.unlocked).length;
 
   return (
-    <section className="shrink-0 rounded-[18px] border border-white/8 bg-[rgba(255,255,255,0.035)] px-3 py-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
+    <section data-panel="discovery-atlas" className="shrink-0 overflow-hidden rounded-[18px] border border-white/8 bg-[rgba(255,255,255,0.035)] px-3 py-2">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
         <div className="text-[13px] font-semibold text-[#e2e8f0]">反应图鉴</div>
         <div className="rounded-full border border-[#22d3ee]/20 bg-[#22d3ee]/10 px-2 py-0.5 text-[10px] font-mono text-[#67e8f9]">
           {unlockedCount}/{cards.length}
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="flex gap-2 overflow-x-auto overflow-y-hidden pb-1 [scrollbar-width:thin]">
         {cards.map(card => (
           <div
             key={card.id}
-            className={`relative min-h-[58px] overflow-hidden rounded-[14px] border px-2.5 py-2 transition-all ${card.unlocked ? 'border-white/14 bg-white/[0.055]' : 'border-white/6 bg-black/10 opacity-55 grayscale'}`}
+            className={`relative h-[44px] min-w-[118px] overflow-hidden rounded-[14px] border px-2.5 py-1.5 transition-all ${card.unlocked ? 'border-white/14 bg-white/[0.055]' : 'border-white/6 bg-black/10 opacity-55 grayscale'}`}
           >
             <div
               className={`absolute inset-y-2 left-2 w-1 rounded-full ${card.unlocked ? 'opacity-100' : 'opacity-25'}`}
@@ -466,8 +466,7 @@ function DiscoveryAtlas({ cards }: { cards: DiscoveryCardView[] }) {
             />
             <div className="pl-3">
               <div className="truncate text-[11px] font-semibold text-[#f8fafc]">{card.unlocked ? card.title : '待发现'}</div>
-              <div className="mt-1 font-mono text-[10px] text-[#94a3b8]">{card.unlocked ? card.formula : '???'}</div>
-              <div className="mt-1 truncate text-[10px] text-[#64748b]">{card.unlocked ? card.hint : '用未知样品试出它'}</div>
+              <div className="mt-0.5 truncate font-mono text-[10px] text-[#94a3b8]">{card.unlocked ? card.formula : '???'}</div>
             </div>
           </div>
         ))}
@@ -3246,9 +3245,9 @@ function App() {
           <aside className={
             isTablet
               ? bottomSheetOpen
-                ? 'absolute bottom-3 left-3 right-3 z-20 flex h-[60vh] shrink-0 flex-col gap-3 overflow-hidden rounded-[22px] bg-[#0a0e1a]/90 transition-all duration-250 ease-out'
+                ? 'absolute bottom-3 left-3 right-3 z-20 flex h-[60vh] min-h-0 shrink-0 flex-col gap-3 overflow-hidden rounded-[22px] bg-[#0a0e1a]/90 transition-all duration-250 ease-out'
                 : 'absolute bottom-3 left-1/2 z-20 flex h-[48px] w-[184px] -translate-x-1/2 shrink-0 flex-col overflow-hidden rounded-full transition-all duration-250 ease-out'
-              : 'relative z-20 flex h-full w-[320px] shrink-0 flex-col gap-3'
+              : 'relative z-20 flex h-full min-h-0 w-[320px] shrink-0 flex-col gap-3 overflow-hidden'
           }>
             {/* Tablet drag handle */}
             <button 
@@ -3261,7 +3260,7 @@ function App() {
               </div>
             </button>
             
-            <div className={`flex-1 flex flex-col gap-3 min-h-0 ${!isTablet || bottomSheetOpen ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200 delay-100`}>
+            <div className={`flex-1 min-h-0 gap-3 overflow-hidden ${isTablet ? 'flex flex-col' : 'grid grid-rows-[minmax(0,1.12fr)_auto_minmax(0,0.88fr)]'} ${!isTablet || bottomSheetOpen ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200 delay-100`}>
               {isTablet && (
                 <div className="glass-panel p-1 flex items-center gap-1 shrink-0">
                   <button
@@ -3281,17 +3280,18 @@ function App() {
                 </div>
               )}
 
-              <div className={`${isTablet && activeRightPanelTab !== 'reagents' ? 'hidden' : 'flex'} flex-col min-h-0 ${isTablet ? '' : 'flex-[1.15]'}`}>
+              <div className={`${isTablet && activeRightPanelTab !== 'reagents' ? 'hidden' : 'flex'} min-h-0 flex-col overflow-hidden ${isTablet ? 'flex-1' : ''}`}>
                 <ReagentShelf
+                  className="h-full"
                   highlightedReagents={challengeInsight?.primaryReagents || []}
                   suggestedReagents={challengeInsight?.secondaryReagents || []}
                   dimIrrelevant={gameMode === 'challenge'}
                   showUnknownSamples={gameMode === 'challenge'}
                 />
               </div>
-              {(!isTablet || bottomSheetOpen) && <DiscoveryAtlas cards={discoveryCards} />}
-              <div className={`${isTablet && activeRightPanelTab !== 'logs' ? 'hidden' : 'flex'} flex-col min-h-0 ${isTablet ? '' : 'flex-[0.85]'}`}>
-                <ObservationLog />
+              {!isTablet && <DiscoveryAtlas cards={discoveryCards} />}
+              <div className={`${isTablet && activeRightPanelTab !== 'logs' ? 'hidden' : 'flex'} min-h-0 flex-col overflow-hidden ${isTablet ? 'flex-1' : ''}`}>
+                <ObservationLog className="h-full" />
               </div>
             </div>
           </aside>

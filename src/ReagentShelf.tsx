@@ -13,6 +13,7 @@ export interface ReagentShelfProps {
   suggestedReagents?: string[];
   dimIrrelevant?: boolean;
   showUnknownSamples?: boolean;
+  className?: string;
 }
 
 type ReagentCategory = '未知样品' | '基础酸碱' | '金属盐' | '氧化还原' | '萃取/有机' | '指示剂';
@@ -102,6 +103,7 @@ export function ReagentShelf({
   suggestedReagents = [],
   dimIrrelevant = false,
   showUnknownSamples = false,
+  className = '',
 }: ReagentShelfProps) {
   const [activeCategory, setActiveCategory] = useState<'全部' | ReagentCategory>('全部');
   const effectiveActiveCategory = !showUnknownSamples && activeCategory === '未知样品' ? '全部' : activeCategory;
@@ -221,7 +223,7 @@ export function ReagentShelf({
   };
 
   return (
-    <div className="flex-1 min-h-[340px] flex flex-col overflow-hidden glass-panel">
+    <div data-panel="reagent-shelf" className={`flex flex-1 min-h-0 flex-col overflow-hidden glass-panel ${className}`}>
       <div className="shrink-0 flex gap-2 overflow-x-auto px-3 py-3 border-b border-white/6 bg-black/10">
         <button
           type="button"
