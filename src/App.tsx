@@ -738,6 +738,7 @@ function App() {
   
   // Custom Toast State
   const [toast, setToast] = useState<{id: string, message: string} | null>(null);
+  const [discoveryToast, setDiscoveryToast] = useState<DiscoveryCardView | null>(null);
 
   const showToast = useCallback((message: string) => {
     const id = createRuntimeId('toast');
@@ -787,6 +788,7 @@ function App() {
   const lastAgentNoteRef = useRef<{ at: number; message: string } | null>(null);
   const lastAgentDigestRef = useRef<string>('');
   const lastAgentConversationDigestRef = useRef<string>('');
+  const lastUnlockedDiscoveryIdsRef = useRef<Set<string>>(new Set());
   const agentAbortControllerRef = useRef<AbortController | null>(null);
   const agentShellRef = useRef<HTMLDivElement | null>(null);
   const agentDockButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -1342,7 +1344,7 @@ function App() {
   // Screen resize handler
   useEffect(() => {
     const handleResize = () => {
-      setIsTablet(window.innerWidth < 1440);
+      setIsTablet(window.innerWidth < 1180);
     };
     handleResize();
     window.addEventListener('resize', handleResize);
@@ -1555,6 +1557,10 @@ function App() {
   const discoveryCards = useMemo(() => buildDiscoveryCards(placedItems), [placedItems]);
   const challengeNextAction = challengeInsight?.checklist.find(item => !item.done)?.label || null;
   const challengeGuideTargetId = gameMode === 'challenge' && activeChallenge ? primaryAgentContainerId : null;
+  const challengeQuickReagent = challengeNextAction && challengeInsight
+    && [...challengeInsight.primaryReagents, ...challengeInsight.secondaryReagents].includes(challengeNextAction)
+    ? challengeNextAction
+    : null;
 
   /* eslint-disable react-hooks/preserve-manual-memoization -- React Compiler flags the stable toast callback here; dependencies remain explicit for hook correctness. */
   const handleAgentQuickAction = useCallback((actionId: 'focus' | 'logs' | 'reagents' | 'note') => {
@@ -1904,6 +1910,21 @@ function App() {
   }, [agentLastEvent?.kind, agentState.goal?.progress, agentState.intent, agentState.risks, agentState.suggestion, placedItems.length]);
 
   useEffect(() => {
+    const unlockedCards = discoveryCards.filter(card => card.unlocked);
+    const previousIds = lastUnlockedDiscoveryIdsRef.current;
+    const newlyUnlocked = unlockedCards.find(card => !previousIds.has(card.id));
+    lastUnlockedDiscoveryIdsRef.current = new Set(unlockedCards.map(card => card.id));
+
+    if (!newlyUnlocked) return;
+    setDiscoveryToast(newlyUnlocked);
+    const timer = window.setTimeout(() => {
+      setDiscoveryToast(current => current?.id === newlyUnlocked.id ? null : current);
+    }, 3200);
+
+    return () => window.clearTimeout(timer);
+  }, [discoveryCards]);
+
+  useEffect(() => {
     if (!agentExpanded) return;
     const timer = window.setTimeout(() => setAgentHasFreshUpdate(false), 0);
     return () => window.clearTimeout(timer);
@@ -2011,6 +2032,48 @@ function App() {
     stopSound, 
     showToast
   );
+
+  function addReagentToContainer(targetId: string, reagentName: string, volumeML = 20) {
+    setPlacedItems(currentItems => {
+      const target = currentItems.find(i => i.id === targetId);
+      if (!target || !LIQUID_CONTAINER_TYPES.has(target.type)) {
+        showToast('先选择一个容器');
+        return currentItems;
+      }
+
+      const capacity = getContainerCapacity(target.type);
+      const currentVolume = getTotalLiquidVolume(target.chemState);
+      if (currentVolume + volumeML > capacity) {
+        showToast(`🚫 ${target.name} 容量不足，无法加入 ${volumeML}mL`);
+        return currentItems;
+      }
+
+      saveSnapshot(currentItems, brokenGlass);
+      const previousState = target.chemState;
+      const result = mixReagent(previousState, reagentName, volumeML);
+
+      setTimeout(() => {
+        emitReactionOutcome(reagentName, result);
+        const hint = computeReactionHint(target, reagentName, previousState, result);
+        showInlineContainerHint({ ...hint, targetId: target.id });
+      }, 0);
+
+      const nextItems = currentItems.map(item => {
+        if (item.id !== target.id) return item;
+        return {
+          ...item,
+          chemState: result.newState,
+          state: result.reactionType,
+          lastReactionTime: result.reactionType !== 'added' ? Date.now() : item.lastReactionTime,
+        };
+      });
+      placedItemsRef.current = nextItems;
+      if (focusedItemIdRef.current === target.id) {
+        syncReadouts(result.newState);
+      }
+      return nextItems;
+    });
+  }
 
   const handleConfirmDrop = () => {
     if (!activeDrop) return;
@@ -2495,6 +2558,18 @@ function App() {
                       </span>
                     ))}
                   </div>
+                  {challengeQuickReagent && primaryAgentContainerId && !activeChallenge.completed && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        addReagentToContainer(primaryAgentContainerId, challengeQuickReagent, 20);
+                        showToast(`加入 20mL ${challengeQuickReagent}`);
+                      }}
+                      className="shrink-0 rounded-full border border-[#22d3ee]/35 bg-[#22d3ee]/12 px-3 py-1.5 text-[11px] font-semibold text-[#a5f3fc] hover:bg-[#22d3ee]/20 transition-colors"
+                    >
+                      加入 20mL
+                    </button>
+                  )}
                   {activeChallenge.completed && (
                     <button
                       type="button"
@@ -2525,6 +2600,26 @@ function App() {
                   <span className="text-[#f59e0b] font-medium text-[14px] drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]">
                     {toast.message}
                   </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {discoveryToast && (
+                <motion.div
+                  key={discoveryToast.id}
+                  initial={{ opacity: 0, y: 22, scale: 0.86 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -12, scale: 0.94 }}
+                  transition={{ type: 'spring', stiffness: 360, damping: 28 }}
+                  className="absolute left-1/2 top-[72px] z-[310] w-[260px] -translate-x-1/2 rounded-[24px] border border-white/12 bg-[rgba(7,11,23,0.9)] px-4 py-3 text-center shadow-[0_24px_60px_rgba(2,6,23,0.48)] backdrop-blur-2xl pointer-events-none"
+                >
+                  <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] font-mono text-[13px] font-bold text-white" style={{ boxShadow: `0 0 28px ${discoveryToast.accent}` }}>
+                    {discoveryToast.formula}
+                  </div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#67e8f9]">发现新现象</div>
+                  <div className="mt-1 text-[14px] font-semibold text-[#f8fafc]">{discoveryToast.title}</div>
+                  <div className="mt-1 text-[11px] text-[#94a3b8]">已加入反应图鉴</div>
                 </motion.div>
               )}
             </AnimatePresence>
