@@ -338,7 +338,17 @@ function getOrganicTint(def?: ReagentDef) {
 }
 
 function resolveReagentDef(reagentName: string) {
-  return REAGENTS[reagentName] || Object.values(REAGENTS).find(d => reagentName.includes(d.formula));
+  const aliasName = UNKNOWN_SAMPLE_ALIASES[reagentName] || reagentName;
+  return REAGENTS[aliasName] || Object.values(REAGENTS).find(d => aliasName.includes(d.formula));
+}
+
+const UNKNOWN_SAMPLE_ALIASES: Record<string, string> = {
+  '未知样品 A': '硫酸铜',
+  '未知样品 B': '硝酸银',
+  '未知样品 C': '氯化铁',
+  '未知样品 D': '碳酸钠',
+  '未知样品 E': '碘水 (I₂ aq)',
+  '未知样品 F': '高锰酸钾',
 }
 
 const REAGENT_FORMULA_MAP = Object.values(REAGENTS).reduce<Record<string, ReagentDef>>((acc, def) => {

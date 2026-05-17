@@ -34,12 +34,12 @@ type TestChallengeId = 'c1' | 'c2' | 'c3' | 'c4' | 'c5' | 'c6'
 
 function makeChallenge(id: TestChallengeId, completed = false): ActiveChallenge {
   const copy: Record<TestChallengeId, [string, string]> = {
-    c1: ['制备蓝色沉淀', '制备蓝绿色 Cu(OH)₂ 沉淀'],
-    c2: ['制备白色沉淀', '制备白色 AgCl 沉淀'],
-    c3: ['制备血红络合物', '制备血红色 Fe(SCN)₃ 络合物'],
-    c4: ['制备气泡', '制备二氧化碳气泡'],
-    c5: ['制备紫色有机层', '制备紫色有机层'],
-    c6: ['制备褪色反应', '制备高锰酸钾褪色体系'],
+    c1: ['未知 A：蓝色沉淀', '鉴定未知样品 A，制备蓝绿色 Cu(OH)₂ 沉淀'],
+    c2: ['未知 B：白色沉淀', '鉴定未知样品 B，制备白色 AgCl 沉淀'],
+    c3: ['未知 C：血红络合', '鉴定未知样品 C，制备血红色 Fe(SCN)₃ 络合物'],
+    c4: ['未知 D：气泡', '鉴定未知样品 D，制备二氧化碳气泡'],
+    c5: ['未知 E：紫色分层', '鉴定未知样品 E，制备紫色有机层'],
+    c6: ['未知 F：褪色', '鉴定未知样品 F，制备高锰酸钾褪色体系'],
   }
 
   return {
@@ -56,13 +56,13 @@ test('c1 制备任务在未放置容器时给出单容器提示', () => {
   assert.ok(insight)
   assert.equal(insight?.progressValue, 0)
   assert.match(insight?.nextHint ?? '', /烧杯/)
-  assert.deepEqual(insight?.primaryReagents, ['硫酸铜', '氢氧化钠'])
+  assert.deepEqual(insight?.primaryReagents, ['未知样品 A', '氢氧化钠'])
   assert.deepEqual(insight?.secondaryReagents, ['氨水', '盐酸'])
 })
 
 test('c1 混合硫酸铜和氢氧化钠后完成蓝色沉淀制备', () => {
   let state = createEmptyState()
-  state = mixReagent(state, '硫酸铜', 20).newState
+  state = mixReagent(state, '未知样品 A', 20).newState
   state = mixReagent(state, '氢氧化钠', 20).newState
 
   const items = [makeContainer('烧杯', state, { state: 'precipitate_cu' })]
@@ -129,7 +129,7 @@ test('c6 草酸酸性还原高锰酸钾后完成褪色任务', () => {
 
 test('拖拽任务主试剂到对应容器时返回成功型提示', () => {
   let state = createEmptyState()
-  state = mixReagent(state, '硫酸铜', 15).newState
+  state = mixReagent(state, '未知样品 A', 15).newState
 
   const hint = buildDragProximityHint(makeChallenge('c1'), makeContainer('烧杯', state), '氢氧化钠')
 
@@ -157,7 +157,7 @@ test('挑战模式下的轻量建议复用 challenge insight 的下一步提示'
 
   assert.equal(agentState.intent, 'exploration')
   assert.match(agentState.suggestion, /烧杯/)
-  assert.equal(agentState.goal?.title, '制备蓝色沉淀')
+  assert.equal(agentState.goal?.title, '未知 A：蓝色沉淀')
 })
 
 test('滴定场景在偏碱时给出盐酸微调建议', () => {
@@ -201,9 +201,9 @@ test('挑战目标进度使用新的制备任务文案', () => {
     activeChallenge: makeChallenge('c3'),
   })
 
-  assert.equal(goal.title, '制备血红络合物')
+  assert.equal(goal.title, '未知 C：血红络合')
   assert.equal(goal.status, 'in_progress')
-  assert.match(goal.progress, /氯化铁|硫氰化钾|烧杯/)
+  assert.match(goal.progress, /未知样品 C|硫氰化钾|烧杯/)
 })
 
 test('反应事件优先进入轻量建议解释文案', () => {

@@ -129,12 +129,12 @@ const AGENT_ORB_WIDTH = 84;
 const AGENT_ORB_HEIGHT = 84;
 const AGENT_FLOATING_MARGIN = 14;
 const AGENT_REQUEST_TIMEOUT_MS = 18000;
-const PREP_CU_TARGET = '制备蓝绿色 Cu(OH)₂ 沉淀';
-const PREP_AG_TARGET = '制备白色 AgCl 沉淀';
-const PREP_FE_TARGET = '制备血红色 Fe(SCN)₃ 络合物';
-const PREP_CO2_TARGET = '制备二氧化碳气泡';
-const PREP_IODINE_TARGET = '制备紫色有机层';
-const PREP_MN_TARGET = '制备高锰酸钾褪色体系';
+const PREP_CU_TARGET = '鉴定未知样品 A，制备蓝绿色 Cu(OH)₂ 沉淀';
+const PREP_AG_TARGET = '鉴定未知样品 B，制备白色 AgCl 沉淀';
+const PREP_FE_TARGET = '鉴定未知样品 C，制备血红色 Fe(SCN)₃ 络合物';
+const PREP_CO2_TARGET = '鉴定未知样品 D，制备二氧化碳气泡';
+const PREP_IODINE_TARGET = '鉴定未知样品 E，制备紫色有机层';
+const PREP_MN_TARGET = '鉴定未知样品 F，制备高锰酸钾褪色体系';
 const AGENT_SPECIES_LABELS: Record<string, string> = {
   HCl: '盐酸',
   H2SO4: '硫酸',
@@ -172,48 +172,48 @@ const AGENT_SPECIES_LABELS: Record<string, string> = {
 };
 const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
   prepCu: {
-    title: '制备蓝色沉淀',
-    reagents: ['硫酸铜', '氢氧化钠', '氨水'],
+    title: '未知 A：蓝色沉淀',
+    reagents: ['未知样品 A', '氢氧化钠', '氨水'],
     accent: 'cyan',
     preset: 'prepCu',
     challengeId: 'c1',
     target: PREP_CU_TARGET,
   },
   prepAg: {
-    title: '制备白色沉淀',
-    reagents: ['硝酸银', '盐酸', '氨水'],
+    title: '未知 B：白色沉淀',
+    reagents: ['未知样品 B', '盐酸', '氨水'],
     accent: 'emerald',
     preset: 'prepAg',
     challengeId: 'c2',
     target: PREP_AG_TARGET,
   },
   prepFe: {
-    title: '制备血红络合物',
-    reagents: ['氯化铁', '硫氰化钾', '氢氧化钠'],
+    title: '未知 C：血红络合',
+    reagents: ['未知样品 C', '硫氰化钾', '氢氧化钠'],
     accent: 'rose',
     preset: 'prepFe',
     challengeId: 'c3',
     target: PREP_FE_TARGET,
   },
   prepCo2: {
-    title: '制备气泡',
-    reagents: ['碳酸钠', '盐酸', '甲基橙'],
+    title: '未知 D：气泡',
+    reagents: ['未知样品 D', '盐酸', '甲基橙'],
     accent: 'amber',
     preset: 'prepCo2',
     challengeId: 'c4',
     target: PREP_CO2_TARGET,
   },
   prepIodine: {
-    title: '制备紫色有机层',
-    reagents: ['碘水', '四氯化碳', '正己烷'],
+    title: '未知 E：紫色分层',
+    reagents: ['未知样品 E', '四氯化碳', '正己烷'],
     accent: 'violet',
     preset: 'prepIodine',
     challengeId: 'c5',
     target: PREP_IODINE_TARGET,
   },
   prepMn: {
-    title: '制备褪色反应',
-    reagents: ['高锰酸钾', '草酸', '硫酸'],
+    title: '未知 F：褪色',
+    reagents: ['未知样品 F', '草酸', '硫酸'],
     accent: 'amber',
     preset: 'prepMn',
     challengeId: 'c6',
@@ -221,6 +221,74 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
   },
 };
 const MISSION_SEQUENCE: MissionPreset[] = ['prepCu', 'prepAg', 'prepFe', 'prepCo2', 'prepIodine', 'prepMn'];
+
+type DiscoveryCardView = {
+  id: string;
+  title: string;
+  formula: string;
+  hint: string;
+  accent: string;
+  unlocked: boolean;
+};
+
+type DiscoveryDefinition = Omit<DiscoveryCardView, 'unlocked'> & {
+  isUnlocked: (state: ChemState) => boolean;
+};
+
+function hasMole(state: ChemState, formula: string, threshold = 1e-7) {
+  return (state.moles?.[formula] || 0) > threshold;
+}
+
+const DISCOVERY_LIBRARY: DiscoveryDefinition[] = [
+  {
+    id: 'cu-oh2',
+    title: '蓝绿色絮状沉淀',
+    formula: 'Cu(OH)₂',
+    hint: '铜盐遇碱',
+    accent: '#22d3ee',
+    isUnlocked: (state) => hasMole(state, 'Cu(OH)2', 1e-6),
+  },
+  {
+    id: 'agcl',
+    title: '白色沉淀',
+    formula: 'AgCl',
+    hint: '银离子遇氯离子',
+    accent: '#f8fafc',
+    isUnlocked: (state) => hasMole(state, 'AgCl', 1e-6),
+  },
+  {
+    id: 'fe-scn',
+    title: '血红络合物',
+    formula: 'Fe(SCN)₃',
+    hint: '铁离子遇 SCN⁻',
+    accent: '#fb7185',
+    isUnlocked: (state) => hasMole(state, 'Fe(SCN)3', 1e-7),
+  },
+  {
+    id: 'co2',
+    title: '无色气泡',
+    formula: 'CO₂',
+    hint: '碳酸盐遇酸',
+    accent: '#f59e0b',
+    isUnlocked: (state) => hasMole(state, 'CO2', 1e-7),
+  },
+  {
+    id: 'iodine-layer',
+    title: '紫色有机层',
+    formula: 'I₂(org)',
+    hint: '碘进入有机相',
+    accent: '#a855f7',
+    isUnlocked: (state) => (state.organicVolume || 0) >= 1 && (hasMole(state, 'I2_org', 1e-7) || (state.organicColor || '').includes('128,0,128')),
+  },
+  {
+    id: 'permanganate-fade',
+    title: '紫色褪去',
+    formula: 'Mn²⁺',
+    hint: '酸性氧化还原',
+    accent: '#c084fc',
+    isUnlocked: (state) => hasMole(state, 'MnSO4', 1e-7) || hasMole(state, 'K2SO4', 1e-7),
+  },
+];
 
 type PointerLike = {
   clientX?: number;
@@ -366,6 +434,46 @@ function getMissionAccentClasses(accent: MissionBrief['accent']) {
         button: 'border-[#22d3ee]/35 bg-[#22d3ee]/12 text-[#a5f3fc] hover:bg-[#22d3ee]/20',
       };
   }
+}
+
+function buildDiscoveryCards(items: PlacedItem[]): DiscoveryCardView[] {
+  return DISCOVERY_LIBRARY.map(discovery => ({
+    ...discovery,
+    unlocked: items.some(item => LIQUID_CONTAINER_TYPES.has(item.type) && discovery.isUnlocked(item.chemState)),
+  }));
+}
+
+function DiscoveryAtlas({ cards }: { cards: DiscoveryCardView[] }) {
+  const unlockedCount = cards.filter(card => card.unlocked).length;
+
+  return (
+    <section className="shrink-0 rounded-[18px] border border-white/8 bg-[rgba(255,255,255,0.035)] px-3 py-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="text-[13px] font-semibold text-[#e2e8f0]">反应图鉴</div>
+        <div className="rounded-full border border-[#22d3ee]/20 bg-[#22d3ee]/10 px-2 py-0.5 text-[10px] font-mono text-[#67e8f9]">
+          {unlockedCount}/{cards.length}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {cards.map(card => (
+          <div
+            key={card.id}
+            className={`relative min-h-[58px] overflow-hidden rounded-[14px] border px-2.5 py-2 transition-all ${card.unlocked ? 'border-white/14 bg-white/[0.055]' : 'border-white/6 bg-black/10 opacity-55 grayscale'}`}
+          >
+            <div
+              className={`absolute inset-y-2 left-2 w-1 rounded-full ${card.unlocked ? 'opacity-100' : 'opacity-25'}`}
+              style={{ backgroundColor: card.accent, boxShadow: card.unlocked ? `0 0 14px ${card.accent}` : undefined }}
+            />
+            <div className="pl-3">
+              <div className="truncate text-[11px] font-semibold text-[#f8fafc]">{card.unlocked ? card.title : '待发现'}</div>
+              <div className="mt-1 font-mono text-[10px] text-[#94a3b8]">{card.unlocked ? card.formula : '???'}</div>
+              <div className="mt-1 truncate text-[10px] text-[#64748b]">{card.unlocked ? card.hint : '用未知样品试出它'}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function summarizeAgentSpecies(chemState: ChemState): AgentSpeciesSummary[] {
@@ -1444,6 +1552,9 @@ function App() {
   }, [focusedItemId, placedItems]);
   const primaryAgentContainerId = primaryAgentContainer?.id || null;
   const challengeInsight = useMemo(() => computeChallengeInsight(activeChallenge, placedItems), [activeChallenge, placedItems]);
+  const discoveryCards = useMemo(() => buildDiscoveryCards(placedItems), [placedItems]);
+  const challengeNextAction = challengeInsight?.checklist.find(item => !item.done)?.label || null;
+  const challengeGuideTargetId = gameMode === 'challenge' && activeChallenge ? primaryAgentContainerId : null;
 
   /* eslint-disable react-hooks/preserve-manual-memoization -- React Compiler flags the stable toast callback here; dependencies remain explicit for hook correctness. */
   const handleAgentQuickAction = useCallback((actionId: 'focus' | 'logs' | 'reagents' | 'note') => {
@@ -3005,6 +3116,17 @@ function App() {
                   );
                 })()}
 
+                {challengeGuideTargetId === item.id && challengeNextAction && item.type !== 'burette' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: [0, -4, 0], scale: 1 }}
+                    transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                    className={`absolute left-1/2 -translate-x-1/2 pointer-events-none w-[168px] rounded-full border border-[#22d3ee]/30 bg-[rgba(7,11,23,0.82)] px-3 py-2 text-center text-[11px] font-semibold text-[#a5f3fc] shadow-[0_14px_34px_rgba(2,6,23,0.38),0_0_24px_rgba(34,211,238,0.12)] backdrop-blur-xl ${item.type === 'testtube' ? '-top-[74px]' : '-top-[54px]'}`}
+                  >
+                    {(challengeNextAction.includes('沉淀') || challengeNextAction.includes('气泡') || challengeNextAction.includes('色') || challengeNextAction.includes('层')) ? '观察' : '拖入'} → {challengeNextAction}
+                  </motion.div>
+                )}
+
                 {/* Focus indicator / label */}
                 <div className={`mt-2 flex flex-col items-center z-10 transition-all duration-300 ${focusedItemId === item.id ? 'scale-110 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : ''}`}>
                   {item.type !== 'testtube' && (
@@ -3069,8 +3191,10 @@ function App() {
                   highlightedReagents={challengeInsight?.primaryReagents || []}
                   suggestedReagents={challengeInsight?.secondaryReagents || []}
                   dimIrrelevant={gameMode === 'challenge'}
+                  showUnknownSamples={gameMode === 'challenge'}
                 />
               </div>
+              {(!isTablet || bottomSheetOpen) && <DiscoveryAtlas cards={discoveryCards} />}
               <div className={`${isTablet && activeRightPanelTab !== 'logs' ? 'hidden' : 'flex'} flex-col min-h-0 ${isTablet ? '' : 'flex-[0.85]'}`}>
                 <ObservationLog />
               </div>

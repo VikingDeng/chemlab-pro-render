@@ -12,9 +12,10 @@ export interface ReagentShelfProps {
   highlightedReagents?: string[];
   suggestedReagents?: string[];
   dimIrrelevant?: boolean;
+  showUnknownSamples?: boolean;
 }
 
-type ReagentCategory = '基础酸碱' | '金属盐' | '氧化还原' | '萃取/有机' | '指示剂';
+type ReagentCategory = '未知样品' | '基础酸碱' | '金属盐' | '氧化还原' | '萃取/有机' | '指示剂';
 
 type ReagentGroup = {
   id: ReagentCategory;
@@ -24,6 +25,19 @@ type ReagentGroup = {
 };
 
 const REAGENT_GROUPS: ReagentGroup[] = [
+  {
+    id: '未知样品',
+    label: '未知样品',
+    description: '闯关用样品，只通过现象判断成分。',
+    items: [
+      { category: '未知样品', dot: '#38bdf8', name: '未知样品 A', badgeFormula: <>A · ?</> },
+      { category: '未知样品', dot: '#f8fafc', name: '未知样品 B', badgeFormula: <>B · ?</> },
+      { category: '未知样品', dot: '#f59e0b', name: '未知样品 C', badgeFormula: <>C · ?</> },
+      { category: '未知样品', dot: '#e2e8f0', name: '未知样品 D', badgeFormula: <>D · ?</> },
+      { category: '未知样品', dot: '#a78bfa', name: '未知样品 E', badgeFormula: <>E · ?</> },
+      { category: '未知样品', dot: '#c084fc', name: '未知样品 F', badgeFormula: <>F · ?</> },
+    ],
+  },
   {
     id: '基础酸碱',
     label: '基础酸碱',
@@ -87,8 +101,10 @@ export function ReagentShelf({
   highlightedReagents = [],
   suggestedReagents = [],
   dimIrrelevant = false,
+  showUnknownSamples = false,
 }: ReagentShelfProps) {
   const [activeCategory, setActiveCategory] = useState<'全部' | ReagentCategory>('全部');
+  const effectiveActiveCategory = !showUnknownSamples && activeCategory === '未知样品' ? '全部' : activeCategory;
 
   const highlightedSet = useMemo(() => new Set(highlightedReagents), [highlightedReagents]);
   const suggestedSet = useMemo(
@@ -99,7 +115,8 @@ export function ReagentShelf({
 
   const visibleGroups = useMemo(
     () => REAGENT_GROUPS
-      .filter(group => activeCategory === '全部' || group.id === activeCategory)
+      .filter(group => showUnknownSamples || group.id !== '未知样品')
+      .filter(group => effectiveActiveCategory === '全部' || group.id === effectiveActiveCategory)
       .map(group => ({
         ...group,
         items: group.items
@@ -116,7 +133,12 @@ export function ReagentShelf({
         const scoreB = b.items.reduce((sum, item) => sum + (highlightedSet.has(item.name) ? 2 : suggestedSet.has(item.name) ? 1 : 0), 0);
         return scoreB - scoreA;
       }),
-    [activeCategory, highlightedSet, suggestedSet]
+    [effectiveActiveCategory, highlightedSet, showUnknownSamples, suggestedSet]
+  );
+
+  const categoryGroups = useMemo(
+    () => REAGENT_GROUPS.filter(group => showUnknownSamples || group.id !== '未知样品'),
+    [showUnknownSamples]
   );
 
   const renderReagentCard = (item: ReagentProps, key: string) => {
@@ -204,16 +226,16 @@ export function ReagentShelf({
         <button
           type="button"
           onClick={() => setActiveCategory('全部')}
-          className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] border transition-colors ${activeCategory === '全部' ? 'border-[#22d3ee]/40 bg-[#22d3ee]/12 text-[#22d3ee] shadow-[0_0_14px_rgba(34,211,238,0.12)]' : 'border-white/8 bg-white/4 text-[#94a3b8] hover:text-white'}`}
+          className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] border transition-colors ${effectiveActiveCategory === '全部' ? 'border-[#22d3ee]/40 bg-[#22d3ee]/12 text-[#22d3ee] shadow-[0_0_14px_rgba(34,211,238,0.12)]' : 'border-white/8 bg-white/4 text-[#94a3b8] hover:text-white'}`}
         >
           全部
         </button>
-        {REAGENT_GROUPS.map(group => (
+        {categoryGroups.map(group => (
           <button
             key={group.id}
             type="button"
             onClick={() => setActiveCategory(group.id)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] border transition-colors ${activeCategory === group.id ? 'border-[#22d3ee]/40 bg-[#22d3ee]/12 text-[#22d3ee] shadow-[0_0_14px_rgba(34,211,238,0.12)]' : 'border-white/8 bg-white/4 text-[#94a3b8] hover:text-white'}`}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] border transition-colors ${effectiveActiveCategory === group.id ? 'border-[#22d3ee]/40 bg-[#22d3ee]/12 text-[#22d3ee] shadow-[0_0_14px_rgba(34,211,238,0.12)]' : 'border-white/8 bg-white/4 text-[#94a3b8] hover:text-white'}`}
           >
             {group.label}
           </button>
