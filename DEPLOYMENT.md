@@ -29,7 +29,7 @@ NODE_ENV=production
 PORT=8787
 LLM_PROVIDER=mimo
 LLM_API_URL=https://token-plan-cn.xiaomimimo.com/v1
-LLM_MODEL=mimo-v2.5-pro
+LLM_MODEL=mimo-v2.5
 LLM_API_KEY=你的_MiMo_Key
 ```
 

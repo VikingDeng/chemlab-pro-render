@@ -14,7 +14,7 @@ npm run dev:full
 项目根目录的 `.env` 已按本机 `model_gateway` 的 `mimo` 配置写入：
 
 - `LLM_API_URL=https://token-plan-cn.xiaomimimo.com/v1`
-- `LLM_MODEL=mimo-v2.5-pro`
+- `LLM_MODEL=mimo-v2.5`
 - `LLM_API_KEY=<本地已写入，不在文档中展示>`
 - `VITE_DEV_API_PROXY_TARGET=http://127.0.0.1:8787`
 

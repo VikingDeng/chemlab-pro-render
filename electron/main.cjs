@@ -22,7 +22,7 @@ async function startApiServer() {
 
   process.env.LLM_PROVIDER ||= 'mimo'
   process.env.LLM_API_URL ||= 'https://token-plan-cn.xiaomimimo.com/v1'
-  process.env.LLM_MODEL ||= 'mimo-v2.5-pro'
+  process.env.LLM_MODEL ||= 'mimo-v2.5'
 
   const serverModulePath = path.resolve(__dirname, '..', 'server', 'index.mjs')
   const { startServer } = await import(pathToFileURL(serverModulePath).href)
