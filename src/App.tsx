@@ -115,6 +115,25 @@ type MissionCompletionCard = {
   accent: string;
 };
 
+type MissionProofOption = {
+  id: string;
+  label: string;
+  detail: string;
+};
+
+type MissionProofCheckpoint = {
+  id: string;
+  label: string;
+  question: string;
+  answerId: string;
+  success: string;
+  options: MissionProofOption[];
+};
+
+type MissionProof = {
+  checkpoints: MissionProofCheckpoint[];
+};
+
 type FloatingAgentPosition = {
   x: number;
   y: number;
@@ -273,6 +292,7 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
 };
 const MISSION_SEQUENCE: MissionPreset[] = ['prepCu', 'prepAg', 'prepFe', 'prepCo2', 'prepIodine', 'prepMn'];
 const DISCOVERY_STORAGE_KEY = 'chemlab:discovery-unlocks:v1';
+const MISSION_COMPLETION_STORAGE_KEY = 'chemlab:mission-completions:v1';
 const MISSION_SUCCESS_META: Record<string, { product: string; formula: string; accent: string }> = {
   c1: { product: '蓝绿色絮状沉淀', formula: 'Cu(OH)₂', accent: '#22d3ee' },
   c2: { product: '白色沉淀', formula: 'AgCl', accent: '#f8fafc' },
@@ -280,6 +300,248 @@ const MISSION_SUCCESS_META: Record<string, { product: string; formula: string; a
   c4: { product: '无色气泡', formula: 'CO₂', accent: '#f59e0b' },
   c5: { product: '紫色有机层', formula: 'I₂(org)', accent: '#a855f7' },
   c6: { product: '紫色褪去', formula: 'Mn²⁺', accent: '#c4b5fd' },
+};
+const MISSION_PROOFS: Record<string, MissionProof> = {
+  c1: {
+    checkpoints: [
+      {
+        id: 'ion',
+        label: '离子',
+        question: '蓝绿色絮状沉淀锁定哪个阳离子？',
+        answerId: 'cu2',
+        success: 'Cu²⁺ 被锁定。',
+        options: [
+          { id: 'cu2', label: 'Cu²⁺', detail: '遇 OH⁻ 生成 Cu(OH)₂' },
+          { id: 'ag', label: 'Ag⁺', detail: '更像白色 AgCl' },
+          { id: 'co3', label: 'CO₃²⁻', detail: '遇酸会放 CO₂' },
+        ],
+      },
+      {
+        id: 'reagent-role',
+        label: '作用',
+        question: 'NaOH 在这一步提供了什么？',
+        answerId: 'oh',
+        success: 'OH⁻ 是沉淀剂。',
+        options: [
+          { id: 'oh', label: 'OH⁻', detail: '把 Cu²⁺ 拉成难溶沉淀' },
+          { id: 'cl', label: 'Cl⁻', detail: '对应银盐检验' },
+          { id: 'scn', label: 'SCN⁻', detail: '对应铁离子显色' },
+        ],
+      },
+      {
+        id: 'control',
+        label: '对照',
+        question: '若先加入过量氨水，更可能看到什么？',
+        answerId: 'deep-blue',
+        success: '深蓝色支持铜氨络合。',
+        options: [
+          { id: 'deep-blue', label: '深蓝溶液', detail: '铜氨络合物' },
+          { id: 'white-clot', label: '白色凝乳', detail: 'AgCl 特征' },
+          { id: 'purple-layer', label: '紫色分层', detail: '碘萃取特征' },
+        ],
+      },
+    ],
+  },
+  c2: {
+    checkpoints: [
+      {
+        id: 'product',
+        label: '产物',
+        question: '白色凝乳状沉淀最可能是什么？',
+        answerId: 'agcl',
+        success: 'AgCl 被锁定。',
+        options: [
+          { id: 'gas', label: 'CO₂↑', detail: '应表现为气泡' },
+          { id: 'agcl', label: 'AgCl↓', detail: 'Ag⁺ + Cl⁻' },
+          { id: 'feoh3', label: 'Fe(OH)₃↓', detail: '红褐色沉淀' },
+        ],
+      },
+      {
+        id: 'missing-ion',
+        label: '变量',
+        question: '若用硝酸代替盐酸，少了哪种关键离子？',
+        answerId: 'chloride',
+        success: 'Cl⁻ 是本关变量。',
+        options: [
+          { id: 'chloride', label: 'Cl⁻', detail: '决定 AgCl 沉淀' },
+          { id: 'hydroxide', label: 'OH⁻', detail: '对应氢氧化物沉淀' },
+          { id: 'carbonate', label: 'CO₃²⁻', detail: '对应冒泡' },
+        ],
+      },
+      {
+        id: 'principle',
+        label: '本质',
+        question: '这类现象属于哪种判断？',
+        answerId: 'insoluble-salt',
+        success: '难溶盐沉淀成立。',
+        options: [
+          { id: 'neutralization', label: '中和放热', detail: '主要看 pH 与温度' },
+          { id: 'insoluble-salt', label: '难溶盐沉淀', detail: '离子结合后析出' },
+          { id: 'extraction', label: '萃取分配', detail: '应出现两层' },
+        ],
+      },
+    ],
+  },
+  c3: {
+    checkpoints: [
+      {
+        id: 'phenomenon',
+        label: '现象',
+        question: '血红色来自哪类变化？',
+        answerId: 'complex',
+        success: '络合显色成立。',
+        options: [
+          { id: 'complex', label: '络合显色', detail: 'Fe³⁺ + SCN⁻' },
+          { id: 'neutral', label: '酸碱中和', detail: '主要改变 pH' },
+          { id: 'extract', label: '萃取分层', detail: '应有上下层' },
+        ],
+      },
+      {
+        id: 'iron-state',
+        label: '价态',
+        question: '本关主要检出的铁离子价态是？',
+        answerId: 'fe3',
+        success: 'Fe³⁺ 与 SCN⁻ 显血红。',
+        options: [
+          { id: 'fe2', label: 'Fe²⁺', detail: '常见浅绿色' },
+          { id: 'fe3', label: 'Fe³⁺', detail: '与 SCN⁻ 血红' },
+          { id: 'cu2', label: 'Cu²⁺', detail: '偏蓝色体系' },
+        ],
+      },
+      {
+        id: 'interference',
+        label: '干扰',
+        question: '若先加 NaOH，最可能干扰成什么？',
+        answerId: 'feoh3',
+        success: 'OH⁻ 会抢先沉淀 Fe³⁺。',
+        options: [
+          { id: 'feoh3', label: '红褐沉淀', detail: 'Fe(OH)₃' },
+          { id: 'agcl', label: '白色沉淀', detail: 'AgCl 路线' },
+          { id: 'co2', label: '无色气泡', detail: '碳酸盐路线' },
+        ],
+      },
+    ],
+  },
+  c4: {
+    checkpoints: [
+      {
+        id: 'sample',
+        label: '样品',
+        question: '连续气泡最能说明样品 D 含什么？',
+        answerId: 'carbonate',
+        success: '碳酸盐被锁定。',
+        options: [
+          { id: 'carbonate', label: 'CO₃²⁻', detail: '遇酸放 CO₂' },
+          { id: 'cu2', label: 'Cu²⁺', detail: '遇碱沉淀' },
+          { id: 'i2', label: 'I₂', detail: '有机相变紫' },
+        ],
+      },
+      {
+        id: 'acid-role',
+        label: '试剂',
+        question: '盐酸在这里的关键作用是？',
+        answerId: 'h-plus',
+        success: 'H⁺ 触发碳酸盐放气。',
+        options: [
+          { id: 'h-plus', label: '提供 H⁺', detail: '推动 CO₂ 生成' },
+          { id: 'oh', label: '提供 OH⁻', detail: '会偏碱' },
+          { id: 'organic', label: '形成有机层', detail: '不是气体路线' },
+        ],
+      },
+      {
+        id: 'gas-id',
+        label: '气体',
+        question: '这一步生成的无色气体应判断为？',
+        answerId: 'co2',
+        success: 'CO₂ 与碳酸盐证据吻合。',
+        options: [
+          { id: 'h2', label: 'H₂', detail: '通常金属+酸' },
+          { id: 'co2', label: 'CO₂', detail: '碳酸盐+酸' },
+          { id: 'cl2', label: 'Cl₂', detail: '黄绿色且有风险' },
+        ],
+      },
+    ],
+  },
+  c5: {
+    checkpoints: [
+      {
+        id: 'process',
+        label: '过程',
+        question: '紫色集中在有机层，说明发生了什么？',
+        answerId: 'partition',
+        success: '碘进入有机相。',
+        options: [
+          { id: 'precipitate', label: '沉淀', detail: '不会形成两层' },
+          { id: 'partition', label: '分配/萃取', detail: 'I₂ 进入有机相' },
+          { id: 'gas', label: '气体生成', detail: '不是分层现象' },
+        ],
+      },
+      {
+        id: 'layer',
+        label: '层位',
+        question: '使用 CCl₄ 时，紫色层通常在哪一侧？',
+        answerId: 'bottom',
+        success: 'CCl₄ 密度大，沉在下层。',
+        options: [
+          { id: 'top', label: '上层', detail: '更像正己烷' },
+          { id: 'bottom', label: '下层', detail: 'CCl₄ 密度大于水' },
+          { id: 'solid', label: '杯底固体', detail: '不是萃取层' },
+        ],
+      },
+      {
+        id: 'property',
+        label: '性质',
+        question: '这个现象主要利用碘的哪种性质？',
+        answerId: 'nonpolar',
+        success: '相似相溶解释分配。',
+        options: [
+          { id: 'nonpolar', label: '更亲非极性相', detail: '有机层显紫' },
+          { id: 'strong-acid', label: '强酸性', detail: '不是本关核心' },
+          { id: 'hydroxide', label: '提供 OH⁻', detail: '对应沉淀' },
+        ],
+      },
+    ],
+  },
+  c6: {
+    checkpoints: [
+      {
+        id: 'condition',
+        label: '条件',
+        question: '高锰酸钾褪色需要哪个条件？',
+        answerId: 'acid-redox',
+        success: '酸性还原条件成立。',
+        options: [
+          { id: 'base', label: '强碱环境', detail: '不符合本关路线' },
+          { id: 'acid-redox', label: '酸性还原', detail: '草酸 + 硫酸' },
+          { id: 'chloride', label: '氯离子沉淀', detail: '对应银盐' },
+        ],
+      },
+      {
+        id: 'oxidant',
+        label: '角色',
+        question: '紫色的 MnO₄⁻ 在反应中扮演什么角色？',
+        answerId: 'oxidant',
+        success: 'MnO₄⁻ 是氧化剂。',
+        options: [
+          { id: 'indicator', label: '酸碱指示剂', detail: '不是单纯变色剂' },
+          { id: 'oxidant', label: '氧化剂', detail: '被还原后褪色' },
+          { id: 'solvent', label: '有机溶剂', detail: '不是分层路线' },
+        ],
+      },
+      {
+        id: 'acid-choice',
+        label: '选酸',
+        question: '本关更适合用硫酸而不是盐酸，原因是？',
+        answerId: 'avoid-cl2',
+        success: '避免氯离子被氧化成 Cl₂。',
+        options: [
+          { id: 'avoid-cl2', label: '避免 Cl₂', detail: '盐酸可能被氧化' },
+          { id: 'make-agcl', label: '生成 AgCl', detail: '没有银离子' },
+          { id: 'extract-i2', label: '萃取碘', detail: '不是氧化还原主线' },
+        ],
+      },
+    ],
+  },
 };
 
 function getNextMissionPreset(challengeId: string) {
@@ -306,6 +568,27 @@ function writeStoredDiscoveryIds(ids: Set<string>) {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(DISCOVERY_STORAGE_KEY, JSON.stringify(Array.from(ids)));
+  } catch {
+    void 0;
+  }
+}
+
+function readStoredMissionCompletionIds() {
+  if (typeof window === 'undefined') return new Set<string>();
+  const validIds = new Set(Object.values(MISSION_BRIEFS).map(mission => mission.challengeId));
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(MISSION_COMPLETION_STORAGE_KEY) || '[]');
+    if (!Array.isArray(parsed)) return new Set<string>();
+    return new Set(parsed.filter((id): id is string => typeof id === 'string' && validIds.has(id)));
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function writeStoredMissionCompletionIds(ids: Set<string>) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(MISSION_COMPLETION_STORAGE_KEY, JSON.stringify(Array.from(ids)));
   } catch {
     void 0;
   }
@@ -890,6 +1173,8 @@ function App() {
   const [rightPanelPulse, setRightPanelPulse] = useState<'reagents' | 'logs' | null>(null);
   const [reagentFocusSignal, setReagentFocusSignal] = useState(0);
   const [unlockedDiscoveryIds, setUnlockedDiscoveryIds] = useState<Set<string>>(() => readStoredDiscoveryIds());
+  const [completedMissionIds, setCompletedMissionIds] = useState<Set<string>>(() => readStoredMissionCompletionIds());
+  const [missionProofAnswers, setMissionProofAnswers] = useState<Record<string, Record<string, { selectedId: string; correct: boolean }>>>({});
   
   // Custom Toast State
   const [toast, setToast] = useState<{id: string, message: string} | null>(null);
@@ -1240,6 +1525,12 @@ function App() {
     setMissionCompletionCard(null);
     setReactionSpotlight(null);
     setDiscoveryToast(null);
+    setMissionProofAnswers(prev => {
+      if (!prev[mission.challengeId]) return prev;
+      const next = { ...prev };
+      delete next[mission.challengeId];
+      return next;
+    });
     setActiveChallenge({
       id: mission.challengeId,
       title: mission.title,
@@ -1257,6 +1548,7 @@ function App() {
     setAgentRemoteSummary('');
     setAgentSuggestedPrompts([]);
     setAgentHasFreshUpdate(false);
+    setAgentExpanded(false);
     setPlacedItems(nextItems);
     placedItemsRef.current = nextItems;
     setBrokenGlass([]);
@@ -1295,6 +1587,7 @@ function App() {
     setAgentRemoteSummary('');
     setAgentSuggestedPrompts([]);
     setAgentHasFreshUpdate(false);
+    setAgentExpanded(false);
     syncReadouts(null);
     setGameMode('challenge');
   };
@@ -1752,11 +2045,18 @@ function App() {
   }, [focusedItemId, placedItems]);
   const primaryAgentContainerId = primaryAgentContainer?.id || null;
   const challengeInsight = useMemo(() => computeChallengeInsight(activeChallenge, placedItems), [activeChallenge, placedItems]);
+  const challengeProductReady = useMemo(() => computeChallengeCompleted(activeChallenge, placedItems), [activeChallenge, placedItems]);
+  const activeMissionProof = activeChallenge ? MISSION_PROOFS[activeChallenge.id] : undefined;
+  const activeProofAnswers = activeChallenge ? (missionProofAnswers[activeChallenge.id] || {}) : {};
+  const activeProofSolvedCount = activeMissionProof?.checkpoints.filter(checkpoint => activeProofAnswers[checkpoint.id]?.correct).length ?? 0;
+  const activeProofCurrent = activeMissionProof?.checkpoints.find(checkpoint => !activeProofAnswers[checkpoint.id]?.correct);
+  const activeProofCurrentAnswer = activeProofCurrent ? activeProofAnswers[activeProofCurrent.id] : undefined;
+  const activeProofSolved = Boolean(activeMissionProof && activeProofSolvedCount === activeMissionProof.checkpoints.length);
   const discoveryCards = useMemo(() => buildDiscoveryCards(placedItems, unlockedDiscoveryIds), [placedItems, unlockedDiscoveryIds]);
   const unlockedDiscoveryCount = useMemo(() => discoveryCards.filter(card => card.unlocked).length, [discoveryCards]);
   const completedMissionCount = useMemo(
-    () => MISSION_SEQUENCE.filter(preset => unlockedDiscoveryIds.has(MISSION_BRIEFS[preset].discoveryId)).length,
-    [unlockedDiscoveryIds]
+    () => MISSION_SEQUENCE.filter(preset => completedMissionIds.has(MISSION_BRIEFS[preset].challengeId)).length,
+    [completedMissionIds]
   );
   const activeMissionPreset = useMemo(
     () => activeChallenge ? MISSION_SEQUENCE.find(preset => MISSION_BRIEFS[preset].challengeId === activeChallenge.id) : undefined,
@@ -1765,6 +2065,13 @@ function App() {
   const activeMissionBrief = activeMissionPreset ? MISSION_BRIEFS[activeMissionPreset] : null;
   const challengeDoneCount = challengeInsight?.checklist.filter(item => item.done).length ?? 0;
   const challengeStepCount = challengeInsight?.checklist.length ?? 0;
+  const challengeProofStepCount = activeMissionProof?.checkpoints.length ?? 0;
+  const challengeDisplayDoneCount = challengeDoneCount + activeProofSolvedCount;
+  const challengeDisplayStepCount = challengeStepCount + challengeProofStepCount;
+  const challengeStepLabels = [
+    ...(activeMissionBrief?.route || challengeInsight?.checklist.map(item => item.label) || []),
+    ...(activeMissionProof?.checkpoints.map(checkpoint => checkpoint.label) || []),
+  ];
   const challengeNextAction = challengeInsight?.checklist.find(item => !item.done)?.label || null;
   const challengeGuideTargetId = gameMode === 'challenge' && activeChallenge ? primaryAgentContainerId : null;
   const challengeQuickReagent = useMemo(() => {
@@ -1879,6 +2186,7 @@ function App() {
   const agentVerticalPlacement = useMemo(() => {
     return agentPosition.y + AGENT_ORB_HEIGHT / 2 >= agentViewport.height / 2 ? 'up' : 'down';
   }, [agentPosition.y, agentViewport.height]);
+  const showFloatingAgent = !(gameMode === 'challenge' && placedItems.length === 0 && brokenGlass.length === 0);
 
   const appendAgentMessage = useCallback((text: string) => {
     setAgentMessages(prev => [...prev, { id: createRuntimeId('agent-msg'), role: 'agent' as const, text }].slice(-8));
@@ -2248,7 +2556,10 @@ function App() {
   useEffect(() => {
     if (gameMode !== 'challenge' || !activeChallenge || activeChallenge.completed) return;
 
-    const success = computeChallengeCompleted(activeChallenge, placedItems);
+    const proof = MISSION_PROOFS[activeChallenge.id];
+    const answers = missionProofAnswers[activeChallenge.id] || {};
+    const proofSolved = proof ? proof.checkpoints.every(checkpoint => answers[checkpoint.id]?.correct) : true;
+    const success = computeChallengeCompleted(activeChallenge, placedItems) && proofSolved;
     if (!success || pendingChallengeCompletionRef.current === activeChallenge.id) return;
 
     pendingChallengeCompletionRef.current = activeChallenge.id;
@@ -2262,10 +2573,17 @@ function App() {
       formula: meta.formula,
       accent: meta.accent,
     });
+    setCompletedMissionIds(previousIds => {
+      if (previousIds.has(activeChallenge.id)) return previousIds;
+      const nextIds = new Set(previousIds);
+      nextIds.add(activeChallenge.id);
+      writeStoredMissionCompletionIds(nextIds);
+      return nextIds;
+    });
     setTimeout(() => {
       setActiveChallenge(c => c?.id === activeChallenge.id ? { ...c, completed: true } : c);
     }, 0);
-  }, [activeChallenge, gameMode, placedItems, playSound]);
+  }, [activeChallenge, gameMode, missionProofAnswers, placedItems, playSound]);
 
   usePhysicsEngine(
     placedItems, 
@@ -2803,7 +3121,7 @@ function App() {
                         <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">
                           <span>{activeMissionBrief?.family || '任务'}</span>
                           <span className="rounded-full border border-[#22d3ee]/22 bg-[#22d3ee]/10 px-2 py-0.5 tracking-normal text-[#67e8f9]">
-                            {challengeDoneCount}/{Math.max(1, challengeStepCount)}
+                            {challengeDisplayDoneCount}/{Math.max(1, challengeDisplayStepCount)}
                           </span>
                         </div>
                         <div className="mt-1 truncate text-[16px] font-semibold text-white">{activeChallenge.title}</div>
@@ -2814,16 +3132,23 @@ function App() {
                     </div>
 
                     <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/8">
-                      <div className="h-full rounded-full bg-gradient-to-r from-[#22d3ee] via-[#f43f5e] to-[#a855f7] transition-all duration-500" style={{ width: `${challengeInsight.progressValue}%` }} />
+                      <div className="h-full rounded-full bg-gradient-to-r from-[#22d3ee] via-[#f43f5e] to-[#a855f7] transition-all duration-500" style={{ width: `${(challengeDisplayDoneCount / Math.max(1, challengeDisplayStepCount)) * 100}%` }} />
                     </div>
 
-                    <div className="mt-3 grid grid-cols-3 gap-1.5">
-                      {(activeMissionBrief?.route || challengeInsight.checklist.map(item => item.label)).slice(0, 3).map((label, index) => {
-                        const stepDone = challengeInsight.checklist[index]?.done || activeChallenge.completed;
+                    <div
+                      className="mt-3 grid gap-1.5 overflow-x-auto pb-1"
+                      style={{ gridTemplateColumns: `repeat(${Math.max(1, challengeStepLabels.length)}, minmax(58px, 1fr))` }}
+                    >
+                      {challengeStepLabels.map((label, index) => {
+                        const stepDone = index < challengeStepCount
+                          ? (challengeInsight.checklist[index]?.done || activeChallenge.completed)
+                          : (activeMissionProof?.checkpoints[index - challengeStepCount]
+                              ? Boolean(activeProofAnswers[activeMissionProof.checkpoints[index - challengeStepCount].id]?.correct)
+                              : false) || activeChallenge.completed;
                         return (
                           <div
                             key={`${label}-${index}`}
-                            className={`rounded-2xl border px-2.5 py-2 transition-colors ${stepDone ? 'border-[#10b981]/24 bg-[#10b981]/10 text-[#bbf7d0]' : index === challengeDoneCount ? 'border-[#22d3ee]/26 bg-[#22d3ee]/10 text-[#a5f3fc]' : 'border-white/8 bg-white/[0.025] text-[#94a3b8]'}`}
+                            className={`rounded-2xl border px-2.5 py-2 transition-colors ${stepDone ? 'border-[#10b981]/24 bg-[#10b981]/10 text-[#bbf7d0]' : index === challengeDisplayDoneCount ? 'border-[#22d3ee]/26 bg-[#22d3ee]/10 text-[#a5f3fc]' : 'border-white/8 bg-white/[0.025] text-[#94a3b8]'}`}
                           >
                             <div className="text-[10px] font-semibold">{stepDone ? '✓' : String(index + 1).padStart(2, '0')}</div>
                             <div className="mt-0.5 truncate text-[11px] font-semibold">{label}</div>
@@ -2837,7 +3162,9 @@ function App() {
                     <div className="flex items-start gap-2">
                       <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#f43f5e] shadow-[0_0_18px_rgba(244,63,94,0.75)]" />
                       <div className="min-w-0 flex-1">
-                        <div className="text-[12px] leading-snug text-[#fce7f3]">{challengeInsight.nextHint}</div>
+                        <div className="text-[12px] leading-snug text-[#fce7f3]">
+                          {challengeProductReady && activeMissionProof && !activeProofSolved && !activeChallenge.completed ? '现象已出现，完成证据链。' : challengeInsight.nextHint}
+                        </div>
                         {activeMissionBrief?.branch && (
                           <div className="mt-1 truncate text-[11px] text-[#64748b]">{activeMissionBrief.branch}</div>
                         )}
@@ -2845,38 +3172,91 @@ function App() {
                     </div>
 
                     {!activeChallenge.completed ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {challengeActionOptions.map(option => (
+                      challengeProductReady && activeMissionProof && activeProofCurrent && !activeProofSolved ? (
+                        <div className="mt-3">
+                          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-[11px] font-semibold text-[#e2e8f0]">
+                              {activeProofCurrent.question}
+                            </div>
+                            <div className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-0.5 text-[10px] font-semibold text-[#94a3b8]">
+                              证据 {activeProofSolvedCount + 1}/{activeMissionProof.checkpoints.length}
+                            </div>
+                          </div>
+                          <div className="mb-2 flex flex-wrap gap-1">
+                            {activeMissionProof.checkpoints.map((checkpoint, checkpointIndex) => {
+                              const checkpointDone = Boolean(activeProofAnswers[checkpoint.id]?.correct);
+                              const checkpointCurrent = checkpoint.id === activeProofCurrent.id;
+                              return (
+                                <span
+                                  key={checkpoint.id}
+                                  className={`rounded-full border px-2 py-0.5 text-[10px] ${checkpointDone ? 'border-[#10b981]/25 bg-[#10b981]/10 text-[#bbf7d0]' : checkpointCurrent ? 'border-[#22d3ee]/28 bg-[#22d3ee]/10 text-[#a5f3fc]' : 'border-white/8 bg-white/[0.025] text-[#64748b]'}`}
+                                >
+                                  {checkpointDone ? '✓' : checkpointIndex + 1} {checkpoint.label}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          <div className="grid gap-1.5">
+                            {activeProofCurrent.options.map(option => {
+                              const isSelected = activeProofCurrentAnswer?.selectedId === option.id;
+                              const isWrong = isSelected && activeProofCurrentAnswer?.correct === false;
+                              return (
+                                <button
+                                  key={option.id}
+                                  type="button"
+                                  onClick={() => setMissionProofAnswers(prev => ({
+                                    ...prev,
+                                    [activeChallenge.id]: {
+                                      ...(prev[activeChallenge.id] || {}),
+                                      [activeProofCurrent.id]: { selectedId: option.id, correct: option.id === activeProofCurrent.answerId },
+                                    },
+                                  }))}
+                                  className={`rounded-2xl border px-3 py-2 text-left transition-colors ${isWrong ? 'border-[#f43f5e]/35 bg-[#f43f5e]/10' : isSelected ? 'border-[#10b981]/35 bg-[#10b981]/10' : 'border-white/8 bg-white/[0.035] hover:border-[#22d3ee]/30 hover:bg-[#22d3ee]/8'}`}
+                                >
+                                  <div className="text-[12px] font-semibold text-[#f8fafc]">{option.label}</div>
+                                  <div className="mt-0.5 text-[10px] text-[#94a3b8]">{option.detail}</div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {activeProofCurrentAnswer?.correct === false && (
+                            <div className="mt-2 text-[11px] text-[#fda4af]">证据不匹配，再看现象。</div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {challengeActionOptions.map(option => (
+                            <button
+                              key={option.name}
+                              type="button"
+                              onClick={() => {
+                                addReagentToContainer(primaryAgentContainerId || '', option.name, option.volume);
+                              }}
+                              className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all hover:-translate-y-0.5 ${option.tone === 'next' ? 'border-[#22d3ee]/42 bg-[#22d3ee]/14 text-[#a5f3fc] shadow-[0_0_20px_rgba(34,211,238,0.14)]' : option.tone === 'main' ? 'border-white/12 bg-white/[0.055] text-[#e2e8f0] hover:border-white/20' : 'border-[#f59e0b]/26 bg-[#f59e0b]/8 text-[#fde68a] hover:bg-[#f59e0b]/14'}`}
+                            >
+                              <span className="mr-1 opacity-70">{option.label}</span>
+                              {option.name.replace('指示剂', '')}
+                            </button>
+                          ))}
                           <button
-                            key={option.name}
                             type="button"
                             onClick={() => {
-                              addReagentToContainer(primaryAgentContainerId || '', option.name, option.volume);
+                              if (primaryAgentContainerId) {
+                                showInlineContainerHint({
+                                  targetId: primaryAgentContainerId,
+                                  title: '观察',
+                                  detail: challengeInsight.nextHint,
+                                  tone: 'info',
+                                });
+                              }
+                              showToast('已观察当前状态');
                             }}
-                            className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all hover:-translate-y-0.5 ${option.tone === 'next' ? 'border-[#22d3ee]/42 bg-[#22d3ee]/14 text-[#a5f3fc] shadow-[0_0_20px_rgba(34,211,238,0.14)]' : option.tone === 'main' ? 'border-white/12 bg-white/[0.055] text-[#e2e8f0] hover:border-white/20' : 'border-[#f59e0b]/26 bg-[#f59e0b]/8 text-[#fde68a] hover:bg-[#f59e0b]/14'}`}
+                            className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-semibold text-[#cbd5e1] transition-all hover:-translate-y-0.5 hover:border-white/20"
                           >
-                            <span className="mr-1 opacity-70">{option.label}</span>
-                            {option.name.replace('指示剂', '')}
+                            观察
                           </button>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (primaryAgentContainerId) {
-                              showInlineContainerHint({
-                                targetId: primaryAgentContainerId,
-                                title: '观察',
-                                detail: challengeInsight.nextHint,
-                                tone: 'info',
-                              });
-                            }
-                            showToast('已观察当前状态');
-                          }}
-                          className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-semibold text-[#cbd5e1] transition-all hover:-translate-y-0.5 hover:border-white/20"
-                        >
-                          观察
-                        </button>
-                      </div>
+                        </div>
+                      )
                     ) : (
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button
@@ -3105,7 +3485,7 @@ function App() {
 
             {placedItems.length === 0 && brokenGlass.length === 0 && gameMode === 'challenge' ? (
               <div className="absolute inset-0 z-[20] flex w-full flex-col items-center overflow-y-auto px-4 pb-6 pt-[216px] xl:pt-[156px]">
-                <div className={`mb-4 w-full overflow-hidden rounded-[28px] border border-white/8 bg-[rgba(7,11,23,0.62)] backdrop-blur-2xl ${isTablet ? 'pl-24' : ''}`}>
+                <div className={`mb-4 min-h-[224px] w-full overflow-hidden rounded-[28px] border border-white/8 bg-[rgba(7,11,23,0.62)] backdrop-blur-2xl ${isTablet ? 'pl-24' : ''}`}>
                   <div className="grid gap-0 md:grid-cols-[0.95fr_1.35fr]">
                     <div className="relative min-h-[158px] border-b border-white/8 p-5 md:border-b-0 md:border-r">
                       <div className="absolute -left-16 -top-16 h-44 w-44 rounded-full bg-[#22d3ee]/12 blur-3xl" />
@@ -3114,7 +3494,7 @@ function App() {
                         <div className="mt-2 text-[24px] font-semibold tracking-[-0.03em] text-white">未知样品库</div>
                         <div className="mt-3 flex items-end gap-3">
                           <div className="font-mono text-[34px] font-bold leading-none text-[#67e8f9]">{completedMissionCount}/{MISSION_SEQUENCE.length}</div>
-                          <div className="pb-1 text-[12px] text-[#94a3b8]">已解锁</div>
+                          <div className="pb-1 text-[12px] text-[#94a3b8]">已完成</div>
                         </div>
                         <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/8">
                           <div className="h-full rounded-full bg-gradient-to-r from-[#22d3ee] via-[#f43f5e] to-[#a855f7] transition-all duration-500" style={{ width: `${(completedMissionCount / MISSION_SEQUENCE.length) * 100}%` }} />
@@ -3133,7 +3513,7 @@ function App() {
                       <div className="grid grid-cols-6 gap-2">
                         {MISSION_SEQUENCE.map((preset, index) => {
                           const mission = MISSION_BRIEFS[preset];
-                          const isMissionDone = unlockedDiscoveryIds.has(mission.discoveryId);
+                          const isMissionDone = completedMissionIds.has(mission.challengeId);
                           return (
                             <button
                               key={`rail-${mission.challengeId}`}
@@ -3160,7 +3540,7 @@ function App() {
                   {MISSION_SEQUENCE.map((preset, index) => {
                     const mission = MISSION_BRIEFS[preset];
                     const accent = getMissionAccentClasses(mission.accent);
-                    const isMissionDone = unlockedDiscoveryIds.has(mission.discoveryId);
+                    const isMissionDone = completedMissionIds.has(mission.challengeId);
                     return (
                       <motion.button
                         key={mission.title}
@@ -3177,6 +3557,9 @@ function App() {
                         <div className="relative pr-9">
                           <div className="mb-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">
                             <span>{mission.family}</span>
+                            <span className="rounded-full border border-white/8 bg-white/[0.035] px-2 py-0.5 tracking-normal text-[#94a3b8]">
+                              证据链 {MISSION_PROOFS[mission.challengeId]?.checkpoints.length || 0}
+                            </span>
                             {index === 0 && (
                               <span className="rounded-full border border-[#22d3ee]/22 bg-[#22d3ee]/10 px-2 py-0.5 tracking-normal text-[#67e8f9]">推荐</span>
                             )}
@@ -3780,12 +4163,13 @@ function App() {
             </div>
           </aside>
 
-          <motion.div
-            className="fixed z-40"
-            style={{ left: agentPosition.x, top: agentPosition.y }}
-            animate={{ y: agentIsDragging ? 0 : agentOrbPulse ? [0, -4, 0] : 0 }}
-            transition={{ duration: agentIsDragging ? 0 : agentOrbPulse ? 1.4 : 0.18, repeat: agentIsDragging || !agentOrbPulse ? 0 : 2, ease: 'easeInOut' }}
-          >
+          {showFloatingAgent && (
+            <motion.div
+              className="fixed z-40"
+              style={{ left: agentPosition.x, top: agentPosition.y }}
+              animate={{ y: agentIsDragging ? 0 : agentOrbPulse ? [0, -4, 0] : 0 }}
+              transition={{ duration: agentIsDragging ? 0 : agentOrbPulse ? 1.4 : 0.18, repeat: agentIsDragging || !agentOrbPulse ? 0 : 2, ease: 'easeInOut' }}
+            >
             <AnimatePresence>
               {agentExpanded && (
                 <motion.div
@@ -3964,7 +4348,8 @@ function App() {
                 />
               )}
             </button>
-          </motion.div>
+            </motion.div>
+          )}
 
         </main>
 
