@@ -311,7 +311,7 @@ export function ReagentShelf({
       <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-4 pr-2">
         {hasMissionHighlights && (
           <section className="rounded-2xl border border-[#22d3ee]/16 bg-[rgba(34,211,238,0.05)] px-3 py-3">
-            <div className="mb-2 text-[11px] font-semibold text-[#67e8f9]">推荐试剂</div>
+            <div className="mb-2 text-[11px] font-semibold text-[#67e8f9]">本关试剂</div>
             <div className="flex flex-wrap gap-2">
               {highlightedReagents.map(name => (
                 <span key={name} className="px-2 py-1 rounded-full border border-[#22d3ee]/25 bg-[#22d3ee]/10 text-[11px] text-[#67e8f9]">

@@ -115,6 +115,14 @@ type MissionCompletionCard = {
   accent: string;
 };
 
+type MissionCue = {
+  id: string;
+  title: string;
+  detail: string;
+  accent: string;
+  tone: 'main' | 'side' | 'proof';
+};
+
 type MissionProofOption = {
   id: string;
   label: string;
@@ -133,6 +141,13 @@ type MissionProofCheckpoint = {
 
 type MissionProof = {
   checkpoints: MissionProofCheckpoint[];
+};
+
+type ChallengeActionOption = {
+  name: string;
+  label: string;
+  tone: 'next' | 'main' | 'try';
+  volume: number;
 };
 
 type FloatingAgentPosition = {
@@ -1201,7 +1216,7 @@ function canAcceptIncomingVolume(type: string, currentState: ChemState, incoming
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
-  const [isTablet, setIsTablet] = useState(false);
+  const [isTablet, setIsTablet] = useState(() => (typeof window === 'undefined' ? false : window.innerWidth < 1180));
   const [activeRightPanelTab, setActiveRightPanelTab] = useState<'reagents' | 'logs'>('reagents');
   const [dragGuide, setDragGuide] = useState<WorkspaceDragGuide | null>(null);
   
@@ -1274,6 +1289,7 @@ function App() {
   const [equations, setEquations] = useState<{id: string, text: string, x: number, y: number}[]>([]);
   const [reactionSpotlight, setReactionSpotlight] = useState<ReactionSpotlight | null>(null);
   const [missionCompletionCard, setMissionCompletionCard] = useState<MissionCompletionCard | null>(null);
+  const [missionCue, setMissionCue] = useState<MissionCue | null>(null);
   const [rightPanelPulse, setRightPanelPulse] = useState<'reagents' | 'logs' | null>(null);
   const [reagentFocusSignal, setReagentFocusSignal] = useState(0);
   const [unlockedDiscoveryIds, setUnlockedDiscoveryIds] = useState<Set<string>>(() => readStoredDiscoveryIds());
@@ -1292,6 +1308,18 @@ function App() {
       setToast(current => current?.id === id ? null : current);
     }, 3000);
   }, [setToast]);
+
+  const showMissionCue = useCallback((cue: Omit<MissionCue, 'id'>, duration = 2200) => {
+    const id = createRuntimeId('mission-cue');
+    setMissionCue({ id, ...cue });
+    if (missionCueTimeoutRef.current) {
+      window.clearTimeout(missionCueTimeoutRef.current);
+    }
+    missionCueTimeoutRef.current = window.setTimeout(() => {
+      setMissionCue(current => current?.id === id ? null : current);
+      missionCueTimeoutRef.current = null;
+    }, duration);
+  }, []);
 
   // Play Mode State
   const [gameMode, setGameMode] = useState<'sandbox' | 'challenge'>('challenge');
@@ -1340,6 +1368,7 @@ function App() {
   const agentInputRef = useRef<HTMLTextAreaElement | null>(null);
   const agentMessagesEndRef = useRef<HTMLDivElement | null>(null);
   const inlineContainerFeedbackTimeoutRef = useRef<number | null>(null);
+  const missionCueTimeoutRef = useRef<number | null>(null);
   const agentDragStateRef = useRef<AgentDragState>({ pointerId: null, startX: 0, startY: 0, originX: 0, originY: 0, dragging: false });
   const handleDragEndRef = useRef(handleDragEnd);
   const emitReactionOutcomeRef = useRef(emitReactionOutcome);
@@ -1374,6 +1403,9 @@ function App() {
     return () => {
       if (inlineContainerFeedbackTimeoutRef.current) {
         window.clearTimeout(inlineContainerFeedbackTimeoutRef.current);
+      }
+      if (missionCueTimeoutRef.current) {
+        window.clearTimeout(missionCueTimeoutRef.current);
       }
     };
   }, []);
@@ -1626,6 +1658,7 @@ function App() {
         setActiveChallenge(null);
       }
       setMissionCompletionCard(null);
+      setMissionCue(null);
       setReactionSpotlight(null);
       setDiscoveryToast(null);
       setFocusedItemId(null); // Clear focus
@@ -1680,6 +1713,7 @@ function App() {
     nextFocusedId = beaker.id;
     setGameMode('challenge');
     setMissionCompletionCard(null);
+    setMissionCue(null);
     setReactionSpotlight(null);
     setDiscoveryToast(null);
     setMissionProofAnswers(prev => {
@@ -1736,6 +1770,7 @@ function App() {
     setEquations([]);
     setActiveDrop(null);
     setMissionCompletionCard(null);
+    setMissionCue(null);
     setReactionSpotlight(null);
     setDiscoveryToast(null);
     setActiveChallenge(null);
@@ -2316,7 +2351,7 @@ function App() {
       || null;
   }, [challengeInsight, challengeNextAction]);
   const challengeStageLabel = useMemo(() => {
-    if (!activeChallenge) return '选推荐演示';
+    if (!activeChallenge) return '选一关';
     if (activeChallenge.completed) return '下一关';
     if (challengeProductReady && activeMissionProof && !activeProofSolved) {
       return activeProofCurrent ? `证据：${activeProofCurrent.label}` : '答证据链';
@@ -2327,7 +2362,7 @@ function App() {
   }, [activeChallenge, activeMissionProof, activeProofCurrent, activeProofSolved, challengeNextAction, challengeProductReady, challengeQuickReagent]);
   const challengeActionOptions = useMemo(() => {
     if (!challengeInsight || !primaryAgentContainerId || activeChallenge?.completed) return [];
-    const options: Array<{ name: string; label: string; tone: 'next' | 'main' | 'try'; volume: number }> = [];
+    const options: ChallengeActionOption[] = [];
     const pushOption = (name: string, label: string, tone: 'next' | 'main' | 'try', volume = 20) => {
       if (!name || options.some(option => option.name === name)) return;
       options.push({ name, label, tone, volume });
@@ -2339,9 +2374,52 @@ function App() {
     challengeInsight.primaryReagents
       .filter(name => !completedLabels.has(name) && !completedLabels.has(normalize(name)))
       .forEach(name => pushOption(name, '主线', 'main'));
-    challengeInsight.secondaryReagents.slice(0, 2).forEach(name => pushOption(name, '可试', 'try', 10));
+    challengeInsight.secondaryReagents.slice(0, 2).forEach(name => pushOption(name, '支线', 'try', 10));
     return options.slice(0, 4);
   }, [activeChallenge?.completed, challengeInsight, challengeQuickReagent, primaryAgentContainerId]);
+  const challengePrimaryAction = useMemo(
+    () => challengeActionOptions.find(option => option.tone === 'next')
+      || challengeActionOptions.find(option => option.tone === 'main')
+      || null,
+    [challengeActionOptions]
+  );
+  const challengeSecondaryActions = useMemo(
+    () => challengeActionOptions
+      .filter(option => option.name !== challengePrimaryAction?.name)
+      .slice(0, 3),
+    [challengeActionOptions, challengePrimaryAction]
+  );
+
+  function flashMissionCue(reagentName: string, tone: ChallengeActionOption['tone']) {
+    if (gameMode !== 'challenge' || !activeChallenge) return;
+    const meta = getMissionSuccessMeta(activeChallenge.id);
+    const reagentLabel = compactMissionLabel(reagentName);
+    if (tone === 'try') {
+      showMissionCue({
+        title: `对照 · ${reagentLabel}`,
+        detail: activeMissionBrief?.branch || '观察现象差异',
+        accent: meta.accent,
+        tone: 'side',
+      });
+      return;
+    }
+
+    showMissionCue({
+      title: `加入 · ${reagentLabel}`,
+      detail: challengeInsight?.nextHint || challengeStageLabel,
+      accent: meta.accent,
+      tone: 'main',
+    });
+  }
+
+  function runChallengeAction(option: ChallengeActionOption) {
+    if (!primaryAgentContainerId) {
+      showToast('先选择一个容器');
+      return;
+    }
+    addReagentToContainer(primaryAgentContainerId, option.name, option.volume);
+    flashMissionCue(option.name, option.tone);
+  }
 
   /* eslint-disable react-hooks/preserve-manual-memoization -- React Compiler flags the stable toast callback here; dependencies remain explicit for hook correctness. */
   const handleAgentQuickAction = useCallback((actionId: 'focus' | 'logs' | 'reagents' | 'note') => {
@@ -2371,7 +2449,7 @@ function App() {
       setReagentFocusSignal(value => value + 1);
       setRightPanelPulse('reagents');
       window.setTimeout(() => setRightPanelPulse(current => current === 'reagents' ? null : current), 1200);
-      showToast('已定位到推荐试剂');
+      showToast('已打开本关试剂');
       return;
     }
 
@@ -3261,7 +3339,7 @@ function App() {
             onClick={() => launchQuickStart('prepCu')}
             className="hidden h-8 items-center rounded-full border border-[#22d3ee]/30 bg-[#22d3ee]/12 px-3 text-[13px] font-semibold text-[#a5f3fc] transition-colors hover:bg-[#22d3ee]/20 sm:flex"
           >
-            推荐演示
+            演示关卡
           </button>
           <button
             type="button"
@@ -3450,7 +3528,7 @@ function App() {
                     initial={{ opacity: 0, y: 18, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-                    className="absolute bottom-5 left-[58%] z-[68] w-[min(500px,calc(100%-180px))] -translate-x-1/2 rounded-[28px] border border-[#22d3ee]/18 bg-[rgba(7,11,23,0.88)] p-3 shadow-[0_18px_58px_rgba(2,6,23,0.48)] backdrop-blur-2xl"
+                    className="absolute bottom-5 left-1/2 z-[68] w-[min(520px,calc(100%-32px))] -translate-x-1/2 rounded-[28px] border border-[#22d3ee]/18 bg-[rgba(7,11,23,0.88)] p-3 shadow-[0_18px_58px_rgba(2,6,23,0.48)] backdrop-blur-2xl sm:left-[58%] sm:w-[min(500px,calc(100%-180px))]"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0">
@@ -3490,13 +3568,24 @@ function App() {
                           <button
                             key={option.id}
                             type="button"
-                            onClick={() => setMissionProofAnswers(prev => ({
-                              ...prev,
-                              [activeChallenge.id]: {
-                                ...(prev[activeChallenge.id] || {}),
-                                [activeProofCurrent.id]: { selectedId: option.id, correct: option.id === activeProofCurrent.answerId },
-                              },
-                            }))}
+                            onClick={() => {
+                              const isCorrect = option.id === activeProofCurrent.answerId;
+                              setMissionProofAnswers(prev => ({
+                                ...prev,
+                                [activeChallenge.id]: {
+                                  ...(prev[activeChallenge.id] || {}),
+                                  [activeProofCurrent.id]: { selectedId: option.id, correct: isCorrect },
+                                },
+                              }));
+                              if (isCorrect) {
+                                showMissionCue({
+                                  title: `证据 · ${activeProofCurrent.label}`,
+                                  detail: activeProofCurrent.success,
+                                  accent: getMissionSuccessMeta(activeChallenge.id).accent,
+                                  tone: 'proof',
+                                });
+                              }
+                            }}
                             className={`rounded-2xl border px-3 py-2 text-left transition-all hover:-translate-y-0.5 ${isWrong ? 'border-[#f43f5e]/35 bg-[#f43f5e]/10' : isSelected ? 'border-[#10b981]/35 bg-[#10b981]/10' : 'border-white/8 bg-white/[0.035] hover:border-[#22d3ee]/30 hover:bg-[#22d3ee]/8'}`}
                           >
                             <div className="text-[12px] font-semibold text-[#f8fafc]">{option.label}</div>
@@ -3510,6 +3599,22 @@ function App() {
                         {activeProofCurrentFeedback}
                       </div>
                     )}
+                    <AnimatePresence>
+                      {missionCue && (
+                        <motion.div
+                          key={missionCue.id}
+                          initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                          transition={{ duration: 0.18, ease: 'easeOut' }}
+                          className={`mt-2 flex items-center gap-2 rounded-[18px] border px-3 py-2 text-[11px] ${missionCue.tone === 'side' ? 'border-[#f59e0b]/22 bg-[#f59e0b]/8 text-[#fde68a]' : missionCue.tone === 'proof' ? 'border-[#10b981]/24 bg-[#10b981]/10 text-[#bbf7d0]' : 'border-[#22d3ee]/22 bg-[#22d3ee]/8 text-[#a5f3fc]'}`}
+                        >
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: missionCue.accent, boxShadow: `0 0 14px ${missionCue.accent}` }} />
+                          <span className="shrink-0 font-semibold">{missionCue.title}</span>
+                          <span className="min-w-0 truncate text-white/70">{missionCue.detail}</span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </motion.div>
                 ) : (
                   <motion.div
@@ -3517,32 +3622,18 @@ function App() {
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2, ease: 'easeOut' }}
-                    className="absolute bottom-5 left-[58%] z-[58] w-[min(500px,calc(100%-180px))] -translate-x-1/2 rounded-[26px] border border-white/10 bg-[rgba(7,11,23,0.76)] px-3 py-2.5 shadow-[0_16px_46px_rgba(2,6,23,0.38)] backdrop-blur-2xl"
+                    className="absolute bottom-5 left-1/2 z-[58] w-[min(520px,calc(100%-32px))] -translate-x-1/2 rounded-[26px] border border-white/10 bg-[rgba(7,11,23,0.76)] px-3 py-2.5 shadow-[0_16px_46px_rgba(2,6,23,0.38)] backdrop-blur-2xl sm:left-[58%] sm:w-[min(500px,calc(100%-180px))]"
                   >
                     {!activeChallenge.completed ? (
                       <>
-                        <div className="mb-2 flex min-w-0 items-center gap-2 text-[11px] text-[#94a3b8]">
-                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#f43f5e] shadow-[0_0_14px_rgba(244,63,94,0.7)]" />
-                          <span className="truncate">{challengeInsight.nextHint}</span>
-                        </div>
-                        <div className="flex flex-wrap items-center justify-center gap-2">
-                          {challengeActionOptions.map(option => (
-                            <button
-                              key={option.name}
-                              type="button"
-                              onClick={() => {
-                                addReagentToContainer(primaryAgentContainerId || '', option.name, option.volume);
-                              }}
-                              className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all hover:-translate-y-0.5 ${option.tone === 'next' ? 'border-[#22d3ee]/42 bg-[#22d3ee]/14 text-[#a5f3fc] shadow-[0_0_20px_rgba(34,211,238,0.14)]' : option.tone === 'main' ? 'border-white/12 bg-white/[0.055] text-[#e2e8f0] hover:border-white/20' : 'border-[#f59e0b]/26 bg-[#f59e0b]/8 text-[#fde68a] hover:bg-[#f59e0b]/14'}`}
-                            >
-                              {option.tone === 'next' && <span className="mr-1 opacity-75">下一步</span>}
-                              {option.tone === 'try' && <span className="mr-1 opacity-70">对照</span>}
-                              {compactMissionLabel(option.name)}
-                            </button>
-                          ))}
+                        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                           <button
                             type="button"
                             onClick={() => {
+                              if (challengePrimaryAction) {
+                                runChallengeAction(challengePrimaryAction);
+                                return;
+                              }
                               if (primaryAgentContainerId) {
                                 showInlineContainerHint({
                                   targetId: primaryAgentContainerId,
@@ -3553,18 +3644,71 @@ function App() {
                               }
                               showToast('已观察当前状态');
                             }}
-                            className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-semibold text-[#cbd5e1] transition-all hover:-translate-y-0.5 hover:border-white/20"
+                            className="group min-h-[48px] min-w-0 rounded-[20px] border border-[#22d3ee]/30 bg-[#22d3ee]/12 px-3.5 py-2 text-left shadow-[0_0_24px_rgba(34,211,238,0.10)] transition-all hover:-translate-y-0.5 hover:bg-[#22d3ee]/18"
                           >
-                            观察
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="h-2 w-2 shrink-0 rounded-full bg-[#22d3ee] shadow-[0_0_16px_rgba(34,211,238,0.85)]" />
+                              <span className="truncate text-[13px] font-semibold text-[#f8fafc]">
+                                {challengePrimaryAction ? `加入 ${compactMissionLabel(challengePrimaryAction.name)}` : '观察现象'}
+                              </span>
+                            </div>
+                            <div className="mt-1 truncate text-[11px] text-[#8fb5c4]">{challengeInsight.nextHint}</div>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => submitAgentQuery('结合当前关卡，下一步该怎么做？')}
-                            className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-3 py-1.5 text-[11px] font-semibold text-[#a5f3fc] transition-all hover:-translate-y-0.5 hover:bg-[#22d3ee]/16"
-                          >
-                            问拉瓦锡
-                          </button>
+
+                          <div className="flex min-w-0 flex-wrap items-center justify-center gap-1.5 sm:justify-end">
+                            {challengeSecondaryActions.map(option => (
+                              <button
+                                key={option.name}
+                                type="button"
+                                title={option.label}
+                                onClick={() => runChallengeAction(option)}
+                                className={`max-w-[132px] truncate rounded-full border px-3 py-2 text-[11px] font-semibold transition-all hover:-translate-y-0.5 ${option.tone === 'main' ? 'border-white/12 bg-white/[0.055] text-[#e2e8f0] hover:border-white/20' : 'border-[#f59e0b]/24 bg-[#f59e0b]/8 text-[#fde68a] hover:bg-[#f59e0b]/14'}`}
+                              >
+                                {compactMissionLabel(option.name)}
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (primaryAgentContainerId) {
+                                  showInlineContainerHint({
+                                    targetId: primaryAgentContainerId,
+                                    title: '观察',
+                                    detail: challengeInsight.nextHint,
+                                    tone: 'info',
+                                  });
+                                }
+                                showToast('已观察当前状态');
+                              }}
+                              className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 text-[11px] font-semibold text-[#cbd5e1] transition-all hover:-translate-y-0.5 hover:border-white/20"
+                            >
+                              观察
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => submitAgentQuery('结合当前关卡，下一步该怎么做？')}
+                              className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-3 py-2 text-[11px] font-semibold text-[#a5f3fc] transition-all hover:-translate-y-0.5 hover:bg-[#22d3ee]/16"
+                            >
+                              问 AI
+                            </button>
+                          </div>
                         </div>
+                        <AnimatePresence>
+                          {missionCue && (
+                            <motion.div
+                              key={missionCue.id}
+                              initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                              transition={{ duration: 0.18, ease: 'easeOut' }}
+                              className={`mt-2 flex items-center gap-2 rounded-[18px] border px-3 py-2 text-[11px] ${missionCue.tone === 'side' ? 'border-[#f59e0b]/22 bg-[#f59e0b]/8 text-[#fde68a]' : missionCue.tone === 'proof' ? 'border-[#10b981]/24 bg-[#10b981]/10 text-[#bbf7d0]' : 'border-[#22d3ee]/22 bg-[#22d3ee]/8 text-[#a5f3fc]'}`}
+                            >
+                              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: missionCue.accent, boxShadow: `0 0 14px ${missionCue.accent}` }} />
+                              <span className="shrink-0 font-semibold">{missionCue.title}</span>
+                              <span className="min-w-0 truncate text-white/70">{missionCue.detail}</span>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </>
                     ) : (
                       <div className="flex flex-wrap items-center justify-center gap-2">
@@ -3885,9 +4029,6 @@ function App() {
                             <span className="rounded-full border border-white/8 bg-white/[0.035] px-2 py-0.5 tracking-normal text-[#94a3b8]">
                               证据链 {MISSION_PROOFS[mission.challengeId]?.checkpoints.length || 0}
                             </span>
-                            {index === 0 && (
-                              <span className="rounded-full border border-[#22d3ee]/22 bg-[#22d3ee]/10 px-2 py-0.5 tracking-normal text-[#67e8f9]">推荐</span>
-                            )}
                             {isCurrentLevel && (
                               <span className="rounded-full border border-[#22d3ee]/22 bg-[#22d3ee]/10 px-2 py-0.5 tracking-normal text-[#67e8f9]">当前</span>
                             )}
