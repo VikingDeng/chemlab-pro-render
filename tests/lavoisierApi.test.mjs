@@ -122,6 +122,48 @@ test('Lavoisier uses the configured LLM response instead of local chemistry fall
   }
 })
 
+test('Lavoisier scrubs internal context wording instead of exposing validation errors', async () => {
+  const fakeLlm = createServer(async (req, res) => {
+    if (req.method !== 'POST' || req.url !== '/chat/completions') {
+      res.writeHead(404).end()
+      return
+    }
+    const content = JSON.stringify({
+      reply: 'context显示 risks为空，沙盒模式下风险较低。请先聚焦容器。',
+      headline: 'context显示',
+      suggestedPrompts: ['聚焦容器'],
+      toolCalls: [],
+    })
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ choices: [{ message: { content } }] }))
+  })
+  const fakeUrl = await listen(fakeLlm)
+  process.env.LLM_API_KEY = 'test-key'
+  process.env.LLM_MODEL = 'fake-mimo'
+  process.env.LLM_API_URL = fakeUrl
+  process.env.LLM_PROVIDER = 'openai-compatible'
+
+  const server = createLavoisierServer()
+  const baseUrl = await listen(server)
+  try {
+    const data = await postJson(baseUrl, {
+      message: '测试拉瓦锡连接',
+      context: { mode: 'sandbox', localSignals: { intent: 'exploration', risks: [] } },
+    })
+
+    assert.doesNotMatch(data.reply, /LLM 回复未通过校验|context|risks为空|沙盒模式/)
+    assert.match(data.reply, /当前读数未显示明显风险|聚焦容器/)
+    assert.equal(data.statusLabel, 'LLM 已接入 · openai-compatible/fake-mimo')
+  } finally {
+    process.env.LLM_API_KEY = ''
+    process.env.LLM_MODEL = ''
+    process.env.LLM_API_URL = ''
+    process.env.LLM_PROVIDER = ''
+    await close(server)
+    await close(fakeLlm)
+  }
+})
+
 test('MiMo v2.5 disables thinking to avoid empty final answers', async () => {
   let capturedRequest
   const fakeLlm = createServer(async (req, res) => {

@@ -375,12 +375,31 @@ function compactAssistantText(text, maxChars = 180) {
   return compact || normalized.slice(0, maxChars)
 }
 
-function polishLlmResponse(response, fallback) {
-  const reply = compactAssistantText(response?.reply)
-  const headline = compactAssistantText(response?.headline, 80)
-  const hasInternalLeak = INTERNAL_REPLY_PATTERNS.some((pattern) => pattern.test(reply) || pattern.test(headline))
+function scrubInternalLeakText(text) {
+  return normalizeAssistantText(text)
+    .replace(/(?:根据|从)?(?:当前)?\s*(?:context|上下文)\s*(?:显示|shows|indicates)?[，,。:：]?\s*/gi, '')
+    .replace(/risks\s*[:：]?\s*为空/gi, '当前读数未显示明显风险')
+    .replace(/localSignals/gi, '当前实验信号')
+    .replace(/沙盒模式下?风险较低/g, '当前读数未显示明显风险')
+    .replace(/沙盒模式下?/g, '当前')
+    .replace(/沙盒探索模式/g, '自由探索模式')
+    .trim()
+}
 
-  if (!reply || hasInternalLeak) {
+function polishLlmResponse(response, fallback) {
+  let reply = compactAssistantText(response?.reply)
+  let headline = compactAssistantText(response?.headline, 80)
+
+  if (!reply) {
+    throw new Error('LLM 回复未通过校验')
+  }
+
+  if (INTERNAL_REPLY_PATTERNS.some((pattern) => pattern.test(reply) || pattern.test(headline))) {
+    reply = compactAssistantText(scrubInternalLeakText(reply))
+    headline = compactAssistantText(scrubInternalLeakText(headline), 80)
+  }
+
+  if (!reply || INTERNAL_REPLY_PATTERNS.some((pattern) => pattern.test(reply) || pattern.test(headline))) {
     throw new Error('LLM 回复未通过校验')
   }
 
