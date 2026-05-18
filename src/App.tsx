@@ -237,6 +237,7 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
   },
 };
 const MISSION_SEQUENCE: MissionPreset[] = ['prepCu', 'prepAg', 'prepFe', 'prepCo2', 'prepIodine', 'prepMn'];
+const DISCOVERY_STORAGE_KEY = 'chemlab:discovery-unlocks:v1';
 const MISSION_SUCCESS_META: Record<string, { product: string; formula: string; accent: string }> = {
   c1: { product: '蓝绿色絮状沉淀', formula: 'Cu(OH)₂', accent: '#22d3ee' },
   c2: { product: '白色沉淀', formula: 'AgCl', accent: '#f8fafc' },
@@ -253,6 +254,26 @@ function getNextMissionPreset(challengeId: string) {
 
 function getMissionSuccessMeta(challengeId: string) {
   return MISSION_SUCCESS_META[challengeId] || { product: '目标现象', formula: '✓', accent: '#22d3ee' };
+}
+
+function readStoredDiscoveryIds() {
+  if (typeof window === 'undefined') return new Set<string>();
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(DISCOVERY_STORAGE_KEY) || '[]');
+    if (!Array.isArray(parsed)) return new Set<string>();
+    return new Set(parsed.filter((id): id is string => DISCOVERY_LIBRARY.some(discovery => discovery.id === id)));
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function writeStoredDiscoveryIds(ids: Set<string>) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(DISCOVERY_STORAGE_KEY, JSON.stringify(Array.from(ids)));
+  } catch {
+    void 0;
+  }
 }
 
 type DiscoveryCardView = {
@@ -469,10 +490,17 @@ function getMissionAccentClasses(accent: MissionBrief['accent']) {
   }
 }
 
-function buildDiscoveryCards(items: PlacedItem[]): DiscoveryCardView[] {
+function getLiveDiscoveryIds(items: PlacedItem[]) {
+  return new Set(DISCOVERY_LIBRARY
+    .filter(discovery => items.some(item => LIQUID_CONTAINER_TYPES.has(item.type) && discovery.isUnlocked(item.chemState)))
+    .map(discovery => discovery.id));
+}
+
+function buildDiscoveryCards(items: PlacedItem[], persistedIds: Set<string>): DiscoveryCardView[] {
+  const liveIds = getLiveDiscoveryIds(items);
   return DISCOVERY_LIBRARY.map(discovery => ({
     ...discovery,
-    unlocked: items.some(item => LIQUID_CONTAINER_TYPES.has(item.type) && discovery.isUnlocked(item.chemState)),
+    unlocked: persistedIds.has(discovery.id) || liveIds.has(discovery.id),
   }));
 }
 
@@ -826,6 +854,7 @@ function App() {
   const [missionCompletionCard, setMissionCompletionCard] = useState<MissionCompletionCard | null>(null);
   const [rightPanelPulse, setRightPanelPulse] = useState<'reagents' | 'logs' | null>(null);
   const [reagentFocusSignal, setReagentFocusSignal] = useState(0);
+  const [unlockedDiscoveryIds, setUnlockedDiscoveryIds] = useState<Set<string>>(() => readStoredDiscoveryIds());
   
   // Custom Toast State
   const [toast, setToast] = useState<{id: string, message: string} | null>(null);
@@ -880,7 +909,7 @@ function App() {
   const lastAgentNoteRef = useRef<{ at: number; message: string } | null>(null);
   const lastAgentDigestRef = useRef<string>('');
   const lastAgentConversationDigestRef = useRef<string>('');
-  const lastUnlockedDiscoveryIdsRef = useRef<Set<string>>(new Set());
+  const lastUnlockedDiscoveryIdsRef = useRef<Set<string>>(new Set(unlockedDiscoveryIds));
   const agentAbortControllerRef = useRef<AbortController | null>(null);
   const agentShellRef = useRef<HTMLDivElement | null>(null);
   const agentDockButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -1393,6 +1422,27 @@ function App() {
     };
   }, [stopSound]);
 
+  function recordDiscoveryUnlocks(chemState: ChemState) {
+    const unlockedIds = DISCOVERY_LIBRARY
+      .filter(discovery => discovery.isUnlocked(chemState))
+      .map(discovery => discovery.id);
+    if (unlockedIds.length === 0) return;
+
+    setUnlockedDiscoveryIds(previousIds => {
+      let changed = false;
+      const nextIds = new Set(previousIds);
+      unlockedIds.forEach(id => {
+        if (!nextIds.has(id)) {
+          nextIds.add(id);
+          changed = true;
+        }
+      });
+      if (!changed) return previousIds;
+      writeStoredDiscoveryIds(nextIds);
+      return nextIds;
+    });
+  }
+
   function emitReactionOutcome(reagentName: string, result: ReactionResult) {
     if (
       result.reactionType.includes('precipitate')
@@ -1427,6 +1477,7 @@ function App() {
         setReactionSpotlight(current => current?.id === spotlight.id ? null : current);
       }, 2600);
     }
+    recordDiscoveryUnlocks(result.newState);
 
     const customEvent = new CustomEvent('reagentDrop', {
       detail: {
@@ -1658,7 +1709,7 @@ function App() {
   }, [focusedItemId, placedItems]);
   const primaryAgentContainerId = primaryAgentContainer?.id || null;
   const challengeInsight = useMemo(() => computeChallengeInsight(activeChallenge, placedItems), [activeChallenge, placedItems]);
-  const discoveryCards = useMemo(() => buildDiscoveryCards(placedItems), [placedItems]);
+  const discoveryCards = useMemo(() => buildDiscoveryCards(placedItems, unlockedDiscoveryIds), [placedItems, unlockedDiscoveryIds]);
   const unlockedDiscoveryCount = useMemo(() => discoveryCards.filter(card => card.unlocked).length, [discoveryCards]);
   const challengeNextAction = challengeInsight?.checklist.find(item => !item.done)?.label || null;
   const challengeGuideTargetId = gameMode === 'challenge' && activeChallenge ? primaryAgentContainerId : null;
@@ -2767,13 +2818,23 @@ function App() {
                       <div className="mt-1 text-[12px] text-[#94a3b8]">已解锁图鉴，可继续下一关。</div>
                     </div>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2">
+                  <div className="mt-4 grid grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => setAtlasOpen(true)}
                       className="rounded-2xl border border-[#22d3ee]/30 bg-[#22d3ee]/10 px-3 py-2 text-[12px] font-semibold text-[#a5f3fc] hover:bg-[#22d3ee]/16 transition-colors"
                     >
                       查看图鉴
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMissionCompletionCard(null);
+                        submitAgentQuery('请用三行解释刚才的现象：现象、原因、下一步。');
+                      }}
+                      className="rounded-2xl border border-[#10b981]/30 bg-[#10b981]/10 px-3 py-2 text-[12px] font-semibold text-[#bbf7d0] hover:bg-[#10b981]/16 transition-colors"
+                    >
+                      问拉瓦锡
                     </button>
                     <button
                       type="button"
@@ -2918,7 +2979,12 @@ function App() {
                         className={`group relative overflow-hidden rounded-[22px] border bg-[rgba(7,11,23,0.62)] p-4 text-left backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:bg-[rgba(15,23,42,0.72)] ${accent.ring}`}
                       >
                         <div className={`absolute right-4 top-4 h-2.5 w-2.5 rounded-full ${accent.dot}`} />
-                        <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">关卡 {String(index + 1).padStart(2, '0')}</div>
+                        <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">
+                          <span>关卡 {String(index + 1).padStart(2, '0')}</span>
+                          {index === 0 && (
+                            <span className="rounded-full border border-[#22d3ee]/22 bg-[#22d3ee]/10 px-2 py-0.5 tracking-normal text-[#67e8f9]">推荐演示</span>
+                          )}
+                        </div>
                         <div className="text-[15px] font-semibold text-[#f8fafc]">{mission.title}</div>
                         <div className="mt-4 flex flex-wrap gap-1.5">
                           {mission.reagents.slice(0, 4).map(reagent => (
