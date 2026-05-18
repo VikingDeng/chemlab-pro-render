@@ -1378,6 +1378,49 @@ function App() {
     };
   }, []);
 
+  function addReagentToContainer(targetId: string, reagentName: string, volumeML = 20) {
+    setPlacedItems(currentItems => {
+      const target = currentItems.find(i => i.id === targetId);
+      if (!target || !LIQUID_CONTAINER_TYPES.has(target.type)) {
+        showToast('先选择一个容器');
+        return currentItems;
+      }
+
+      const capacity = getContainerCapacity(target.type);
+      const currentVolume = getTotalLiquidVolume(target.chemState);
+      if (currentVolume + volumeML > capacity) {
+        showToast(`🚫 ${target.name} 容量不足，无法加入 ${volumeML}mL`);
+        return currentItems;
+      }
+
+      saveSnapshot(currentItems, brokenGlass);
+      const previousState = target.chemState;
+      const result = mixReagent(previousState, reagentName, volumeML);
+
+      setTimeout(() => {
+        emitReactionOutcomeRef.current(reagentName, result);
+        const hint = computeReactionHint(target, reagentName, previousState, result);
+        showInlineContainerHint({ ...hint, targetId: target.id });
+      }, 0);
+
+      const nextItems = currentItems.map(item => {
+        if (item.id !== target.id) return item;
+        return {
+          ...item,
+          chemState: result.newState,
+          state: result.reactionType,
+          lastReactionTime: result.reactionType !== 'added' ? Date.now() : item.lastReactionTime,
+        };
+      });
+      placedItemsRef.current = nextItems;
+      if (focusedItemIdRef.current === target.id) {
+        syncReadouts(result.newState);
+      }
+      return nextItems;
+    });
+  }
+
+
   function handleDragEnd(_event: unknown, info: DragInfoLike | undefined, itemType: string, itemName: string) {
     if (!workspaceRef.current) {
       showToast('⚠️ 实验台尚未准备完成，请稍后再试');
@@ -1451,7 +1494,11 @@ function App() {
 
             if (gameMode === 'challenge') {
               const guidedVolume = Math.min(collisionItem.type === 'testtube' ? 5 : 20, maxAdd);
-              window.setTimeout(() => addReagentToContainer(collisionItem.id, itemName, guidedVolume), 0);
+              window.setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('quickAddReagent', {
+                  detail: { name: itemName, tone: 'main', volume: guidedVolume },
+                }));
+              }, 0);
               return currentItems;
             }
 
@@ -2049,6 +2096,27 @@ function App() {
     };
     window.addEventListener('workspaceDragState', handleWorkspaceDragState);
 
+    const handleQuickAddReagent = (event: Event) => {
+      const customEvent = event as CustomEvent<{ name?: string; tone?: 'main' | 'try' | 'free'; volume?: number }>;
+      const reagentName = customEvent.detail?.name;
+      if (!reagentName) return;
+      const liveItems = placedItemsRef.current;
+      const target = (focusedItemIdRef.current
+        ? liveItems.find(item => item.id === focusedItemIdRef.current && LIQUID_CONTAINER_TYPES.has(item.type))
+        : null)
+        || liveItems.find(item => LIQUID_CONTAINER_TYPES.has(item.type) && getTotalLiquidVolume(item.chemState) > 0)
+        || liveItems.find(item => LIQUID_CONTAINER_TYPES.has(item.type));
+
+      if (!target) {
+        showToast('先开始关卡或选择容器');
+        return;
+      }
+
+      const volume = customEvent.detail?.volume ?? (target.type === 'testtube' ? 5 : customEvent.detail?.tone === 'try' ? 10 : 20);
+      addReagentToContainer(target.id, reagentName, volume);
+    };
+    window.addEventListener('quickAddReagent', handleQuickAddReagent);
+
     const handleBuretteDrip = (e: Event) => {
       const customEvent = e as CustomEvent;
       const { targetId, reagentName, amount, sourceId, transferState } = customEvent.detail;
@@ -2176,8 +2244,10 @@ function App() {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('reagentDrop', handleReagentDrop);
       window.removeEventListener('workspaceDragState', handleWorkspaceDragState);
+      window.removeEventListener('quickAddReagent', handleQuickAddReagent);
       window.removeEventListener('buretteDrip', handleBuretteDrip);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- quick-add uses setPlacedItems functional updates and refs for live containers.
   }, [showInlineContainerHint, showToast, syncReadouts]);
 
   const agentState = useMemo(() => inferAgentState({
@@ -2368,11 +2438,11 @@ function App() {
 
   const appendAgentMessage = useCallback((text: string) => {
     setAgentMessages(prev => [...prev, { id: createRuntimeId('agent-msg'), role: 'agent' as const, text }].slice(-8));
-  }, []);
+  }, [setAgentMessages]);
 
   const appendUserMessage = useCallback((text: string) => {
     setAgentMessages(prev => [...prev, { id: createRuntimeId('agent-msg'), role: 'user' as const, text }].slice(-8));
-  }, []);
+  }, [setAgentMessages]);
 
   const requestLavoisierApi = useCallback(async (query: string, options?: { silent?: boolean; includeUserMessage?: boolean }) => {
     const trimmed = query.trim();
@@ -2598,7 +2668,7 @@ function App() {
         agentAbortControllerRef.current = null;
       }
     }
-  }, [activeChallenge, activeMissionBrief, activeMissionProof, activeProofCurrent, activeProofCurrentAnswer, activeProofCurrentFeedback, activeProofSolved, activeProofSolvedCount, agentLastEvent, agentMessages, agentState.goal, agentState.intent, agentState.risks, appendAgentMessage, appendUserMessage, challengeDisplayDoneCount, challengeDisplayStepCount, challengeProductReady, challengeStageLabel, gameMode, placedItems, primaryAgentContainerId, runAgentToolCalls, lavoisierApiUrl, setAgentDraft, setAgentExpanded]);
+  }, [activeChallenge, activeMissionBrief, activeMissionProof, activeProofCurrent, activeProofCurrentAnswer, activeProofCurrentFeedback, activeProofSolved, activeProofSolvedCount, agentLastEvent, agentMessages, agentState.goal, agentState.intent, agentState.risks, appendAgentMessage, appendUserMessage, challengeDisplayDoneCount, challengeDisplayStepCount, challengeProductReady, challengeStageLabel, gameMode, placedItems, primaryAgentContainerId, runAgentToolCalls, lavoisierApiUrl, setAgentDraft, setAgentError, setAgentExpanded, setAgentIsLoading, setAgentRemoteHeadline, setAgentRemoteSummary, setAgentStatusLabel, setAgentSuggestedPrompts]);
 
   const submitAgentQuery = useCallback((query: string) => {
     void requestLavoisierApi(query, { includeUserMessage: true });
@@ -2644,12 +2714,12 @@ function App() {
       x: dragState.originX + deltaX,
       y: dragState.originY + deltaY,
     }, agentViewport.width, agentViewport.height));
-  }, [agentViewport.height, agentViewport.width]);
+  }, [agentViewport.height, agentViewport.width, setAgentIsDragging, setAgentPosition]);
 
   const resetAgentDragState = useCallback(() => {
     agentDragStateRef.current = { pointerId: null, startX: 0, startY: 0, originX: 0, originY: 0, dragging: false };
     setAgentIsDragging(false);
-  }, []);
+  }, [setAgentIsDragging]);
 
   const handleAgentPointerUp = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
     const dragState = agentDragStateRef.current;
@@ -2667,7 +2737,7 @@ function App() {
 
     resetAgentDragState();
     setAgentExpanded(v => !v);
-  }, [agentViewport.height, agentViewport.width, resetAgentDragState, setAgentExpanded]);
+  }, [agentViewport.height, agentViewport.width, resetAgentDragState, setAgentExpanded, setAgentPosition]);
 
   const handleAgentPointerCancel = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
     const dragState = agentDragStateRef.current;
@@ -2682,7 +2752,7 @@ function App() {
     }
 
     resetAgentDragState();
-  }, [agentViewport.height, agentViewport.width, resetAgentDragState]);
+  }, [agentViewport.height, agentViewport.width, resetAgentDragState, setAgentPosition]);
 
   useEffect(() => {
     const digest = `${agentState.intent}|${agentState.suggestion}|${agentState.risks.slice(0, 2).join('|')}|${agentState.goal?.progress || ''}`;
@@ -2841,48 +2911,6 @@ function App() {
     stopSound, 
     showToast
   );
-
-  function addReagentToContainer(targetId: string, reagentName: string, volumeML = 20) {
-    setPlacedItems(currentItems => {
-      const target = currentItems.find(i => i.id === targetId);
-      if (!target || !LIQUID_CONTAINER_TYPES.has(target.type)) {
-        showToast('先选择一个容器');
-        return currentItems;
-      }
-
-      const capacity = getContainerCapacity(target.type);
-      const currentVolume = getTotalLiquidVolume(target.chemState);
-      if (currentVolume + volumeML > capacity) {
-        showToast(`🚫 ${target.name} 容量不足，无法加入 ${volumeML}mL`);
-        return currentItems;
-      }
-
-      saveSnapshot(currentItems, brokenGlass);
-      const previousState = target.chemState;
-      const result = mixReagent(previousState, reagentName, volumeML);
-
-      setTimeout(() => {
-        emitReactionOutcome(reagentName, result);
-        const hint = computeReactionHint(target, reagentName, previousState, result);
-        showInlineContainerHint({ ...hint, targetId: target.id });
-      }, 0);
-
-      const nextItems = currentItems.map(item => {
-        if (item.id !== target.id) return item;
-        return {
-          ...item,
-          chemState: result.newState,
-          state: result.reactionType,
-          lastReactionTime: result.reactionType !== 'added' ? Date.now() : item.lastReactionTime,
-        };
-      });
-      placedItemsRef.current = nextItems;
-      if (focusedItemIdRef.current === target.id) {
-        syncReadouts(result.newState);
-      }
-      return nextItems;
-    });
-  }
 
   const handleConfirmDrop = () => {
     if (!activeDrop) return;
@@ -4455,6 +4483,7 @@ function App() {
                   suggestedReagents={challengeInsight?.secondaryReagents || []}
                   dimIrrelevant={gameMode === 'challenge'}
                   showUnknownSamples={gameMode === 'challenge'}
+                  quickAddEnabled={gameMode === 'challenge' && Boolean(activeChallenge)}
                 />
               </div>
               <div className={`${isTablet && activeRightPanelTab !== 'logs' ? 'hidden' : 'flex'} min-h-0 flex-col overflow-hidden rounded-[18px] transition-all duration-300 ${isTablet ? 'flex-1' : ''} ${rightPanelPulse === 'logs' ? 'ring-2 ring-[#22d3ee]/45 shadow-[0_0_28px_rgba(34,211,238,0.18)]' : ''}`}>

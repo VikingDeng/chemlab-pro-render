@@ -16,6 +16,7 @@ export interface ReagentShelfProps {
   className?: string;
   focusOnly?: boolean;
   focusSignal?: number;
+  quickAddEnabled?: boolean;
 }
 
 type ReagentCategory = '未知样品' | '基础酸碱' | '金属盐' | '氧化还原' | '萃取/有机' | '指示剂';
@@ -108,10 +109,13 @@ export function ReagentShelf({
   className = '',
   focusOnly = false,
   focusSignal = 0,
+  quickAddEnabled = false,
 }: ReagentShelfProps) {
   const [activeCategory, setActiveCategory] = useState<'全部' | ReagentCategory>('全部');
+  const [dragGhost, setDragGhost] = useState<ReagentProps & { x: number; y: number } | null>(null);
   const effectiveActiveCategory = !showUnknownSamples && activeCategory === '未知样品' ? '全部' : activeCategory;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const dragClickGuardRef = useRef(false);
 
   const highlightedSet = useMemo(() => new Set(highlightedReagents), [highlightedReagents]);
   const suggestedSet = useMemo(
@@ -178,23 +182,50 @@ export function ReagentShelf({
       }));
     };
 
+    const updateDragGhost = (point: { x: number; y: number }) => {
+      setDragGhost({ ...item, x: point.x, y: point.y });
+    };
+
+    const emitQuickAdd = () => {
+      if (!quickAddEnabled || dragClickGuardRef.current) return;
+      window.dispatchEvent(new CustomEvent('quickAddReagent', {
+        detail: {
+          name: item.name,
+          tone: isHighlighted ? 'main' : isSuggested ? 'try' : 'free',
+        },
+      }));
+    };
+
     return (
       <motion.div
         drag
         dragSnapToOrigin
-        dragElastic={0.2}
-        onDragStart={(_e, info) => emitWorkspaceDragState(true, info.point)}
-        onDrag={(_e, info) => emitWorkspaceDragState(true, info.point)}
+        dragElastic={0.08}
+        dragMomentum={false}
+        onClick={emitQuickAdd}
+        onDragStart={(_e, info) => {
+          dragClickGuardRef.current = true;
+          emitWorkspaceDragState(true, info.point);
+          updateDragGhost(info.point);
+        }}
+        onDrag={(_e, info) => {
+          emitWorkspaceDragState(true, info.point);
+          updateDragGhost(info.point);
+        }}
         onDragEnd={(e, i) => {
           emitWorkspaceDragState(false);
+          setDragGhost(null);
+          window.setTimeout(() => {
+            dragClickGuardRef.current = false;
+          }, 0);
           const customEvent = new CustomEvent('reagentDrop', {
             detail: { event: e, info: i, type: 'reagent', name: item.name, isDrop: true }
           });
           window.dispatchEvent(customEvent);
         }}
-        whileDrag={{ scale: 0.95, zIndex: 100, opacity: 0.8, cursor: 'grabbing', rotate: 2 }}
+        whileDrag={{ scale: 0.98, zIndex: 100, opacity: 0.28, cursor: 'grabbing' }}
         key={key}
-        className={`isolate min-h-[58px] flex items-center justify-between pl-5 pr-4 py-3 rounded-xl border transition-all duration-200 cursor-grab group relative overflow-visible ${isHighlighted
+        className={`isolate min-h-[58px] flex items-center justify-between pl-5 pr-4 py-3 rounded-xl border transition-all duration-200 cursor-grab group relative overflow-visible ${quickAddEnabled ? 'active:scale-[0.99]' : ''} ${isHighlighted
           ? 'border-[#22d3ee]/40 bg-[rgba(34,211,238,0.10)] shadow-[0_0_18px_rgba(34,211,238,0.12)]'
           : isSuggested
           ? 'border-[#c084fc]/28 bg-[rgba(168,85,247,0.08)] shadow-[0_0_14px_rgba(168,85,247,0.08)]'
@@ -207,14 +238,9 @@ export function ReagentShelf({
         ></div>
 
         {(isHighlighted || isSuggested) && (
-          <div className="absolute top-2 right-2 z-10 pointer-events-none">
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${isHighlighted
-              ? 'border-[#22d3ee]/35 bg-[#22d3ee]/14 text-[#67e8f9]'
-              : 'border-[#c084fc]/30 bg-[#a855f7]/14 text-[#e9d5ff]'}`}
-            >
-              {isHighlighted ? '推荐' : '可试'}
-            </span>
-          </div>
+          <div
+            className={`absolute left-0 top-2 bottom-2 w-1 rounded-full pointer-events-none ${isHighlighted ? 'bg-[#22d3ee]' : 'bg-[#a855f7]'}`}
+          />
         )}
 
         <div className="flex items-center gap-3 overflow-hidden mr-2 relative z-10 pointer-events-none min-w-0">
@@ -243,6 +269,26 @@ export function ReagentShelf({
 
   return (
     <div data-panel="reagent-shelf" className={`flex flex-1 min-h-0 flex-col overflow-hidden glass-panel ${className}`}>
+      {dragGhost && (
+        <div
+          className="pointer-events-none fixed z-[9999] flex min-h-[54px] w-[230px] -translate-x-1/2 -translate-y-1/2 items-center justify-between rounded-2xl border border-[#22d3ee]/34 bg-[rgba(8,13,24,0.92)] px-4 py-3 shadow-[0_20px_54px_rgba(2,6,23,0.56),0_0_24px_rgba(34,211,238,0.16)] backdrop-blur-xl will-change-transform"
+          style={{ left: dragGhost.x, top: dragGhost.y }}
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              className="h-3.5 w-3.5 shrink-0 rounded-full shadow-[0_0_12px_currentColor]"
+              style={{ backgroundColor: dragGhost.dot, color: dragGhost.dot }}
+            />
+            <span className="truncate text-[14px] font-semibold text-white">{dragGhost.name}</span>
+          </div>
+          <span
+            className="ml-3 shrink-0 rounded-full border border-white/8 px-2 py-1 font-mono text-[11px]"
+            style={{ color: dragGhost.dot }}
+          >
+            {dragGhost.badgeFormula}
+          </span>
+        </div>
+      )}
       <div className="shrink-0 flex gap-2 overflow-x-auto px-3 py-3 border-b border-white/6 bg-black/10">
         <button
           type="button"
@@ -292,7 +338,7 @@ export function ReagentShelf({
           </section>
         ))}
         <div className="mt-4 text-[#475569] italic text-[13px] text-center w-full pt-3 border-t border-white/5">
-          拖入容器
+          {quickAddEnabled ? '点按加入，也可拖入容器' : '拖入容器'}
         </div>
       </div>
     </div>
