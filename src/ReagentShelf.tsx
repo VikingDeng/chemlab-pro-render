@@ -29,38 +29,38 @@ type ReagentGroup = {
 };
 
 const REAGENT_IMAGE_BY_NAME: Record<string, string> = {
-  '未知样品 A': '/reagents/unknown-a.svg',
-  '未知样品 B': '/reagents/unknown-b.svg',
-  '未知样品 C': '/reagents/unknown-c.svg',
-  '未知样品 D': '/reagents/unknown-d.svg',
-  '未知样品 E': '/reagents/unknown-e.svg',
-  '未知样品 F': '/reagents/unknown-f.svg',
-  '盐酸': '/reagents/hcl.svg',
-  '硫酸': '/reagents/h2so4.svg',
-  '硝酸': '/reagents/hno3.svg',
-  '氢氧化钠': '/reagents/naoh.svg',
-  '氨水': '/reagents/nh3.svg',
-  '硫酸铜': '/reagents/cuso4.svg',
-  '硝酸银': '/reagents/agno3.svg',
-  '氯化铁': '/reagents/fecl3.svg',
-  '硫酸亚铁': '/reagents/feso4.svg',
-  '氯化钡': '/reagents/bacl2.svg',
-  '碳酸钠': '/reagents/na2co3.svg',
-  '硫氰化钾': '/reagents/kscn.svg',
-  '高锰酸钾': '/reagents/kmno4.svg',
-  '双氧水': '/reagents/h2o2.svg',
-  '草酸 (H₂C₂O₄)': '/reagents/oxalic.svg',
-  '葡萄糖 (Glucose)': '/reagents/glucose.svg',
-  '四氯化碳 (CCl₄)': '/reagents/ccl4.svg',
-  '正己烷 (Hexane)': '/reagents/hexane.svg',
-  '碘水 (I₂ aq)': '/reagents/i2-aq.svg',
-  '碘单质 (I₂ 固体)': '/reagents/i2-solid.svg',
-  '酚酞指示剂': '/reagents/phenolphthalein.svg',
-  '甲基橙指示剂': '/reagents/methyl-orange.svg',
+  '未知样品 A': '/reagents/unknown-a.jpg',
+  '未知样品 B': '/reagents/unknown-b.jpg',
+  '未知样品 C': '/reagents/unknown-c.jpg',
+  '未知样品 D': '/reagents/unknown-d.jpg',
+  '未知样品 E': '/reagents/unknown-e.jpg',
+  '未知样品 F': '/reagents/unknown-f.jpg',
+  '盐酸': '/reagents/hcl.jpg',
+  '硫酸': '/reagents/h2so4.jpg',
+  '硝酸': '/reagents/hno3.jpg',
+  '氢氧化钠': '/reagents/naoh.jpg',
+  '氨水': '/reagents/nh3.jpg',
+  '硫酸铜': '/reagents/cuso4.jpg',
+  '硝酸银': '/reagents/agno3.jpg',
+  '氯化铁': '/reagents/fecl3.jpg',
+  '硫酸亚铁': '/reagents/feso4.jpg',
+  '氯化钡': '/reagents/bacl2.jpg',
+  '碳酸钠': '/reagents/na2co3.jpg',
+  '硫氰化钾': '/reagents/kscn.jpg',
+  '高锰酸钾': '/reagents/kmno4.jpg',
+  '双氧水': '/reagents/h2o2.jpg',
+  '草酸 (H₂C₂O₄)': '/reagents/oxalic.jpg',
+  '葡萄糖 (Glucose)': '/reagents/glucose.jpg',
+  '四氯化碳 (CCl₄)': '/reagents/ccl4.jpg',
+  '正己烷 (Hexane)': '/reagents/hexane.jpg',
+  '碘水 (I₂ aq)': '/reagents/i2-aq.jpg',
+  '碘单质 (I₂ 固体)': '/reagents/i2-solid.jpg',
+  '酚酞指示剂': '/reagents/phenolphthalein.jpg',
+  '甲基橙指示剂': '/reagents/methyl-orange.jpg',
 };
 
 function getReagentImageSrc(name: string) {
-  return REAGENT_IMAGE_BY_NAME[name] || '/reagents/unknown-a.svg';
+  return REAGENT_IMAGE_BY_NAME[name] || '/reagents/unknown-a.jpg';
 }
 
 const REAGENT_GROUPS: ReagentGroup[] = [
@@ -281,14 +281,14 @@ export function ReagentShelf({
 
         <div className="flex items-center gap-3 overflow-hidden mr-2 relative z-10 pointer-events-none min-w-0">
           <span
-            className={`relative z-20 grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/10 bg-[#07101f] shadow-[0_10px_24px_rgba(2,6,23,0.34)] transition-transform duration-200 ease-out ${isHighlighted ? 'scale-[1.04] ring-1 ring-[#22d3ee]/32' : 'group-hover:scale-[1.03]'}`}
+            className={`relative z-20 grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/10 bg-[#07101f] shadow-[0_10px_24px_rgba(2,6,23,0.34)] transition-transform duration-200 ease-out ${isHighlighted ? 'scale-[1.04] ring-1 ring-[#22d3ee]/32' : 'group-hover:scale-[1.03]'}`}
           >
             <img
               src={imageSrc}
               alt=""
               draggable={false}
               loading="lazy"
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover contrast-[1.04] saturate-[1.08]"
             />
             <span
               className="absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full border border-[#07101f] shadow-[0_0_10px_currentColor]"
@@ -326,7 +326,7 @@ export function ReagentShelf({
               src={getReagentImageSrc(dragGhost.name)}
               alt=""
               draggable={false}
-              className="h-11 w-11 shrink-0 rounded-2xl border border-white/10 object-cover shadow-[0_10px_22px_rgba(2,6,23,0.35)]"
+              className="h-12 w-12 shrink-0 rounded-2xl border border-white/10 object-cover contrast-[1.04] saturate-[1.08] shadow-[0_10px_22px_rgba(2,6,23,0.35)]"
             />
             <span className="truncate text-[14px] font-semibold text-white">{dragGhost.name}</span>
           </div>
