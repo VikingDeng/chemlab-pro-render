@@ -1206,7 +1206,7 @@ function App() {
   }, [setToast]);
 
   // Play Mode State
-  const [gameMode, setGameMode] = useState<'sandbox' | 'challenge'>('sandbox');
+  const [gameMode, setGameMode] = useState<'sandbox' | 'challenge'>('challenge');
   const [activeChallenge, setActiveChallenge] = useState<{id: string, title: string, target: string, completed: boolean, targetId?: string} | null>(null);
 
   // Focused item for dashboard readouts
@@ -2202,7 +2202,7 @@ function App() {
   const agentVerticalPlacement = useMemo(() => {
     return agentPosition.y + AGENT_ORB_HEIGHT / 2 >= agentViewport.height / 2 ? 'up' : 'down';
   }, [agentPosition.y, agentViewport.height]);
-  const showFloatingAgent = !(gameMode === 'challenge' && placedItems.length === 0 && brokenGlass.length === 0);
+  const showFloatingAgent = true;
 
   const appendAgentMessage = useCallback((text: string) => {
     setAgentMessages(prev => [...prev, { id: createRuntimeId('agent-msg'), role: 'agent' as const, text }].slice(-8));
@@ -2389,12 +2389,12 @@ function App() {
 	        return;
 	      }
       const message = error instanceof Error ? error.message : '未知错误';
-      const display = `拉瓦锡暂时没有从远程接口拿到回复：${message}`;
+      const display = `远程 LLM 连接失败：${message}。请重试。`;
       setAgentError(display);
       if (!options?.silent) {
         appendAgentMessage(display);
       }
-      setAgentStatusLabel('异常');
+      setAgentStatusLabel('LLM 连接异常');
 	    } finally {
 	      window.clearTimeout(timeoutId);
 	      setAgentIsLoading(false);
@@ -3034,6 +3034,13 @@ function App() {
           </div>
           <button
             type="button"
+            onClick={() => launchQuickStart('prepCu')}
+            className="hidden h-8 items-center rounded-full border border-[#22d3ee]/30 bg-[#22d3ee]/12 px-3 text-[13px] font-semibold text-[#a5f3fc] transition-colors hover:bg-[#22d3ee]/20 sm:flex"
+          >
+            推荐演示
+          </button>
+          <button
+            type="button"
             onClick={() => setAtlasOpen(true)}
             className="flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 text-[13px] text-[#cbd5e1] transition-colors hover:border-[#22d3ee]/30 hover:bg-[#22d3ee]/10 hover:text-[#67e8f9]"
           >
@@ -3042,12 +3049,12 @@ function App() {
             <span className="font-mono text-[11px] text-[#67e8f9]">{unlockedDiscoveryCount}/{discoveryCards.length}</span>
           </button>
           </div>
-          <div className="flex items-center gap-6 text-[14px]">
+          <div className="flex items-center gap-4 text-[13px] text-[#cbd5e1]">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-[9999px] bg-[#10b981]"></span>
-              <span>安全</span>
+              <span>在线</span>
             </div>
-            <div className="font-mono text-[14px]">温度: 22°C</div>
+            <div className="font-mono text-[13px] text-[#94a3b8]">任务 {completedMissionCount}/{MISSION_SEQUENCE.length}</div>
           </div>
         </header>
 
@@ -3095,6 +3102,7 @@ function App() {
           {/* CENTER WORKSPACE */}
           <section
             ref={workspaceRef}
+            data-panel="workspace"
             className="flex-1 h-full relative rounded-[16px] overflow-hidden flex flex-col items-center justify-center z-0 workspace-canvas shadow-[inset_0_0_100px_rgba(0,0,0,0.5)] border border-[rgba(255,255,255,0.05)] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[rgba(30,41,59,0.3)] to-transparent">
             
             {/* Grid Background Overlay for scientific feel */}
@@ -3162,7 +3170,7 @@ function App() {
 
             {/* Challenge HUD */}
             {gameMode === 'challenge' && activeChallenge && challengeInsight && (
-              <div className="absolute left-1/2 top-[210px] z-[55] w-[min(840px,calc(100%-32px))] -translate-x-1/2 overflow-hidden rounded-[24px] border border-white/10 bg-[rgba(7,11,23,0.84)] shadow-[0_22px_70px_rgba(2,6,23,0.46)] backdrop-blur-2xl xl:top-[146px]">
+              <div data-panel="challenge-hud" className="absolute left-1/2 top-[118px] z-[55] w-[min(820px,calc(100%-32px))] -translate-x-1/2 overflow-hidden rounded-[24px] border border-white/10 bg-[rgba(7,11,23,0.84)] shadow-[0_22px_70px_rgba(2,6,23,0.46)] backdrop-blur-2xl">
                 <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#22d3ee]/55 to-transparent" />
                 <div className="grid gap-3 p-3 md:grid-cols-[1.15fr_1fr]">
                   <div className="min-w-0">
@@ -3427,7 +3435,7 @@ function App() {
                   initial={{ opacity: 0, y: -20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  className={`absolute left-1/2 -translate-x-1/2 px-6 py-3 rounded-full glass-panel shadow-lg border border-[#f59e0b]/30 z-[300] flex items-center justify-center pointer-events-none ${gameMode === 'challenge' ? (isTablet ? 'top-[240px]' : 'top-[212px] xl:top-[168px]') : 'top-[158px] md:top-[118px] xl:top-[80px]'}`}
+                  className={`absolute left-1/2 -translate-x-1/2 px-6 py-3 rounded-full glass-panel shadow-lg border border-[#f59e0b]/30 z-[300] flex items-center justify-center pointer-events-none ${gameMode === 'challenge' ? 'top-[104px]' : 'top-[104px]'}`}
                 >
                   <span className="text-[#f59e0b] font-medium text-[14px] drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]">
                     {toast.message}
@@ -3534,8 +3542,8 @@ function App() {
             </AnimatePresence>
 
             {placedItems.length === 0 && brokenGlass.length === 0 && gameMode === 'challenge' ? (
-              <div className="absolute inset-0 z-[20] flex w-full flex-col items-center overflow-y-auto px-4 pb-6 pt-[216px] xl:pt-[156px]">
-                <div className={`mb-4 min-h-[224px] w-full overflow-hidden rounded-[28px] border border-white/8 bg-[rgba(7,11,23,0.62)] backdrop-blur-2xl ${isTablet ? 'pl-24' : ''}`}>
+              <div data-panel="challenge-mission-select" className="absolute inset-0 z-[20] flex w-full flex-col items-center overflow-y-auto px-4 pb-6 pt-[124px] sm:pt-[116px]">
+                <div data-panel="mission-library-card" className={`mb-4 min-h-[224px] w-full overflow-hidden rounded-[28px] border border-white/8 bg-[rgba(7,11,23,0.62)] backdrop-blur-2xl ${isTablet ? 'pl-24' : ''}`}>
                   <div className="grid gap-0 md:grid-cols-[0.95fr_1.35fr]">
                     <div className="relative min-h-[158px] border-b border-white/8 p-5 md:border-b-0 md:border-r">
                       <div className="absolute -left-16 -top-16 h-44 w-44 rounded-full bg-[#22d3ee]/12 blur-3xl" />
@@ -4228,6 +4236,7 @@ function App() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.96 }}
                   transition={{ duration: 0.2, ease: 'easeOut' }}
+                  data-panel="lavoisier-panel"
                   className={`absolute w-[min(392px,calc(100vw-24px))] ${agentDockSide === 'right' ? 'right-[calc(100%+14px)]' : 'left-[calc(100%+14px)]'} ${agentVerticalPlacement === 'up' ? 'bottom-0' : 'top-0'} ${agentVerticalPlacement === 'up' ? (agentDockSide === 'right' ? 'origin-bottom-right' : 'origin-bottom-left') : (agentDockSide === 'right' ? 'origin-top-right' : 'origin-top-left')}`}
                 >
                   <div className="rounded-[30px] border border-white/10 bg-[rgba(7,11,23,0.96)] backdrop-blur-2xl px-4 py-4 shadow-[0_26px_80px_rgba(2,6,23,0.52)]">
@@ -4262,7 +4271,7 @@ function App() {
                       <button type="button" onClick={() => submitAgentQuery('结合当前实验目标，下一步该怎么做？')} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#22d3ee]/30 hover:bg-[#22d3ee]/10 transition-colors">下一步</button>
                       <button type="button" onClick={() => submitAgentQuery('请解释当前实验现象和背后的化学原因。')} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#22d3ee]/30 hover:bg-[#22d3ee]/10 transition-colors">解释现象</button>
                       <button type="button" onClick={() => submitAgentQuery('我现在这一步做对了吗？')} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#f59e0b]/30 hover:bg-[#f59e0b]/10 transition-colors">我做对了吗</button>
-                      <button type="button" onClick={() => handleAgentQuickAction('reagents')} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#10b981]/30 hover:bg-[#10b981]/10 transition-colors">打开试剂</button>
+                      <button type="button" onClick={(event) => { event.stopPropagation(); handleAgentQuickAction('reagents'); }} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#10b981]/30 hover:bg-[#10b981]/10 transition-colors">打开试剂</button>
                     </div>
 
                     {agentError && (

@@ -74,7 +74,7 @@ export function DashboardReadouts({ focusedLabel = '未选择容器', boilingPoi
   const phPosition = (ph / 14) * 100;
 
   return (
-    <div className="absolute top-[74px] md:top-[78px] xl:top-[12px] left-1/2 -translate-x-1/2 px-4 py-2 glass-panel z-10 w-[min(520px,calc(100%-32px))] md:w-[min(520px,calc(100%-220px))] xl:w-[min(520px,calc(100%-32px))]">
+    <div data-panel="dashboard-readouts" className="absolute top-3 left-1/2 -translate-x-1/2 px-4 py-2 glass-panel z-30 w-[min(520px,calc(100%-32px))]">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3 text-[10px] mb-2 uppercase tracking-[1px]">
         <span className="text-[#475569] font-bold">读数</span>
         <span className="text-[#94a3b8] font-medium normal-case tracking-normal truncate max-w-[220px]">当前容器：{focusedLabel}</span>

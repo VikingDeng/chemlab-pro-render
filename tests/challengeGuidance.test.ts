@@ -127,6 +127,28 @@ test('c6 草酸酸性还原高锰酸钾后完成褪色任务', () => {
   assert.equal(getChallengeInsight(makeChallenge('c6'), items)?.progressValue, 100)
 })
 
+test('推荐演示路径使用未知样品主线也能完成全部关卡', () => {
+  const flows: Array<{ id: TestChallengeId; reagents: string[]; state: string }> = [
+    { id: 'c1', reagents: ['未知样品 A', '氢氧化钠'], state: 'precipitate_cu' },
+    { id: 'c2', reagents: ['未知样品 B', '盐酸'], state: 'precipitate_ag' },
+    { id: 'c3', reagents: ['未知样品 C', '硫氰化钾'], state: 'complex_fe_scn' },
+    { id: 'c4', reagents: ['未知样品 D', '盐酸'], state: 'gas_co2' },
+    { id: 'c5', reagents: ['未知样品 E', '四氯化碳 (CCl₄)'], state: 'extraction' },
+    { id: 'c6', reagents: ['未知样品 F', '草酸 (H₂C₂O₄)', '硫酸'], state: 'redox_kmno4' },
+  ]
+
+  for (const flow of flows) {
+    const state = flow.reagents.reduce(
+      (currentState, reagent) => mixReagent(currentState, reagent, 20).newState,
+      createEmptyState(),
+    )
+
+    const items = [makeContainer('烧杯', state, { state: flow.state })]
+    assert.equal(isChallengeCompleted(makeChallenge(flow.id), items), true, `${flow.id} should complete`)
+    assert.equal(getChallengeInsight(makeChallenge(flow.id), items)?.progressValue, 100, `${flow.id} should show 100% progress`)
+  }
+})
+
 test('拖拽任务主试剂到对应容器时返回成功型提示', () => {
   let state = createEmptyState()
   state = mixReagent(state, '未知样品 A', 15).newState

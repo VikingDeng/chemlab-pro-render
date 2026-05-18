@@ -194,7 +194,7 @@ export function ReagentShelf({
         }}
         whileDrag={{ scale: 0.95, zIndex: 100, opacity: 0.8, cursor: 'grabbing', rotate: 2 }}
         key={key}
-        className={`isolate min-h-[58px] flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-200 cursor-grab group relative overflow-visible ${isHighlighted
+        className={`isolate min-h-[58px] flex items-center justify-between pl-5 pr-4 py-3 rounded-xl border transition-all duration-200 cursor-grab group relative overflow-visible ${isHighlighted
           ? 'border-[#22d3ee]/40 bg-[rgba(34,211,238,0.10)] shadow-[0_0_18px_rgba(34,211,238,0.12)]'
           : isSuggested
           ? 'border-[#c084fc]/28 bg-[rgba(168,85,247,0.08)] shadow-[0_0_14px_rgba(168,85,247,0.08)]'
@@ -219,7 +219,7 @@ export function ReagentShelf({
 
         <div className="flex items-center gap-3 overflow-hidden mr-2 relative z-10 pointer-events-none min-w-0">
           <span
-            className={`relative z-20 w-3 h-3 rounded-[9999px] shrink-0 ring-2 ring-[#0b1120] transition-transform duration-300 ease-out shadow-[0_0_10px_currentColor] ${isHighlighted ? 'scale-[1.18]' : 'group-hover:scale-[1.12]'}`}
+            className={`relative z-20 ml-0.5 w-3.5 h-3.5 rounded-[9999px] shrink-0 ring-1 ring-[#0b1120] transition-transform duration-300 ease-out shadow-[0_0_10px_currentColor] ${isHighlighted ? 'scale-[1.14]' : 'group-hover:scale-[1.1]'}`}
             style={{ backgroundColor: item.dot }}
           ></span>
           <span className={`text-[14px] font-medium truncate ${isHighlighted ? 'text-white' : 'text-[#e2e8f0]'}`}>

@@ -1,6 +1,14 @@
 # ChemLab Pro
 
-ChemLab Pro 是一个基于 `React + TypeScript + Vite` 构建的交互式化学实验室前端项目，用来模拟常见器材操作、加液反应、温度变化与观察记录。
+ChemLab Pro 是一个基于 `React + TypeScript + Vite` 构建的交互式化学实验室，用来演示任务式化学探索、现象反馈、观察记录和拉瓦锡 LLM 助手。
+
+
+## 当前交付状态
+
+- 线上演示：`https://chemlab-pro.onrender.com/?v=deliverable`
+- 默认入口：任务挑战，不再从空白台面开始。
+- 推荐流程：开始推荐演示 → 加入推荐试剂 → 观察现象 → 完成证据链 → 问拉瓦锡解释。
+- 拉瓦锡：同源 `/api/lavoisier`，模型 `mimo-v2.5`，不使用本地假回答。
 
 ## 本地开发
 
@@ -50,9 +58,4 @@ npm start
 
 服务默认监听 `PORT=8787`，线上部署时把 `.env` 中的 `PORT`、`LLM_API_URL`、`LLM_MODEL`、`LLM_API_KEY` 配到平台环境变量即可。前端和 API 同源部署后不需要额外 CORS 或 Vite 代理。
 
-已补充更完整的部署与 EXE 说明：`DEPLOYMENT.md`。
-
-当前已生成的 Windows 便携版：
-
-- `/Users/viking/Desktop/ChemLab-Pro-Windows-Portable.exe`
-- `/Users/viking/Desktop/ChemLab-Pro-Windows-Portable.zip`
+已补充更完整的部署、演示流程与 EXE 说明：`DEPLOYMENT.md`。

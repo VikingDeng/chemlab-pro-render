@@ -1,18 +1,28 @@
 # ChemLab Pro 交付与部署说明
 
-## 现在先给对方看效果
+## 当前推荐演示地址
 
-当前本机已经启动了一个临时公网预览隧道：
+- 正式预览：`https://chemlab-pro.onrender.com`
+- 建议发给对方的防缓存地址：`https://chemlab-pro.onrender.com/?v=deliverable`
+- 拉瓦锡接口：同源 `/api/lavoisier`
+- 当前模型：`mimo-v2.5`
 
-- 预览地址：`https://6fd82b6ea917a2.lhr.life`
-- 本机服务：`http://localhost:8787`
-- 验证时间：2026-05-17 00:22（页面、GET `/api/lavoisier` 与 POST Agent 对话均已通过）
+打开页面后默认进入「任务挑战」。非技术用户只需要点「开始推荐演示」或顶部「推荐演示」，再按界面里的下一步试剂按钮推进。
 
-注意：这是临时隧道，依赖这台电脑保持开机、终端不要断开；适合今天/短时间演示，不适合作为正式交付地址。如果看到 `no tunnel here :(`，说明隧道已断开，需要重新启动隧道或改用 Render/Railway/VPS 正式部署。
+## 推荐演示流程
 
-## 推荐正式部署方式
+1. 打开线上地址。
+2. 点击「开始推荐演示」。
+3. 按任务面板依次加入推荐试剂，观察颜色、沉淀、气泡或分层。
+4. 出现现象后完成证据链选择题。
+5. 点击「问拉瓦锡」，让 AI 用短句解释现象。
+6. 点击「下一关」继续。
 
-这个项目现在是一个 Node 单服务：同一个服务提供前端页面和 `/api/lavoisier` 后端接口。
+这个流程用于交付前展示：能玩、能看见现象、能问 AI、能完成任务。
+
+## Render 部署
+
+本项目是单 Node 服务：同一个服务提供前端页面和 `/api/lavoisier`。
 
 生产启动命令：
 
@@ -22,63 +32,52 @@ npm run build
 npm start
 ```
 
-线上环境变量：
+Render 环境变量：
 
 ```env
 NODE_ENV=production
-PORT=8787
 LLM_PROVIDER=mimo
 LLM_API_URL=https://token-plan-cn.xiaomimimo.com/v1
 LLM_MODEL=mimo-v2.5
 LLM_API_KEY=你的_MiMo_Key
 ```
 
-### Render / Railway
+仓库已包含 `render.yaml`。推送到 GitHub 后 Render 会自动重新部署。
 
-仓库里已经准备好：
-
-- `render.yaml`
-- `railway.json`
-
-导入仓库后，把 `LLM_API_KEY` 填到平台环境变量即可。不要把真实 key 提交到公开仓库。
-
-### Docker / VPS
+## 本地一键启动
 
 ```bash
-docker build -t chemlab-pro .
-docker run --env-file .env -p 8787:8787 chemlab-pro
+npm install
+npm run dev:full
 ```
+
+生产模式本地验证：
+
+```bash
+npm run build
+npm start
+```
+
+然后打开 `http://localhost:8787`。
 
 ## Windows EXE
 
-已经补了 Electron 桌面壳配置，并已在本机生成 Windows 便携版：
-
-- `/Users/viking/Desktop/ChemLab-Pro-Windows-Portable.exe`
-- `/Users/viking/Desktop/ChemLab-Pro-Windows-Portable.zip`
-- `/Users/viking/Desktop/chemlab_workspace_delivery.zip`
-
-如果需要重新生成，运行：
+项目已经配置 Electron。重新生成 Windows 便携版：
 
 ```bash
 npm run package:win
 ```
 
-在 Windows 机器或 GitHub Actions 的 `windows-latest` 上运行最稳；产物在 `release/*.exe`。
-
-如果在国内网络下打包下载 Electron 依赖慢，运行：
+国内网络下载 Electron 慢时：
 
 ```bash
 npm run package:win:cn
 ```
 
-如果用 GitHub Actions：
+产物在 `release/*.exe`。正式给非技术用户前，至少在一台真实 Windows 机器上做一次双击启动、进入任务、问拉瓦锡的冒烟测试。
 
-1. 把项目推到 GitHub。
-2. 在仓库 `Settings -> Secrets and variables -> Actions` 添加 secret：`MIMO_API_KEY`。
-3. 手动运行 workflow：`Build Windows EXE`。
-4. 下载 artifact：`ChemLab-Pro-Windows-Portable`。
+## 交付注意
 
-## 重要安全提醒
-
-- 网页部署：MiMo key 只放服务器环境变量，前端看不到。
-- EXE 交付：为了让无技术背景用户双击即用，key 会随应用一起打包/放在资源文件里；这只适合小范围可信交付，不适合大规模公开分发。
+- 网页版：MiMo key 放在 Render 环境变量里，前端不可见。
+- EXE：为了双击即用，key 会随应用资源一起交付；只适合小范围可信交付。
+- 如果拉瓦锡提示远程 LLM 连接失败，不会生成假回答；请刷新或稍后重试。
