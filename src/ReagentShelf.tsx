@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 
 export interface ReagentProps {
@@ -14,6 +14,8 @@ export interface ReagentShelfProps {
   dimIrrelevant?: boolean;
   showUnknownSamples?: boolean;
   className?: string;
+  focusOnly?: boolean;
+  focusSignal?: number;
 }
 
 type ReagentCategory = '未知样品' | '基础酸碱' | '金属盐' | '氧化还原' | '萃取/有机' | '指示剂';
@@ -104,9 +106,12 @@ export function ReagentShelf({
   dimIrrelevant = false,
   showUnknownSamples = false,
   className = '',
+  focusOnly = false,
+  focusSignal = 0,
 }: ReagentShelfProps) {
   const [activeCategory, setActiveCategory] = useState<'全部' | ReagentCategory>('全部');
   const effectiveActiveCategory = !showUnknownSamples && activeCategory === '未知样品' ? '全部' : activeCategory;
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const highlightedSet = useMemo(() => new Set(highlightedReagents), [highlightedReagents]);
   const suggestedSet = useMemo(
@@ -114,6 +119,7 @@ export function ReagentShelf({
     [highlightedSet, suggestedReagents]
   );
   const hasMissionHighlights = highlightedSet.size > 0 || suggestedSet.size > 0;
+  const isRelevant = useCallback((item: ReagentProps) => highlightedSet.has(item.name) || suggestedSet.has(item.name), [highlightedSet, suggestedSet]);
 
   const visibleGroups = useMemo(
     () => REAGENT_GROUPS
@@ -122,6 +128,7 @@ export function ReagentShelf({
       .map(group => ({
         ...group,
         items: group.items
+          .filter(item => !focusOnly || !hasMissionHighlights || isRelevant(item))
           .map((item, index) => ({ item, index }))
           .sort((a, b) => {
             const scoreA = highlightedSet.has(a.item.name) ? 2 : suggestedSet.has(a.item.name) ? 1 : 0;
@@ -130,18 +137,30 @@ export function ReagentShelf({
           })
           .map(entry => entry.item),
       }))
+      .filter(group => group.items.length > 0)
       .sort((a, b) => {
         const scoreA = a.items.reduce((sum, item) => sum + (highlightedSet.has(item.name) ? 2 : suggestedSet.has(item.name) ? 1 : 0), 0);
         const scoreB = b.items.reduce((sum, item) => sum + (highlightedSet.has(item.name) ? 2 : suggestedSet.has(item.name) ? 1 : 0), 0);
         return scoreB - scoreA;
       }),
-    [effectiveActiveCategory, highlightedSet, showUnknownSamples, suggestedSet]
+    [effectiveActiveCategory, focusOnly, hasMissionHighlights, highlightedSet, isRelevant, showUnknownSamples, suggestedSet]
   );
 
   const categoryGroups = useMemo(
-    () => REAGENT_GROUPS.filter(group => showUnknownSamples || group.id !== '未知样品'),
-    [showUnknownSamples]
+    () => REAGENT_GROUPS
+      .filter(group => showUnknownSamples || group.id !== '未知样品')
+      .filter(group => !focusOnly || !hasMissionHighlights || group.items.some(isRelevant)),
+    [focusOnly, hasMissionHighlights, isRelevant, showUnknownSamples]
   );
+
+  useEffect(() => {
+    if (!focusSignal) return;
+    const frame = requestAnimationFrame(() => {
+      setActiveCategory('全部');
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusSignal]);
 
   const renderReagentCard = (item: ReagentProps, key: string) => {
     const isHighlighted = highlightedSet.has(item.name);
@@ -243,7 +262,7 @@ export function ReagentShelf({
           </button>
         ))}
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-4 pr-2">
+      <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-4 pr-2">
         {hasMissionHighlights && (
           <section className="rounded-2xl border border-[#22d3ee]/16 bg-[rgba(34,211,238,0.05)] px-3 py-3">
             <div className="mb-2 text-[11px] font-semibold text-[#67e8f9]">推荐试剂</div>

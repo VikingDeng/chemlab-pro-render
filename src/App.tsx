@@ -99,6 +99,22 @@ type ContainerHintCard = {
   tone: HintTone;
 };
 
+type ReactionSpotlight = {
+  id: string;
+  title: string;
+  detail: string;
+  accent: string;
+};
+
+type MissionCompletionCard = {
+  id: string;
+  challengeId: string;
+  title: string;
+  product: string;
+  formula: string;
+  accent: string;
+};
+
 type FloatingAgentPosition = {
   x: number;
   y: number;
@@ -221,6 +237,23 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
   },
 };
 const MISSION_SEQUENCE: MissionPreset[] = ['prepCu', 'prepAg', 'prepFe', 'prepCo2', 'prepIodine', 'prepMn'];
+const MISSION_SUCCESS_META: Record<string, { product: string; formula: string; accent: string }> = {
+  c1: { product: '蓝绿色絮状沉淀', formula: 'Cu(OH)₂', accent: '#22d3ee' },
+  c2: { product: '白色沉淀', formula: 'AgCl', accent: '#f8fafc' },
+  c3: { product: '血红色络合物', formula: 'Fe(SCN)₃', accent: '#fb7185' },
+  c4: { product: '无色气泡', formula: 'CO₂', accent: '#f59e0b' },
+  c5: { product: '紫色有机层', formula: 'I₂(org)', accent: '#a855f7' },
+  c6: { product: '紫色褪去', formula: 'Mn²⁺', accent: '#c4b5fd' },
+};
+
+function getNextMissionPreset(challengeId: string) {
+  const currentIndex = MISSION_SEQUENCE.findIndex(preset => MISSION_BRIEFS[preset].challengeId === challengeId);
+  return MISSION_SEQUENCE[(currentIndex + 1 + MISSION_SEQUENCE.length) % MISSION_SEQUENCE.length];
+}
+
+function getMissionSuccessMeta(challengeId: string) {
+  return MISSION_SUCCESS_META[challengeId] || { product: '目标现象', formula: '✓', accent: '#22d3ee' };
+}
 
 type DiscoveryCardView = {
   id: string;
@@ -441,6 +474,28 @@ function buildDiscoveryCards(items: PlacedItem[]): DiscoveryCardView[] {
     ...discovery,
     unlocked: items.some(item => LIQUID_CONTAINER_TYPES.has(item.type) && discovery.isUnlocked(item.chemState)),
   }));
+}
+
+function buildReactionSpotlight(reagentName: string, result: ReactionResult): ReactionSpotlight | null {
+  if (result.reactionType === 'added') return null;
+  const log = result.log || '';
+  const title = log.split(/[，。；]/)[0] || `已加入 ${reagentName}`;
+  const accent = result.reactionType.includes('gas')
+    ? '#f59e0b'
+    : result.reactionType.includes('complex')
+    ? '#fb7185'
+    : result.reactionType.includes('redox')
+    ? '#a855f7'
+    : result.reactionType.includes('precipitate')
+    ? '#22d3ee'
+    : '#10b981';
+  const detail = result.equation || `继续观察颜色、沉淀、气泡或分层变化`;
+  return {
+    id: createRuntimeId('reaction-spotlight'),
+    title,
+    detail,
+    accent,
+  };
 }
 
 function DiscoveryAtlasModal({ cards, onClose }: { cards: DiscoveryCardView[]; onClose: () => void }) {
@@ -767,6 +822,10 @@ function App() {
 
   // Holographic Equations state
   const [equations, setEquations] = useState<{id: string, text: string, x: number, y: number}[]>([]);
+  const [reactionSpotlight, setReactionSpotlight] = useState<ReactionSpotlight | null>(null);
+  const [missionCompletionCard, setMissionCompletionCard] = useState<MissionCompletionCard | null>(null);
+  const [rightPanelPulse, setRightPanelPulse] = useState<'reagents' | 'logs' | null>(null);
+  const [reagentFocusSignal, setReagentFocusSignal] = useState(0);
   
   // Custom Toast State
   const [toast, setToast] = useState<{id: string, message: string} | null>(null);
@@ -799,7 +858,7 @@ function App() {
   const [agentStatusLabel, setAgentStatusLabel] = useState('在线');
   const [agentRemoteHeadline, setAgentRemoteHeadline] = useState('');
   const [agentRemoteSummary, setAgentRemoteSummary] = useState('');
-  const [agentSuggestedPrompts, setAgentSuggestedPrompts] = useState<string[]>(['下一步', '解释现象', '有风险吗']);
+  const [agentSuggestedPrompts, setAgentSuggestedPrompts] = useState<string[]>(['下一步', '解释现象', '我做对了吗']);
   const [agentMessages, setAgentMessages] = useState<AgentChatMessage[]>([]);
   const [agentLastEvent, setAgentLastEvent] = useState<AgentLastEvent | undefined>(undefined);
   const [agentViewport, setAgentViewport] = useState(() => ({
@@ -1108,6 +1167,8 @@ function App() {
     nextItems = [beaker];
     nextFocusedId = beaker.id;
     setGameMode('challenge');
+    setMissionCompletionCard(null);
+    setReactionSpotlight(null);
     setActiveChallenge({
       id: mission.challengeId,
       title: mission.title,
@@ -1154,6 +1215,8 @@ function App() {
     setTemperatureHistory([]);
     setEquations([]);
     setActiveDrop(null);
+    setMissionCompletionCard(null);
+    setReactionSpotlight(null);
     setActiveChallenge(null);
     setAgentMessages([]);
     setAgentRemoteHeadline('');
@@ -1355,6 +1418,14 @@ function App() {
       setTimeout(() => {
         setEquations(prev => prev.filter(e => e.id !== eqId));
       }, 4500);
+    }
+
+    const spotlight = buildReactionSpotlight(reagentName, result);
+    if (spotlight) {
+      setReactionSpotlight(spotlight);
+      window.setTimeout(() => {
+        setReactionSpotlight(current => current?.id === spotlight.id ? null : current);
+      }, 2600);
     }
 
     const customEvent = new CustomEvent('reagentDrop', {
@@ -1612,12 +1683,19 @@ function App() {
     if (actionId === 'logs') {
       if (isTablet) setBottomSheetOpen(true);
       setActiveRightPanelTab('logs');
+      setRightPanelPulse('logs');
+      window.setTimeout(() => setRightPanelPulse(current => current === 'logs' ? null : current), 1200);
+      showToast('已打开观察日志');
       return;
     }
 
     if (actionId === 'reagents') {
       if (isTablet) setBottomSheetOpen(true);
       setActiveRightPanelTab('reagents');
+      setReagentFocusSignal(value => value + 1);
+      setRightPanelPulse('reagents');
+      window.setTimeout(() => setRightPanelPulse(current => current === 'reagents' ? null : current), 1200);
+      showToast('已定位到推荐试剂');
       return;
     }
 
@@ -1812,7 +1890,7 @@ function App() {
       }
       setAgentRemoteHeadline(normalized.headline || '');
       setAgentRemoteSummary(normalized.reply);
-      setAgentSuggestedPrompts(normalized.suggestedPrompts?.length ? normalized.suggestedPrompts.slice(0, 3) : ['下一步', '解释现象', '有风险吗']);
+      setAgentSuggestedPrompts(normalized.suggestedPrompts?.length ? normalized.suggestedPrompts.slice(0, 3) : ['下一步', '解释现象', '我做对了吗']);
       setAgentStatusLabel(normalized.statusLabel || '在线');
       runAgentToolCalls(normalized.toolCalls);
 	    } catch (error) {
@@ -2048,18 +2126,16 @@ function App() {
 
     pendingChallengeCompletionRef.current = activeChallenge.id;
     playSound('reaction');
-    const successMessage = activeChallenge.id === 'c1'
-      ? '完成：蓝色沉淀已出现'
-      : activeChallenge.id === 'c2'
-      ? '完成：白色沉淀已出现'
-      : activeChallenge.id === 'c3'
-      ? '完成：血红色已出现'
-      : activeChallenge.id === 'c4'
-      ? '完成：气泡已出现'
-      : activeChallenge.id === 'c5'
-      ? '完成：紫色有机层已出现'
-      : '完成：紫色褪去';
-    showToast(successMessage);
+    const meta = getMissionSuccessMeta(activeChallenge.id);
+    showToast(`完成：${meta.product}`);
+    setMissionCompletionCard({
+      id: createRuntimeId('mission-complete'),
+      challengeId: activeChallenge.id,
+      title: activeChallenge.title,
+      product: meta.product,
+      formula: meta.formula,
+      accent: meta.accent,
+    });
     setTimeout(() => {
       setActiveChallenge(c => c?.id === activeChallenge.id ? { ...c, completed: true } : c);
     }, 0);
@@ -2626,8 +2702,7 @@ function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        const currentIndex = MISSION_SEQUENCE.findIndex(preset => MISSION_BRIEFS[preset].challengeId === activeChallenge.id);
-                        const nextPreset = MISSION_SEQUENCE[(currentIndex + 1 + MISSION_SEQUENCE.length) % MISSION_SEQUENCE.length];
+                        const nextPreset = getNextMissionPreset(activeChallenge.id);
                         launchQuickStart(nextPreset);
                         showToast(`下一关：${MISSION_BRIEFS[nextPreset].title}`);
                       }}
@@ -2639,6 +2714,82 @@ function App() {
                 </div>
               </div>
             )}
+
+            <AnimatePresence>
+              {reactionSpotlight && (
+                <motion.div
+                  key={reactionSpotlight.id}
+                  initial={{ opacity: 0, scale: 0.86, y: 24 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.92, y: -18 }}
+                  transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+                  className="pointer-events-none absolute left-1/2 top-[45%] z-[120] w-[min(360px,calc(100%-40px))] -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-white/14 bg-[rgba(7,11,23,0.86)] px-5 py-4 text-center shadow-[0_28px_70px_rgba(2,6,23,0.55)] backdrop-blur-2xl"
+                >
+                  <div className="mx-auto mb-3 h-3 w-16 rounded-full" style={{ backgroundColor: reactionSpotlight.accent, boxShadow: `0 0 34px ${reactionSpotlight.accent}` }} />
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#67e8f9]">发现现象</div>
+                  <div className="mt-1 text-[18px] font-semibold text-white">{reactionSpotlight.title}</div>
+                  <div className="mt-2 truncate font-mono text-[12px] text-[#94a3b8]">{reactionSpotlight.detail}</div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {missionCompletionCard && (
+                <motion.div
+                  key={missionCompletionCard.id}
+                  initial={{ opacity: 0, y: 30, scale: 0.94 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 18, scale: 0.96 }}
+                  transition={{ type: 'spring', stiffness: 360, damping: 30 }}
+                  className="absolute bottom-6 left-1/2 z-[130] w-[min(420px,calc(100%-40px))] -translate-x-1/2 rounded-[28px] border border-white/14 bg-[rgba(8,13,24,0.92)] p-4 shadow-[0_28px_70px_rgba(2,6,23,0.56)] backdrop-blur-2xl"
+                >
+                  <button
+                    type="button"
+                    aria-label="关闭完成卡片"
+                    onClick={() => setMissionCompletionCard(null)}
+                    className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[#94a3b8] hover:text-white"
+                  >
+                    <X size={14} />
+                  </button>
+                  <div className="pr-8">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#67e8f9]">关卡完成</div>
+                    <div className="mt-1 text-[17px] font-semibold text-white">{missionCompletionCard.title}</div>
+                  </div>
+                  <div className="mt-4 flex items-center gap-3 rounded-[22px] border border-white/8 bg-white/[0.035] px-3 py-3">
+                    <div
+                      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.06] font-mono text-[13px] font-bold text-white"
+                      style={{ boxShadow: `0 0 30px ${missionCompletionCard.accent}` }}
+                    >
+                      {missionCompletionCard.formula}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-semibold text-[#f8fafc]">{missionCompletionCard.product}</div>
+                      <div className="mt-1 text-[12px] text-[#94a3b8]">已解锁图鉴，可继续下一关。</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAtlasOpen(true)}
+                      className="rounded-2xl border border-[#22d3ee]/30 bg-[#22d3ee]/10 px-3 py-2 text-[12px] font-semibold text-[#a5f3fc] hover:bg-[#22d3ee]/16 transition-colors"
+                    >
+                      查看图鉴
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextPreset = getNextMissionPreset(missionCompletionCard.challengeId);
+                        launchQuickStart(nextPreset);
+                        showToast(`下一关：${MISSION_BRIEFS[nextPreset].title}`);
+                      }}
+                      className="rounded-2xl border border-[#f43f5e]/30 bg-[#f43f5e]/10 px-3 py-2 text-[12px] font-semibold text-[#fda4af] hover:bg-[#f43f5e]/16 transition-colors"
+                    >
+                      下一关
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Smart Toasts */}
             <AnimatePresence>
@@ -3333,16 +3484,18 @@ function App() {
                 </div>
               )}
 
-              <div className={`${isTablet && activeRightPanelTab !== 'reagents' ? 'hidden' : 'flex'} min-h-0 flex-col overflow-hidden ${isTablet ? 'flex-1' : ''}`}>
+              <div className={`${isTablet && activeRightPanelTab !== 'reagents' ? 'hidden' : 'flex'} min-h-0 flex-col overflow-hidden rounded-[18px] transition-all duration-300 ${isTablet ? 'flex-1' : ''} ${rightPanelPulse === 'reagents' ? 'ring-2 ring-[#10b981]/45 shadow-[0_0_28px_rgba(16,185,129,0.18)]' : ''}`}>
                 <ReagentShelf
                   className="h-full"
+                  focusSignal={reagentFocusSignal}
+                  focusOnly={gameMode === 'challenge' && Boolean(activeChallenge)}
                   highlightedReagents={challengeInsight?.primaryReagents || []}
                   suggestedReagents={challengeInsight?.secondaryReagents || []}
                   dimIrrelevant={gameMode === 'challenge'}
                   showUnknownSamples={gameMode === 'challenge'}
                 />
               </div>
-              <div className={`${isTablet && activeRightPanelTab !== 'logs' ? 'hidden' : 'flex'} min-h-0 flex-col overflow-hidden ${isTablet ? 'flex-1' : ''}`}>
+              <div className={`${isTablet && activeRightPanelTab !== 'logs' ? 'hidden' : 'flex'} min-h-0 flex-col overflow-hidden rounded-[18px] transition-all duration-300 ${isTablet ? 'flex-1' : ''} ${rightPanelPulse === 'logs' ? 'ring-2 ring-[#22d3ee]/45 shadow-[0_0_28px_rgba(34,211,238,0.18)]' : ''}`}>
                 <ObservationLog className="h-full" />
               </div>
             </div>
@@ -3395,7 +3548,7 @@ function App() {
                     <div className="mt-3 grid grid-cols-2 gap-2">
                       <button type="button" onClick={() => submitAgentQuery('结合当前实验目标，下一步该怎么做？')} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#22d3ee]/30 hover:bg-[#22d3ee]/10 transition-colors">下一步</button>
                       <button type="button" onClick={() => submitAgentQuery('请解释当前实验现象和背后的化学原因。')} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#22d3ee]/30 hover:bg-[#22d3ee]/10 transition-colors">解释现象</button>
-                      <button type="button" onClick={() => submitAgentQuery('请检查当前实验风险，并给出安全操作建议。')} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#f59e0b]/30 hover:bg-[#f59e0b]/10 transition-colors">检查风险</button>
+                      <button type="button" onClick={() => submitAgentQuery('我现在这一步做对了吗？')} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#f59e0b]/30 hover:bg-[#f59e0b]/10 transition-colors">我做对了吗</button>
                       <button type="button" onClick={() => handleAgentQuickAction('reagents')} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#10b981]/30 hover:bg-[#10b981]/10 transition-colors">打开试剂</button>
                     </div>
 
@@ -3416,7 +3569,7 @@ function App() {
                           {agentMessages.map(message => (
                             <div
                               key={message.id}
-                              className={`rounded-[16px] px-3 py-2 text-[12px] leading-relaxed ${message.role === 'agent' ? 'bg-[rgba(34,211,238,0.08)] border border-[#22d3ee]/14 text-[#dbeafe]' : 'bg-white/5 border border-white/8 text-[#e2e8f0]'}`}
+                              className={`whitespace-pre-line rounded-[16px] px-3 py-2 text-[12px] leading-relaxed ${message.role === 'agent' ? 'bg-[rgba(34,211,238,0.08)] border border-[#22d3ee]/14 text-[#dbeafe]' : 'bg-white/5 border border-white/8 text-[#e2e8f0]'}`}
                             >
                               {message.text}
                             </div>
