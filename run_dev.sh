@@ -9,4 +9,5 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+export VITE_DEV_API_PROXY_TARGET="${VITE_DEV_API_PROXY_TARGET:-http://127.0.0.1:${PORT:-8787}}"
 npm run dev -- --host 0.0.0.0

@@ -169,6 +169,7 @@ const AGENT_ORB_WIDTH = 84;
 const AGENT_ORB_HEIGHT = 84;
 const AGENT_FLOATING_MARGIN = 14;
 const AGENT_REQUEST_TIMEOUT_MS = 18000;
+const PUBLIC_LAVOISIER_API_URL = 'https://chemlab-pro.onrender.com/api/lavoisier';
 const PREP_CU_TARGET = '鉴定未知样品 A，制备蓝绿色 Cu(OH)₂ 沉淀';
 const PREP_AG_TARGET = '鉴定未知样品 B，制备白色 AgCl 沉淀';
 const PREP_FE_TARGET = '鉴定未知样品 C，制备血红色 Fe(SCN)₃ 络合物';
@@ -193,6 +194,11 @@ const AGENT_SPECIES_LABELS: Record<string, string> = {
   I2: '碘',
   I2_org: '有机相碘',
   CCl4: '四氯化碳',
+  CH2Cl2: '二氯甲烷',
+  EtOAc: '乙酸乙酯',
+  Toluene: '甲苯',
+  Et2O: '乙醚',
+  Cyclohexane: '环己烷',
   Hexane: '正己烷',
   Phenolphthalein: '酚酞',
   MethylOrange: '甲基橙',
@@ -949,6 +955,21 @@ function extractLavoisierTextFromUnknown(payload: unknown): string {
     .find((text): text is string => typeof text === 'string' && text.trim().length > 0);
 
   return outputText?.trim() || '';
+}
+
+function getLavoisierApiCandidates(primaryUrl: string) {
+  const trimmedPrimary = primaryUrl.trim() || '/api/lavoisier';
+  const candidates = [trimmedPrimary];
+
+  if (typeof window !== 'undefined') {
+    const isRelativeApi = trimmedPrimary.startsWith('/');
+    const isProductionHost = window.location.hostname === 'chemlab-pro.onrender.com';
+    if (isRelativeApi && !isProductionHost) {
+      candidates.push(PUBLIC_LAVOISIER_API_URL);
+    }
+  }
+
+  return Array.from(new Set(candidates));
 }
 
 function getPointerCoordinates(pointerLike?: PointerLike | null) {
@@ -2252,48 +2273,67 @@ function App() {
           species: summarizeAgentSpecies(item.chemState),
         }));
 
-      const response = await fetch(lavoisierApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          message: trimmed,
-          conversation: history,
-          context: {
-            mode: gameMode,
-            challenge: activeChallenge,
-            focusedContainer: primaryContainer ? {
-              id: primaryContainer.id,
-              name: primaryContainer.name,
-              type: primaryContainer.type,
-              volume: getTotalLiquidVolume(primaryContainer.chemState),
-              temperature: primaryContainer.chemState.temperature,
-              ph: calculatePH(primaryContainer.chemState),
-              pressure: calculatePressureEstimate(primaryContainer.chemState, getContainerCapacity(primaryContainer.type)),
-              state: primaryContainer.state || 'idle',
-              organicVolume: primaryContainer.chemState.organicVolume || 0,
-              organicColor: primaryContainer.chemState.organicColor || null,
-              species: summarizeAgentSpecies(primaryContainer.chemState),
-            } : null,
-            containers,
-            lastEvent: agentLastEvent || null,
-            localSignals: {
-              intent: agentState.intent,
-              risks: agentState.risks,
-              goal: agentState.goal || null,
-            },
-            availableSkills: ['focus_container', 'open_logs', 'open_reagents', 'save_note'],
+      const requestBody = JSON.stringify({
+        message: trimmed,
+        conversation: history,
+        context: {
+          mode: gameMode,
+          challenge: activeChallenge,
+          focusedContainer: primaryContainer ? {
+            id: primaryContainer.id,
+            name: primaryContainer.name,
+            type: primaryContainer.type,
+            volume: getTotalLiquidVolume(primaryContainer.chemState),
+            temperature: primaryContainer.chemState.temperature,
+            ph: calculatePH(primaryContainer.chemState),
+            pressure: calculatePressureEstimate(primaryContainer.chemState, getContainerCapacity(primaryContainer.type)),
+            state: primaryContainer.state || 'idle',
+            organicVolume: primaryContainer.chemState.organicVolume || 0,
+            organicColor: primaryContainer.chemState.organicColor || null,
+            species: summarizeAgentSpecies(primaryContainer.chemState),
+          } : null,
+          containers,
+          lastEvent: agentLastEvent || null,
+          localSignals: {
+            intent: agentState.intent,
+            risks: agentState.risks,
+            goal: agentState.goal || null,
           },
-        }),
+          availableSkills: ['focus_container', 'open_logs', 'open_reagents', 'save_note'],
+        },
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      let payload: unknown = null;
+      let lastApiError: unknown = null;
+      for (const apiUrl of getLavoisierApiCandidates(lavoisierApiUrl)) {
+        try {
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            signal: controller.signal,
+            body: requestBody,
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          payload = await response.json();
+          break;
+        } catch (apiError) {
+          lastApiError = apiError;
+          if (apiError instanceof DOMException && apiError.name === 'AbortError') {
+            throw apiError;
+          }
+        }
       }
 
-      const payload = await response.json();
+      if (!payload) {
+        throw lastApiError instanceof Error ? lastApiError : new Error('接口不可达');
+      }
+
       const parsedText = extractLavoisierTextFromUnknown(payload);
       if (!parsedText) {
         throw new Error('接口返回为空');

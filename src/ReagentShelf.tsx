@@ -84,6 +84,11 @@ const REAGENT_GROUPS: ReagentGroup[] = [
     description: '聚焦有机相、分层与碘萃取相关试剂。',
     items: [
       { category: '萃取/有机', dot: '#ffffff', name: '四氯化碳 (CCl₄)', badgeFormula: <>CCl₄ · 纯</> },
+      { category: '萃取/有机', dot: '#dbeafe', name: '二氯甲烷 (DCM)', badgeFormula: <>CH₂Cl₂ · 重相</> },
+      { category: '萃取/有机', dot: '#fef3c7', name: '乙酸乙酯 (EtOAc)', badgeFormula: <>EtOAc · 轻相</> },
+      { category: '萃取/有机', dot: '#fde68a', name: '甲苯 (Toluene)', badgeFormula: <>PhMe · 轻相</> },
+      { category: '萃取/有机', dot: '#bfdbfe', name: '乙醚 (Ether)', badgeFormula: <>Et₂O · 易挥发</> },
+      { category: '萃取/有机', dot: '#e0e7ff', name: '环己烷 (Cyclohexane)', badgeFormula: <>C₆H₁₂ · 轻相</> },
       { category: '萃取/有机', dot: '#e0f2fe', name: '正己烷 (Hexane)', badgeFormula: <>Hexane · 纯</> },
       { category: '萃取/有机', dot: '#a8a29e', name: '碘水 (I₂ aq)', badgeFormula: <>I₂ · 0.05M</> },
       { category: '萃取/有机', dot: '#2e0a2e', name: '碘单质 (I₂ 固体)', badgeFormula: <>I₂ · 升华相变</> },
