@@ -712,6 +712,56 @@ type WebkitAudioWindow = Window & typeof globalThis & {
   webkitAudioContext?: typeof AudioContext;
 };
 
+function createSoftNoiseBuffer(audioCtx: AudioContext, durationSeconds: number) {
+  const frameCount = Math.max(1, Math.floor(audioCtx.sampleRate * durationSeconds));
+  const buffer = audioCtx.createBuffer(1, frameCount, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  let filtered = 0;
+
+  for (let index = 0; index < frameCount; index += 1) {
+    const white = (Math.random() * 2) - 1;
+    filtered = (filtered * 0.86) + (white * 0.14);
+    data[index] = filtered * 0.65;
+  }
+
+  return buffer;
+}
+
+function scheduleNoiseBurst(
+  audioCtx: AudioContext,
+  destination: AudioNode,
+  options: {
+    start: number;
+    duration: number;
+    peakGain: number;
+    filterType: BiquadFilterType;
+    frequency: number;
+    q?: number;
+  },
+) {
+  const source = audioCtx.createBufferSource();
+  const filter = audioCtx.createBiquadFilter();
+  const gain = audioCtx.createGain();
+  const attack = Math.min(0.045, options.duration * 0.25);
+  const end = options.start + options.duration;
+
+  source.buffer = createSoftNoiseBuffer(audioCtx, options.duration);
+  filter.type = options.filterType;
+  filter.frequency.setValueAtTime(options.frequency, options.start);
+  filter.Q.setValueAtTime(options.q ?? 0.8, options.start);
+  gain.gain.setValueAtTime(0.0001, options.start);
+  gain.gain.linearRampToValueAtTime(options.peakGain, options.start + attack);
+  gain.gain.exponentialRampToValueAtTime(0.0001, end);
+
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(destination);
+  source.start(options.start);
+  source.stop(end);
+
+  return [source, filter, gain] as AudioNode[];
+}
+
 function createRuntimeId(prefix: string) {
   runtimeIdCounter += 1;
   return `${prefix}-${runtimeIdCounter}`;
@@ -1399,6 +1449,12 @@ function App() {
             const maxAdd = absoluteMax - currentVol;
             const initAdd = Math.min(collisionItem.type === 'testtube' ? 5 : 50, maxAdd);
 
+            if (gameMode === 'challenge') {
+              const guidedVolume = Math.min(collisionItem.type === 'testtube' ? 5 : 20, maxAdd);
+              window.setTimeout(() => addReagentToContainer(collisionItem.id, itemName, guidedVolume), 0);
+              return currentItems;
+            }
+
             setActiveDrop({
               targetId: collisionItem.id,
               reagentName: itemName,
@@ -1680,82 +1736,114 @@ function App() {
       const now = audioCtx.currentTime;
       
       if (type === 'place') {
-        // Deep "thud" for placing equipment (glass on desk)
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(150, now);
-        oscillator.frequency.exponentialRampToValueAtTime(40, now + 0.1);
-        gainNode.gain.setValueAtTime(0.5, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-        oscillator.start(now);
-        oscillator.stop(now + 0.1);
-        
-        // Haptic feedback
-        if (navigator.vibrate) navigator.vibrate(10);
-      } else if (type === 'pour') {
-        // Higher pitched liquid sound
+        // Soft glass-on-bench tap: short, low and not startling.
         oscillator.type = 'triangle';
-        oscillator.frequency.setValueAtTime(600, now);
-        oscillator.frequency.linearRampToValueAtTime(800, now + 0.3);
+        oscillator.frequency.setValueAtTime(118, now);
+        oscillator.frequency.exponentialRampToValueAtTime(64, now + 0.14);
+        gainNode.gain.setValueAtTime(0.11, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.006, now + 0.14);
+        cleanupNodes = [
+          ...cleanupNodes,
+          ...scheduleNoiseBurst(audioCtx, audioCtx.destination, {
+            start: now,
+            duration: 0.06,
+            peakGain: 0.018,
+            filterType: 'highpass',
+            frequency: 860,
+            q: 0.55,
+          }),
+        ];
+        oscillator.start(now);
+        oscillator.stop(now + 0.14);
         
-        // Volume shaping (liquid flowing)
+        if (navigator.vibrate) navigator.vibrate(4);
+      } else if (type === 'pour') {
+        // Filtered noise carries the stream texture; oscillator only adds a quiet body tone.
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(212, now);
+        oscillator.frequency.linearRampToValueAtTime(238, now + 0.42);
+        
         gainNode.gain.setValueAtTime(0, now);
-        gainNode.gain.linearRampToValueAtTime(0.1, now + 0.05);
-        gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
+        gainNode.gain.linearRampToValueAtTime(0.014, now + 0.06);
+        gainNode.gain.linearRampToValueAtTime(0, now + 0.42);
         
-        // Add some noise/modulations for liquid texture
         const lfo = audioCtx.createOscillator();
         lfo.type = 'sine';
-        lfo.frequency.value = 15;
+        lfo.frequency.value = 7.5;
         const lfoGain = audioCtx.createGain();
-        lfoGain.gain.value = 50;
-        cleanupNodes = [...cleanupNodes, lfo, lfoGain];
+        lfoGain.gain.value = 7;
+        cleanupNodes = [
+          ...cleanupNodes,
+          lfo,
+          lfoGain,
+          ...scheduleNoiseBurst(audioCtx, audioCtx.destination, {
+            start: now,
+            duration: 0.42,
+            peakGain: 0.03,
+            filterType: 'bandpass',
+            frequency: 520,
+            q: 0.7,
+          }),
+        ];
         lfo.connect(lfoGain);
         lfoGain.connect(oscillator.frequency);
         lfo.start(now);
-        lfo.stop(now + 0.3);
+        lfo.stop(now + 0.42);
         
         oscillator.start(now);
-        oscillator.stop(now + 0.3);
+        oscillator.stop(now + 0.42);
         
-        if (navigator.vibrate) navigator.vibrate([15, 30, 15]);
+        if (navigator.vibrate) navigator.vibrate(6);
       } else if (type === 'reaction') {
-        // Hissing/bubbling sound for chemical reaction
-        oscillator.type = 'square';
-        oscillator.frequency.setValueAtTime(200, now);
-        oscillator.frequency.linearRampToValueAtTime(150, now + 1.0);
+        // Gentle bubbling/hiss; noise texture feels closer to fizzing liquid than a synth alarm.
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(118, now);
+        oscillator.frequency.linearRampToValueAtTime(86, now + 0.9);
         
-        gainNode.gain.setValueAtTime(0.15, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 1.0);
+        gainNode.gain.setValueAtTime(0.036, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.005, now + 0.9);
         
-        // Rapid modulation for bubbling
         const bubbleMod = audioCtx.createOscillator();
-        bubbleMod.type = 'sawtooth';
-        bubbleMod.frequency.value = 8;
+        bubbleMod.type = 'sine';
+        bubbleMod.frequency.value = 4.8;
         const bubbleGain = audioCtx.createGain();
-        bubbleGain.gain.value = 100;
-        cleanupNodes = [...cleanupNodes, bubbleMod, bubbleGain];
+        bubbleGain.gain.value = 20;
+        cleanupNodes = [
+          ...cleanupNodes,
+          bubbleMod,
+          bubbleGain,
+          ...scheduleNoiseBurst(audioCtx, audioCtx.destination, {
+            start: now,
+            duration: 0.9,
+            peakGain: 0.026,
+            filterType: 'bandpass',
+            frequency: 760,
+            q: 1.15,
+          }),
+        ];
         bubbleMod.connect(bubbleGain);
         bubbleGain.connect(oscillator.frequency);
         bubbleMod.start(now);
-        bubbleMod.stop(now + 1.0);
+        bubbleMod.stop(now + 0.9);
         
         oscillator.start(now);
-        oscillator.stop(now + 1.0);
+        oscillator.stop(now + 0.9);
         
-        if (navigator.vibrate) navigator.vibrate([20, 20, 20, 20, 20]);
+        if (navigator.vibrate) navigator.vibrate([8, 20, 8]);
       } else if (type === 'boil' && itemId) {
         // Only start if not already boiling for this item
         if (continuousAudioRef.current[itemId]) return;
         
-        oscillator.type = 'square';
-        oscillator.frequency.setValueAtTime(100, now);
-        gainNode.gain.setValueAtTime(0.05, now); // Low volume boiling rumble
+        oscillator.type = 'triangle';
+        oscillator.frequency.setValueAtTime(72, now);
+        gainNode.gain.setValueAtTime(0.022, now);
         
         const bubbleMod = audioCtx.createOscillator();
         bubbleMod.type = 'sine';
-        bubbleMod.frequency.value = 4 + (((itemId?.length || 1) % 3) * 0.75);
+        bubbleMod.frequency.value = 2.6 + (((itemId?.length || 1) % 3) * 0.45);
         const bubbleGain = audioCtx.createGain();
-        bubbleGain.gain.value = 50;
+        bubbleGain.gain.value = 14;
+        cleanupNodes = [...cleanupNodes, bubbleMod, bubbleGain];
         bubbleMod.connect(bubbleGain);
         bubbleGain.connect(oscillator.frequency);
         
@@ -1771,14 +1859,25 @@ function App() {
           delete continuousAudioRef.current[itemId];
         }
         
-        oscillator.type = 'sawtooth';
-        oscillator.frequency.setValueAtTime(1000, now);
-        oscillator.frequency.exponentialRampToValueAtTime(100, now + 0.5);
-        gainNode.gain.setValueAtTime(0.8, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+        oscillator.type = 'triangle';
+        oscillator.frequency.setValueAtTime(640, now);
+        oscillator.frequency.exponentialRampToValueAtTime(126, now + 0.34);
+        gainNode.gain.setValueAtTime(0.18, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.008, now + 0.34);
+        cleanupNodes = [
+          ...cleanupNodes,
+          ...scheduleNoiseBurst(audioCtx, audioCtx.destination, {
+            start: now,
+            duration: 0.18,
+            peakGain: 0.05,
+            filterType: 'bandpass',
+            frequency: 1500,
+            q: 0.9,
+          }),
+        ];
         oscillator.start(now);
-        oscillator.stop(now + 0.5);
-        if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+        oscillator.stop(now + 0.34);
+        if (navigator.vibrate) navigator.vibrate([18, 28, 18]);
       }
     } catch {
       void 0;
@@ -2115,10 +2214,16 @@ function App() {
     () => MISSION_SEQUENCE.filter(preset => completedMissionIds.has(MISSION_BRIEFS[preset].challengeId)).length,
     [completedMissionIds]
   );
+  const currentLevelIndex = useMemo(() => {
+    const firstOpen = MISSION_SEQUENCE.findIndex(preset => !completedMissionIds.has(MISSION_BRIEFS[preset].challengeId));
+    return firstOpen === -1 ? MISSION_SEQUENCE.length - 1 : firstOpen;
+  }, [completedMissionIds]);
+  const currentLevelPreset = MISSION_SEQUENCE[currentLevelIndex] || MISSION_SEQUENCE[0];
   const activeMissionPreset = useMemo(
     () => activeChallenge ? MISSION_SEQUENCE.find(preset => MISSION_BRIEFS[preset].challengeId === activeChallenge.id) : undefined,
     [activeChallenge]
   );
+  const activeLevelIndex = activeMissionPreset ? MISSION_SEQUENCE.indexOf(activeMissionPreset) : currentLevelIndex;
   const activeMissionBrief = activeMissionPreset ? MISSION_BRIEFS[activeMissionPreset] : null;
   const challengeDoneCount = challengeInsight?.checklist.filter(item => item.done).length ?? 0;
   const challengeStepCount = challengeInsight?.checklist.length ?? 0;
@@ -3274,10 +3379,10 @@ function App() {
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.035] px-2 py-0.5 text-[10px] font-semibold text-[#94a3b8]">
-                          {activeMissionBrief?.family || '任务'}
+                          第 {activeLevelIndex + 1} 关
                         </span>
                         <div className="min-w-0 truncate text-[14px] font-semibold text-white">{activeChallenge.title}</div>
-                        <span className="hidden shrink-0 text-[11px] text-[#64748b] sm:inline">{activeMissionBrief?.signal || challengeInsight.progressLabel}</span>
+                        <span className="hidden shrink-0 text-[11px] text-[#64748b] sm:inline">{activeMissionBrief?.family || challengeInsight.progressLabel}</span>
                       </div>
                       <div className="mt-2 flex items-center gap-1.5 overflow-hidden">
                         {challengeStepLabels.map((label, index) => {
@@ -3340,6 +3445,13 @@ function App() {
                           );
                         })}
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => submitAgentQuery('这道证据题应该怎么判断？请结合当前现象给一个提示。')}
+                        className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-2.5 py-1 text-[10px] font-semibold text-[#a5f3fc] hover:bg-[#22d3ee]/16 transition-colors"
+                      >
+                        问拉瓦锡
+                      </button>
                     </div>
 
                     <div className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -3417,10 +3529,24 @@ function App() {
                           >
                             观察
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => submitAgentQuery('结合当前关卡，下一步该怎么做？')}
+                            className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-3 py-1.5 text-[11px] font-semibold text-[#a5f3fc] transition-all hover:-translate-y-0.5 hover:bg-[#22d3ee]/16"
+                          >
+                            问拉瓦锡
+                          </button>
                         </div>
                       </>
                     ) : (
                       <div className="flex flex-wrap items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => submitAgentQuery('请用三行解释刚才的现象：现象、原因、下一步。')}
+                          className="rounded-full border border-[#10b981]/30 bg-[#10b981]/10 px-3 py-1.5 text-[11px] font-semibold text-[#bbf7d0] hover:bg-[#10b981]/16 transition-colors"
+                        >
+                          解释现象
+                        </button>
                         <button
                           type="button"
                           onClick={() => setAtlasOpen(true)}
@@ -3454,12 +3580,14 @@ function App() {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.92, y: -18 }}
                   transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-                  className="pointer-events-none absolute left-1/2 top-[45%] z-[120] w-[min(360px,calc(100%-40px))] -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-white/14 bg-[rgba(7,11,23,0.86)] px-5 py-4 text-center shadow-[0_28px_70px_rgba(2,6,23,0.55)] backdrop-blur-2xl"
+                  className={gameMode === 'challenge'
+                    ? 'pointer-events-none absolute right-4 top-[196px] z-[120] w-[min(280px,calc(100%-32px))] rounded-[22px] border border-white/12 bg-[rgba(7,11,23,0.78)] px-3 py-2.5 text-left shadow-[0_16px_42px_rgba(2,6,23,0.42)] backdrop-blur-2xl'
+                    : 'pointer-events-none absolute left-1/2 top-[45%] z-[120] w-[min(360px,calc(100%-40px))] -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-white/14 bg-[rgba(7,11,23,0.86)] px-5 py-4 text-center shadow-[0_28px_70px_rgba(2,6,23,0.55)] backdrop-blur-2xl'}
                 >
-                  <div className="mx-auto mb-3 h-3 w-16 rounded-full" style={{ backgroundColor: reactionSpotlight.accent, boxShadow: `0 0 34px ${reactionSpotlight.accent}` }} />
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#67e8f9]">发现现象</div>
-                  <div className="mt-1 text-[18px] font-semibold text-white">{reactionSpotlight.title}</div>
-                  <div className="mt-2 truncate font-mono text-[12px] text-[#94a3b8]">{reactionSpotlight.detail}</div>
+                  <div className={gameMode === 'challenge' ? 'mb-2 h-2 w-12 rounded-full' : 'mx-auto mb-3 h-3 w-16 rounded-full'} style={{ backgroundColor: reactionSpotlight.accent, boxShadow: `0 0 34px ${reactionSpotlight.accent}` }} />
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#67e8f9]">发现现象</div>
+                  <div className={gameMode === 'challenge' ? 'mt-1 truncate text-[14px] font-semibold text-white' : 'mt-1 text-[18px] font-semibold text-white'}>{reactionSpotlight.title}</div>
+                  <div className="mt-1 truncate font-mono text-[11px] text-[#94a3b8]">{reactionSpotlight.detail}</div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -3472,7 +3600,7 @@ function App() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 18, scale: 0.96 }}
                   transition={{ type: 'spring', stiffness: 360, damping: 30 }}
-                  className="absolute bottom-6 left-1/2 z-[130] w-[min(420px,calc(100%-40px))] -translate-x-1/2 rounded-[28px] border border-white/14 bg-[rgba(8,13,24,0.92)] p-4 shadow-[0_28px_70px_rgba(2,6,23,0.56)] backdrop-blur-2xl"
+                  className="absolute bottom-[112px] right-5 z-[130] w-[min(320px,calc(100%-36px))] rounded-[24px] border border-white/14 bg-[rgba(8,13,24,0.9)] p-3 shadow-[0_20px_54px_rgba(2,6,23,0.50)] backdrop-blur-2xl"
                 >
                   <button
                     type="button"
@@ -3486,9 +3614,9 @@ function App() {
                     <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#67e8f9]">关卡完成</div>
                     <div className="mt-1 text-[17px] font-semibold text-white">{missionCompletionCard.title}</div>
                   </div>
-                  <div className="mt-4 flex items-center gap-3 rounded-[22px] border border-white/8 bg-white/[0.035] px-3 py-3">
+                  <div className="mt-3 flex items-center gap-3 rounded-[20px] border border-white/8 bg-white/[0.035] px-3 py-2.5">
                     <div
-                      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.06] font-mono text-[13px] font-bold text-white"
+                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.06] font-mono text-[12px] font-bold text-white"
                       style={{ boxShadow: `0 0 30px ${missionCompletionCard.accent}` }}
                     >
                       {missionCompletionCard.formula}
@@ -3498,11 +3626,11 @@ function App() {
                       <div className="mt-1 text-[12px] text-[#94a3b8]">已解锁图鉴，可继续下一关。</div>
                     </div>
                   </div>
-                  <div className="mt-4 grid grid-cols-3 gap-2">
+                  <div className="mt-3 grid grid-cols-3 gap-1.5">
                     <button
                       type="button"
                       onClick={() => setAtlasOpen(true)}
-                      className="rounded-2xl border border-[#22d3ee]/30 bg-[#22d3ee]/10 px-3 py-2 text-[12px] font-semibold text-[#a5f3fc] hover:bg-[#22d3ee]/16 transition-colors"
+                      className="rounded-2xl border border-[#22d3ee]/30 bg-[#22d3ee]/10 px-2 py-2 text-[11px] font-semibold text-[#a5f3fc] hover:bg-[#22d3ee]/16 transition-colors"
                     >
                       查看图鉴
                     </button>
@@ -3512,7 +3640,7 @@ function App() {
                         setMissionCompletionCard(null);
                         submitAgentQuery('请用三行解释刚才的现象：现象、原因、下一步。');
                       }}
-                      className="rounded-2xl border border-[#10b981]/30 bg-[#10b981]/10 px-3 py-2 text-[12px] font-semibold text-[#bbf7d0] hover:bg-[#10b981]/16 transition-colors"
+                      className="rounded-2xl border border-[#10b981]/30 bg-[#10b981]/10 px-2 py-2 text-[11px] font-semibold text-[#bbf7d0] hover:bg-[#10b981]/16 transition-colors"
                     >
                       解释现象
                     </button>
@@ -3523,7 +3651,7 @@ function App() {
                         launchQuickStart(nextPreset);
                         showToast(`下一关：${MISSION_BRIEFS[nextPreset].title}`);
                       }}
-                      className="rounded-2xl border border-[#f43f5e]/30 bg-[#f43f5e]/10 px-3 py-2 text-[12px] font-semibold text-[#fda4af] hover:bg-[#f43f5e]/16 transition-colors"
+                      className="rounded-2xl border border-[#f43f5e]/30 bg-[#f43f5e]/10 px-2 py-2 text-[11px] font-semibold text-[#fda4af] hover:bg-[#f43f5e]/16 transition-colors"
                     >
                       下一关
                     </button>
@@ -3539,9 +3667,11 @@ function App() {
                   initial={{ opacity: 0, y: -20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  className={`absolute left-1/2 -translate-x-1/2 px-6 py-3 rounded-full glass-panel shadow-lg border border-[#f59e0b]/30 z-[300] flex items-center justify-center pointer-events-none ${gameMode === 'challenge' ? 'top-[104px]' : 'top-[104px]'}`}
+                  className={gameMode === 'challenge'
+                    ? 'absolute right-4 top-4 rounded-2xl border border-[#f59e0b]/24 bg-[rgba(7,11,23,0.78)] px-3 py-2 shadow-lg backdrop-blur-2xl z-[300] flex items-center justify-center pointer-events-none'
+                    : 'absolute left-1/2 top-[104px] -translate-x-1/2 px-6 py-3 rounded-full glass-panel shadow-lg border border-[#f59e0b]/30 z-[300] flex items-center justify-center pointer-events-none'}
                 >
-                  <span className="text-[#f59e0b] font-medium text-[14px] drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]">
+                  <span className={gameMode === 'challenge' ? 'text-[#fde68a] font-medium text-[12px]' : 'text-[#f59e0b] font-medium text-[14px] drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]'}>
                     {toast.message}
                   </span>
                 </motion.div>
@@ -3556,13 +3686,15 @@ function App() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -12, scale: 0.94 }}
                   transition={{ type: 'spring', stiffness: 360, damping: 28 }}
-                  className="absolute left-1/2 top-[72px] z-[310] w-[260px] -translate-x-1/2 rounded-[24px] border border-white/12 bg-[rgba(7,11,23,0.9)] px-4 py-3 text-center shadow-[0_24px_60px_rgba(2,6,23,0.48)] backdrop-blur-2xl pointer-events-none"
+                  className={gameMode === 'challenge'
+                    ? 'absolute right-4 top-[70px] z-[310] w-[min(240px,calc(100%-32px))] rounded-[22px] border border-white/12 bg-[rgba(7,11,23,0.82)] px-3 py-2.5 text-left shadow-[0_18px_48px_rgba(2,6,23,0.42)] backdrop-blur-2xl pointer-events-none'
+                    : 'absolute left-1/2 top-[72px] z-[310] w-[260px] -translate-x-1/2 rounded-[24px] border border-white/12 bg-[rgba(7,11,23,0.9)] px-4 py-3 text-center shadow-[0_24px_60px_rgba(2,6,23,0.48)] backdrop-blur-2xl pointer-events-none'}
                 >
-                  <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] font-mono text-[13px] font-bold text-white" style={{ boxShadow: `0 0 28px ${discoveryToast.accent}` }}>
+                  <div className={gameMode === 'challenge' ? 'mb-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] font-mono text-[11px] font-bold text-white' : 'mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] font-mono text-[13px] font-bold text-white'} style={{ boxShadow: `0 0 28px ${discoveryToast.accent}` }}>
                     {discoveryToast.formula}
                   </div>
                   <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#67e8f9]">发现新现象</div>
-                  <div className="mt-1 text-[14px] font-semibold text-[#f8fafc]">{discoveryToast.title}</div>
+                  <div className="mt-1 truncate text-[14px] font-semibold text-[#f8fafc]">{discoveryToast.title}</div>
                   <div className="mt-1 text-[11px] text-[#94a3b8]">已加入反应图鉴</div>
                 </motion.div>
               )}
@@ -3570,19 +3702,19 @@ function App() {
 
             {/* Floating Holographic Equations */}
             <AnimatePresence>
-              {equations.map(eq => (
+              {equations.map((eq, index) => (
                 <motion.div
                   key={eq.id}
-                  initial={{ opacity: 0, y: eq.y + 40, x: "-50%", scale: 0.8 }}
-                  animate={{ opacity: 1, y: eq.y, x: "-50%", scale: 1 }}
-                  exit={{ opacity: 0, y: eq.y - 20, x: "-50%", scale: 0.95 }}
+                  initial={gameMode === 'challenge' ? { opacity: 0, y: -8, scale: 0.95 } : { opacity: 0, y: eq.y + 40, x: "-50%", scale: 0.8 }}
+                  animate={gameMode === 'challenge' ? { opacity: 1, y: 0, scale: 1 } : { opacity: 1, y: eq.y, x: "-50%", scale: 1 }}
+                  exit={gameMode === 'challenge' ? { opacity: 0, y: -8, scale: 0.95 } : { opacity: 0, y: eq.y - 20, x: "-50%", scale: 0.95 }}
                   transition={{ type: "spring", stiffness: 100, damping: 15 }}
-                  className="fixed flex items-center justify-center pointer-events-none z-[9999]"
-                  style={{ left: '50%', top: 0 }}
+                  className={gameMode === 'challenge' ? 'fixed flex items-center justify-center pointer-events-none z-[121]' : 'fixed flex items-center justify-center pointer-events-none z-[9999]'}
+                  style={gameMode === 'challenge' ? { right: 20, top: 142 + (index * 40) } : { left: '50%', top: 0 }}
                 >
-                  <div className="px-6 py-3 glass-panel border-[#22d3ee]/60 bg-[#0a0e1a]/80 shadow-[0_0_40px_rgba(34,211,238,0.4)] flex items-center">
+                  <div className={gameMode === 'challenge' ? 'flex items-center rounded-2xl border border-[#22d3ee]/26 bg-[rgba(10,14,26,0.72)] px-3 py-1.5 shadow-[0_10px_28px_rgba(34,211,238,0.12)] backdrop-blur-xl' : 'px-6 py-3 glass-panel border-[#22d3ee]/60 bg-[#0a0e1a]/80 shadow-[0_0_40px_rgba(34,211,238,0.4)] flex items-center'}>
                     <span 
-                      className="text-[#22d3ee] text-[18px] drop-shadow-[0_0_12px_rgba(34,211,238,1)] font-bold tracking-wider whitespace-nowrap"
+                      className={gameMode === 'challenge' ? 'text-[#a5f3fc] text-[12px] font-semibold tracking-wide whitespace-nowrap' : 'text-[#22d3ee] text-[18px] drop-shadow-[0_0_12px_rgba(34,211,238,1)] font-bold tracking-wider whitespace-nowrap'}
                       style={{ fontFamily: "'JetBrains Mono', monospace" }}
                     >
                       {eq.text}
@@ -3652,8 +3784,8 @@ function App() {
                     <div className="relative min-h-[158px] border-b border-white/8 p-5 md:border-b-0 md:border-r">
                       <div className="absolute -left-16 -top-16 h-44 w-44 rounded-full bg-[#22d3ee]/12 blur-3xl" />
                       <div className="relative">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#64748b]">样品线索</div>
-                        <div className="mt-2 text-[24px] font-semibold tracking-[-0.03em] text-white">未知样品库</div>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#64748b]">闯关进度</div>
+                        <div className="mt-2 text-[24px] font-semibold tracking-[-0.03em] text-white">化学闯关</div>
                         <div className="mt-3 flex items-end gap-3">
                           <div className="font-mono text-[34px] font-bold leading-none text-[#67e8f9]">{completedMissionCount}/{MISSION_SEQUENCE.length}</div>
                           <div className="pb-1 text-[12px] text-[#94a3b8]">已完成</div>
@@ -3663,10 +3795,10 @@ function App() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => launchQuickStart('prepCu')}
+                          onClick={() => launchQuickStart(currentLevelPreset)}
                           className="mt-5 rounded-full border border-[#22d3ee]/35 bg-[#22d3ee]/12 px-4 py-2 text-[12px] font-semibold text-[#a5f3fc] transition-all hover:-translate-y-0.5 hover:bg-[#22d3ee]/20"
                         >
-                          开始推荐演示
+                          开始第 {currentLevelIndex + 1} 关
                         </button>
                       </div>
                     </div>
@@ -3676,15 +3808,16 @@ function App() {
                         {MISSION_SEQUENCE.map((preset, index) => {
                           const mission = MISSION_BRIEFS[preset];
                           const isMissionDone = completedMissionIds.has(mission.challengeId);
+                          const isCurrentLevel = index === currentLevelIndex && !isMissionDone;
                           return (
                             <button
                               key={`rail-${mission.challengeId}`}
                               type="button"
                               onClick={() => launchQuickStart(mission.preset)}
-                              className={`group flex min-h-[70px] flex-col items-center justify-center gap-1 rounded-2xl border transition-all hover:-translate-y-0.5 ${isMissionDone ? 'border-[#10b981]/26 bg-[#10b981]/10 text-[#bbf7d0]' : 'border-white/8 bg-white/[0.025] text-[#94a3b8] hover:border-[#22d3ee]/28 hover:text-[#a5f3fc]'}`}
+                              className={`group flex min-h-[70px] flex-col items-center justify-center gap-1 rounded-2xl border transition-all hover:-translate-y-0.5 ${isMissionDone ? 'border-[#10b981]/26 bg-[#10b981]/10 text-[#bbf7d0]' : isCurrentLevel ? 'border-[#22d3ee]/35 bg-[#22d3ee]/12 text-[#a5f3fc] shadow-[0_0_18px_rgba(34,211,238,0.10)]' : 'border-white/8 bg-white/[0.025] text-[#94a3b8] hover:border-[#22d3ee]/28 hover:text-[#a5f3fc]'}`}
                             >
                               <span className="font-mono text-[12px] font-semibold">{isMissionDone ? '✓' : String(index + 1).padStart(2, '0')}</span>
-                              <span className="max-w-full truncate px-1 text-[10px]">{mission.signal}</span>
+                              <span className="max-w-full truncate px-1 text-[10px]">{isCurrentLevel ? '当前关' : mission.signal}</span>
                             </button>
                           );
                         })}
@@ -3703,6 +3836,7 @@ function App() {
                     const mission = MISSION_BRIEFS[preset];
                     const accent = getMissionAccentClasses(mission.accent);
                     const isMissionDone = completedMissionIds.has(mission.challengeId);
+                    const isCurrentLevel = index === currentLevelIndex && !isMissionDone;
                     return (
                       <motion.button
                         key={mission.title}
@@ -3710,7 +3844,7 @@ function App() {
                         onClick={() => mission.preset && launchQuickStart(mission.preset)}
                         whileHover={{ y: -3 }}
                         whileTap={{ scale: 0.985 }}
-                        className={`group relative min-h-[176px] overflow-hidden rounded-[26px] border bg-[rgba(7,11,23,0.66)] p-4 text-left backdrop-blur-xl transition-colors duration-200 hover:bg-[rgba(15,23,42,0.76)] ${isMissionDone ? 'border-[#10b981]/28 shadow-[0_0_24px_rgba(16,185,129,0.10)]' : accent.ring}`}
+                        className={`group relative min-h-[176px] overflow-hidden rounded-[26px] border bg-[rgba(7,11,23,0.66)] p-4 text-left backdrop-blur-xl transition-colors duration-200 hover:bg-[rgba(15,23,42,0.76)] ${isMissionDone ? 'border-[#10b981]/28 shadow-[0_0_24px_rgba(16,185,129,0.10)]' : isCurrentLevel ? 'border-[#22d3ee]/42 shadow-[0_0_30px_rgba(34,211,238,0.13)]' : accent.ring}`}
                       >
                         <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-50 blur-2xl transition-opacity group-hover:opacity-80" style={{ backgroundColor: isMissionDone ? '#10b981' : MISSION_SUCCESS_META[mission.challengeId]?.accent }} />
                         <div className={`absolute right-4 top-4 flex h-7 min-w-7 items-center justify-center rounded-full text-[11px] font-bold ${isMissionDone ? 'border border-[#10b981]/30 bg-[#10b981]/12 text-[#86efac]' : accent.dot}`}>
@@ -3718,12 +3852,16 @@ function App() {
                         </div>
                         <div className="relative pr-9">
                           <div className="mb-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">
+                            <span>第 {index + 1} 关</span>
                             <span>{mission.family}</span>
                             <span className="rounded-full border border-white/8 bg-white/[0.035] px-2 py-0.5 tracking-normal text-[#94a3b8]">
                               证据链 {MISSION_PROOFS[mission.challengeId]?.checkpoints.length || 0}
                             </span>
                             {index === 0 && (
                               <span className="rounded-full border border-[#22d3ee]/22 bg-[#22d3ee]/10 px-2 py-0.5 tracking-normal text-[#67e8f9]">推荐</span>
+                            )}
+                            {isCurrentLevel && (
+                              <span className="rounded-full border border-[#22d3ee]/22 bg-[#22d3ee]/10 px-2 py-0.5 tracking-normal text-[#67e8f9]">当前</span>
                             )}
                             {isMissionDone && (
                               <span className="rounded-full border border-[#10b981]/22 bg-[#10b981]/10 px-2 py-0.5 tracking-normal text-[#86efac]">已完成</span>
@@ -3751,7 +3889,7 @@ function App() {
 
                           <div className="mt-5 flex items-center justify-between gap-3">
                             <span className="truncate text-[11px] text-[#64748b]">{mission.branch}</span>
-                            <span className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${isMissionDone ? 'border-[#10b981]/30 bg-[#10b981]/10 text-[#bbf7d0] hover:bg-[#10b981]/16' : accent.button}`}>{isMissionDone ? '再试' : '开始'}</span>
+                            <span className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${isMissionDone ? 'border-[#10b981]/30 bg-[#10b981]/10 text-[#bbf7d0] hover:bg-[#10b981]/16' : isCurrentLevel ? 'border-[#22d3ee]/35 bg-[#22d3ee]/12 text-[#a5f3fc]' : accent.button}`}>{isMissionDone ? '再试' : isCurrentLevel ? '继续' : '挑战'}</span>
                           </div>
                         </div>
                       </motion.button>
