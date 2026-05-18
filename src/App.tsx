@@ -194,11 +194,6 @@ const AGENT_SPECIES_LABELS: Record<string, string> = {
   I2: '碘',
   I2_org: '有机相碘',
   CCl4: '四氯化碳',
-  CH2Cl2: '二氯甲烷',
-  EtOAc: '乙酸乙酯',
-  Toluene: '甲苯',
-  Et2O: '乙醚',
-  Cyclohexane: '环己烷',
   Hexane: '正己烷',
   Phenolphthalein: '酚酞',
   MethylOrange: '甲基橙',
@@ -2306,27 +2301,42 @@ function App() {
       let payload: unknown = null;
       let lastApiError: unknown = null;
       for (const apiUrl of getLavoisierApiCandidates(lavoisierApiUrl)) {
-        try {
-          const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            signal: controller.signal,
-            body: requestBody,
-          });
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            const response = await fetch(apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              signal: controller.signal,
+              body: requestBody,
+            });
 
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+            if (!response.ok) {
+              throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status });
+            }
+
+            payload = await response.json();
+            break;
+          } catch (apiError) {
+            lastApiError = apiError;
+            if (apiError instanceof DOMException && apiError.name === 'AbortError') {
+              throw apiError;
+            }
+
+            const status = apiError instanceof Error && 'status' in apiError
+              ? Number((apiError as { status?: unknown }).status)
+              : 0;
+            const shouldRetrySameEndpoint = attempt === 0 && (!status || status >= 500);
+            if (shouldRetrySameEndpoint) {
+              await new Promise(resolve => window.setTimeout(resolve, 450));
+              continue;
+            }
+            break;
           }
-
-          payload = await response.json();
+        }
+        if (payload) {
           break;
-        } catch (apiError) {
-          lastApiError = apiError;
-          if (apiError instanceof DOMException && apiError.name === 'AbortError') {
-            throw apiError;
-          }
         }
       }
 

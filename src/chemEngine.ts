@@ -77,11 +77,6 @@ export const REAGENTS: Record<string, ReagentDef> = {
   '蒸馏水': { formula: 'H2O', molarity: 55.5, baseColor: {r:255, g:255, b:255, a:0}, state: 'l', defaultTemperature: ROOM_TEMPERATURE, heatCapacity: AQUEOUS_SPECIFIC_HEAT, normalBoilingPoint: 100 },
 
   '四氯化碳 (CCl₄)': { formula: 'CCl4', molarity: 10.3, baseColor: {r:255, g:255, b:255, a:0}, state: 'l', isOrganic: true, density: 1.59, defaultTemperature: ROOM_TEMPERATURE, heatCapacity: 0.86, normalBoilingPoint: 76.7 },
-  '二氯甲烷 (DCM)': { formula: 'CH2Cl2', molarity: 15.6, baseColor: {r:219, g:234, b:254, a:0.08}, state: 'l', isOrganic: true, density: 1.33, defaultTemperature: ROOM_TEMPERATURE, heatCapacity: 1.25, normalBoilingPoint: 39.6 },
-  '乙酸乙酯 (EtOAc)': { formula: 'EtOAc', molarity: 10.2, baseColor: {r:254, g:243, b:199, a:0.08}, state: 'l', isOrganic: true, density: 0.90, defaultTemperature: ROOM_TEMPERATURE, heatCapacity: 1.9, normalBoilingPoint: 77.1 },
-  '甲苯 (Toluene)': { formula: 'Toluene', molarity: 9.4, baseColor: {r:253, g:230, b:138, a:0.08}, state: 'l', isOrganic: true, density: 0.87, defaultTemperature: ROOM_TEMPERATURE, heatCapacity: 1.7, normalBoilingPoint: 110.6 },
-  '乙醚 (Ether)': { formula: 'Et2O', molarity: 9.6, baseColor: {r:191, g:219, b:254, a:0.08}, state: 'l', isOrganic: true, density: 0.71, defaultTemperature: ROOM_TEMPERATURE, heatCapacity: 2.4, normalBoilingPoint: 34.6 },
-  '环己烷 (Cyclohexane)': { formula: 'Cyclohexane', molarity: 9.3, baseColor: {r:224, g:231, b:255, a:0.08}, state: 'l', isOrganic: true, density: 0.78, defaultTemperature: ROOM_TEMPERATURE, heatCapacity: 1.85, normalBoilingPoint: 80.7 },
   '碘水 (I₂ aq)': { formula: 'I2', molarity: 0.05, baseColor: {r:180, g:120, b:40, a:0.5}, state: 'aq', defaultTemperature: ROOM_TEMPERATURE, heatCapacity: AQUEOUS_SPECIFIC_HEAT },
   '碘单质 (I₂ 固体)': { formula: 'I2_s', molarity: 0, baseColor: {r:40, g:0, b:40, a:1}, state: 's', enthalpy: 0, defaultTemperature: ROOM_TEMPERATURE, heatCapacity: 0.21, normalBoilingPoint: 184 }, // purple-black solid
   '碘单质 (I₂ 有机相)': { formula: 'I2_org', molarity: 0, baseColor: {r:128, g:0, b:128, a:0.7}, state: 'l', isOrganic: true, defaultTemperature: ROOM_TEMPERATURE, heatCapacity: 0.8, normalBoilingPoint: 184 },
@@ -643,9 +638,8 @@ function getStandardTransferFactor(
 
 function getDistillationFactor(formula: string, phase: 'aqueous' | 'organic') {
   if (phase === 'organic') {
-    if (formula === 'Hexane' || formula === 'CH2Cl2' || formula === 'Et2O') return 1;
-    if (formula === 'CCl4' || formula === 'EtOAc' || formula === 'Cyclohexane') return 0.92;
-    if (formula === 'Toluene') return 0.72;
+    if (formula === 'Hexane') return 1;
+    if (formula === 'CCl4') return 0.92;
     if (formula === IODINE_ORGANIC_FORMULA) return 0.18;
     return ORGANIC_FORMULA_SET.has(formula) ? 0.35 : 0;
   }
@@ -691,20 +685,13 @@ function getTransferSelector(phase: 'mixed' | 'aqueous' | 'organic', options: Sp
 }
 
 function getIodinePartitionCoefficient(state: ChemState) {
-  const solventWeights = [
-    { formula: 'CCl4', coefficient: 85 },
-    { formula: 'CH2Cl2', coefficient: 62 },
-    { formula: 'Toluene', coefficient: 54 },
-    { formula: 'Hexane', coefficient: 30 },
-    { formula: 'Cyclohexane', coefficient: 28 },
-    { formula: 'EtOAc', coefficient: 24 },
-    { formula: 'Et2O', coefficient: 20 },
-  ].map(entry => ({ ...entry, amount: state.moles[entry.formula] || 0 }));
-  const totalWeight = solventWeights.reduce((sum, entry) => sum + entry.amount, 0);
+  const ccl4Weight = state.moles['CCl4'] || 0;
+  const hexaneWeight = state.moles['Hexane'] || 0;
+  const totalWeight = ccl4Weight + hexaneWeight;
 
   if (totalWeight <= EPSILON) return 35;
 
-  return solventWeights.reduce((sum, entry) => sum + (entry.amount * entry.coefficient), 0) / totalWeight;
+  return ((ccl4Weight * 85) + (hexaneWeight * 30)) / totalWeight;
 }
 
 function applyIodinePartition(state: ChemState) {

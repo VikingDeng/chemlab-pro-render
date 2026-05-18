@@ -115,18 +115,6 @@ test('c5 形成含碘紫色有机层后完成制备', () => {
   assert.equal(getChallengeInsight(makeChallenge('c5'), items)?.progressValue, 100)
 })
 
-test('新增萃取剂同样能形成碘的紫色有机层', () => {
-  for (const solvent of ['二氯甲烷 (DCM)', '乙酸乙酯 (EtOAc)', '甲苯 (Toluene)', '乙醚 (Ether)', '环己烷 (Cyclohexane)']) {
-    let state = createEmptyState()
-    state = mixReagent(state, '碘水 (I₂ aq)', 12).newState
-    state = mixReagent(state, solvent, 8).newState
-
-    assert.equal(isChallengeCompleted(makeChallenge('c5'), [makeContainer('烧杯', state)]), true, solvent)
-    assert.ok((state.organicVolume || 0) > 0, solvent)
-    assert.match(state.organicColor || '', /128,0,128/, solvent)
-  }
-})
-
 test('c6 草酸酸性还原高锰酸钾后完成褪色任务', () => {
   let state = createEmptyState()
   state = mixReagent(state, '高锰酸钾', 20).newState
