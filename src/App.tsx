@@ -124,6 +124,10 @@ type MissionPreset = 'prepCu' | 'prepAg' | 'prepFe' | 'prepCo2' | 'prepIodine' |
 
 type MissionBrief = {
   title: string;
+  family: string;
+  signal: string;
+  route: string[];
+  branch: string;
   reagents: string[];
   accent: 'cyan' | 'rose' | 'emerald' | 'amber' | 'violet';
   preset: MissionPreset;
@@ -190,6 +194,10 @@ const AGENT_SPECIES_LABELS: Record<string, string> = {
 const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
   prepCu: {
     title: '未知 A：蓝色沉淀',
+    family: '沉淀鉴定',
+    signal: '蓝绿色絮状',
+    route: ['样品 A', '加碱', '沉淀'],
+    branch: '氨水会转深蓝',
     reagents: ['未知样品 A', '氢氧化钠', '氨水'],
     accent: 'cyan',
     preset: 'prepCu',
@@ -199,6 +207,10 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
   },
   prepAg: {
     title: '未知 B：白色沉淀',
+    family: '沉淀鉴定',
+    signal: '白色凝乳状',
+    route: ['样品 B', '加氯离子', '沉淀'],
+    branch: '氨水可做对照',
     reagents: ['未知样品 B', '盐酸', '氨水'],
     accent: 'emerald',
     preset: 'prepAg',
@@ -208,6 +220,10 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
   },
   prepFe: {
     title: '未知 C：血红络合',
+    family: '络合显色',
+    signal: '瞬间血红',
+    route: ['样品 C', 'SCN⁻', '显色'],
+    branch: '加碱会变沉淀',
     reagents: ['未知样品 C', '硫氰化钾', '氢氧化钠'],
     accent: 'rose',
     preset: 'prepFe',
@@ -217,6 +233,10 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
   },
   prepCo2: {
     title: '未知 D：气泡',
+    family: '气体生成',
+    signal: '连续气泡',
+    route: ['样品 D', '加酸', '冒泡'],
+    branch: '指示剂看酸化',
     reagents: ['未知样品 D', '盐酸', '甲基橙'],
     accent: 'amber',
     preset: 'prepCo2',
@@ -226,6 +246,10 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
   },
   prepIodine: {
     title: '未知 E：紫色分层',
+    family: '萃取分层',
+    signal: '有机层变紫',
+    route: ['样品 E', '有机相', '分层'],
+    branch: '正己烷可对比',
     reagents: ['未知样品 E', '四氯化碳', '正己烷'],
     accent: 'violet',
     preset: 'prepIodine',
@@ -235,6 +259,10 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
   },
   prepMn: {
     title: '未知 F：褪色',
+    family: '氧化还原',
+    signal: '紫色褪去',
+    route: ['样品 F', '还原剂', '酸化'],
+    branch: '酸度决定速度',
     reagents: ['未知样品 F', '草酸', '硫酸'],
     accent: 'amber',
     preset: 'prepMn',
@@ -1730,12 +1758,41 @@ function App() {
     () => MISSION_SEQUENCE.filter(preset => unlockedDiscoveryIds.has(MISSION_BRIEFS[preset].discoveryId)).length,
     [unlockedDiscoveryIds]
   );
+  const activeMissionPreset = useMemo(
+    () => activeChallenge ? MISSION_SEQUENCE.find(preset => MISSION_BRIEFS[preset].challengeId === activeChallenge.id) : undefined,
+    [activeChallenge]
+  );
+  const activeMissionBrief = activeMissionPreset ? MISSION_BRIEFS[activeMissionPreset] : null;
+  const challengeDoneCount = challengeInsight?.checklist.filter(item => item.done).length ?? 0;
+  const challengeStepCount = challengeInsight?.checklist.length ?? 0;
   const challengeNextAction = challengeInsight?.checklist.find(item => !item.done)?.label || null;
   const challengeGuideTargetId = gameMode === 'challenge' && activeChallenge ? primaryAgentContainerId : null;
-  const challengeQuickReagent = challengeNextAction && challengeInsight
-    && [...challengeInsight.primaryReagents, ...challengeInsight.secondaryReagents].includes(challengeNextAction)
-    ? challengeNextAction
-    : null;
+  const challengeQuickReagent = useMemo(() => {
+    if (!challengeNextAction || !challengeInsight) return null;
+    const actionPool = [...challengeInsight.primaryReagents, ...challengeInsight.secondaryReagents];
+    const normalize = (name: string) => name.replace(/[（(].*?[）)]/g, '').replace('指示剂', '').trim();
+    return actionPool.find(name => name === challengeNextAction)
+      || actionPool.find(name => normalize(name) === challengeNextAction || name.includes(challengeNextAction) || challengeNextAction.includes(normalize(name)))
+      || (challengeNextAction === '有机相' ? actionPool.find(name => name.includes('四氯化碳')) : undefined)
+      || null;
+  }, [challengeInsight, challengeNextAction]);
+  const challengeActionOptions = useMemo(() => {
+    if (!challengeInsight || !primaryAgentContainerId || activeChallenge?.completed) return [];
+    const options: Array<{ name: string; label: string; tone: 'next' | 'main' | 'try'; volume: number }> = [];
+    const pushOption = (name: string, label: string, tone: 'next' | 'main' | 'try', volume = 20) => {
+      if (!name || options.some(option => option.name === name)) return;
+      options.push({ name, label, tone, volume });
+    };
+
+    if (challengeQuickReagent) pushOption(challengeQuickReagent, '下一步', 'next');
+    const completedLabels = new Set(challengeInsight.checklist.filter(item => item.done).map(item => item.label));
+    const normalize = (name: string) => name.replace(/[（(].*?[）)]/g, '').replace('指示剂', '').trim();
+    challengeInsight.primaryReagents
+      .filter(name => !completedLabels.has(name) && !completedLabels.has(normalize(name)))
+      .forEach(name => pushOption(name, '主线', 'main'));
+    challengeInsight.secondaryReagents.slice(0, 2).forEach(name => pushOption(name, '可试', 'try', 10));
+    return options.slice(0, 4);
+  }, [activeChallenge?.completed, challengeInsight, challengeQuickReagent, primaryAgentContainerId]);
 
   /* eslint-disable react-hooks/preserve-manual-memoization -- React Compiler flags the stable toast callback here; dependencies remain explicit for hook correctness. */
   const handleAgentQuickAction = useCallback((actionId: 'focus' | 'logs' | 'reagents' | 'note') => {
@@ -2197,7 +2254,6 @@ function App() {
     pendingChallengeCompletionRef.current = activeChallenge.id;
     playSound('reaction');
     const meta = getMissionSuccessMeta(activeChallenge.id);
-    showToast(`完成：${meta.product}`);
     setMissionCompletionCard({
       id: createRuntimeId('mission-complete'),
       challengeId: activeChallenge.id,
@@ -2209,7 +2265,7 @@ function App() {
     setTimeout(() => {
       setActiveChallenge(c => c?.id === activeChallenge.id ? { ...c, completed: true } : c);
     }, 0);
-  }, [activeChallenge, gameMode, placedItems, playSound, showToast]);
+  }, [activeChallenge, gameMode, placedItems, playSound]);
 
   usePhysicsEngine(
     placedItems, 
@@ -2738,49 +2794,112 @@ function App() {
 
             {/* Challenge HUD */}
             {gameMode === 'challenge' && activeChallenge && challengeInsight && (
-              <div className="absolute top-[128px] left-1/2 z-[55] w-[min(760px,calc(100%-32px))] -translate-x-1/2 rounded-[18px] border border-[#f43f5e]/22 bg-[rgba(7,11,23,0.82)] px-3 py-2 shadow-[0_16px_44px_rgba(2,6,23,0.34)] backdrop-blur-xl">
-                <div className="flex items-center gap-3">
-                  <div className="min-w-[132px] shrink-0">
-                    <div className="text-[13px] font-semibold leading-tight text-[#f8fafc]">{activeChallenge.title}</div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/8">
-                      <div className="h-full rounded-full bg-[#f43f5e] transition-all duration-500" style={{ width: `${challengeInsight.progressValue}%` }} />
+              <div className="absolute left-1/2 top-[122px] z-[55] w-[min(840px,calc(100%-32px))] -translate-x-1/2 overflow-hidden rounded-[24px] border border-white/10 bg-[rgba(7,11,23,0.84)] shadow-[0_22px_70px_rgba(2,6,23,0.46)] backdrop-blur-2xl">
+                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#22d3ee]/55 to-transparent" />
+                <div className="grid gap-3 p-3 md:grid-cols-[1.15fr_1fr]">
+                  <div className="min-w-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">
+                          <span>{activeMissionBrief?.family || '任务'}</span>
+                          <span className="rounded-full border border-[#22d3ee]/22 bg-[#22d3ee]/10 px-2 py-0.5 tracking-normal text-[#67e8f9]">
+                            {challengeDoneCount}/{Math.max(1, challengeStepCount)}
+                          </span>
+                        </div>
+                        <div className="mt-1 truncate text-[16px] font-semibold text-white">{activeChallenge.title}</div>
+                      </div>
+                      <div className="shrink-0 rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-[11px] text-[#cbd5e1]">
+                        {activeMissionBrief?.signal || challengeInsight.progressLabel}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/8">
+                      <div className="h-full rounded-full bg-gradient-to-r from-[#22d3ee] via-[#f43f5e] to-[#a855f7] transition-all duration-500" style={{ width: `${challengeInsight.progressValue}%` }} />
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-1.5">
+                      {(activeMissionBrief?.route || challengeInsight.checklist.map(item => item.label)).slice(0, 3).map((label, index) => {
+                        const stepDone = challengeInsight.checklist[index]?.done || activeChallenge.completed;
+                        return (
+                          <div
+                            key={`${label}-${index}`}
+                            className={`rounded-2xl border px-2.5 py-2 transition-colors ${stepDone ? 'border-[#10b981]/24 bg-[#10b981]/10 text-[#bbf7d0]' : index === challengeDoneCount ? 'border-[#22d3ee]/26 bg-[#22d3ee]/10 text-[#a5f3fc]' : 'border-white/8 bg-white/[0.025] text-[#94a3b8]'}`}
+                          >
+                            <div className="text-[10px] font-semibold">{stepDone ? '✓' : String(index + 1).padStart(2, '0')}</div>
+                            <div className="mt-0.5 truncate text-[11px] font-semibold">{label}</div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                  <div className="min-w-0 flex-1 text-[12px] leading-snug text-[#fce7f3]">
-                    {challengeInsight.nextHint}
+
+                  <div className="rounded-[20px] border border-white/8 bg-black/16 p-3">
+                    <div className="flex items-start gap-2">
+                      <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#f43f5e] shadow-[0_0_18px_rgba(244,63,94,0.75)]" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[12px] leading-snug text-[#fce7f3]">{challengeInsight.nextHint}</div>
+                        {activeMissionBrief?.branch && (
+                          <div className="mt-1 truncate text-[11px] text-[#64748b]">{activeMissionBrief.branch}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {!activeChallenge.completed ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {challengeActionOptions.map(option => (
+                          <button
+                            key={option.name}
+                            type="button"
+                            onClick={() => {
+                              addReagentToContainer(primaryAgentContainerId || '', option.name, option.volume);
+                            }}
+                            className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all hover:-translate-y-0.5 ${option.tone === 'next' ? 'border-[#22d3ee]/42 bg-[#22d3ee]/14 text-[#a5f3fc] shadow-[0_0_20px_rgba(34,211,238,0.14)]' : option.tone === 'main' ? 'border-white/12 bg-white/[0.055] text-[#e2e8f0] hover:border-white/20' : 'border-[#f59e0b]/26 bg-[#f59e0b]/8 text-[#fde68a] hover:bg-[#f59e0b]/14'}`}
+                          >
+                            <span className="mr-1 opacity-70">{option.label}</span>
+                            {option.name.replace('指示剂', '')}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (primaryAgentContainerId) {
+                              showInlineContainerHint({
+                                targetId: primaryAgentContainerId,
+                                title: '观察',
+                                detail: challengeInsight.nextHint,
+                                tone: 'info',
+                              });
+                            }
+                            showToast('已观察当前状态');
+                          }}
+                          className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-semibold text-[#cbd5e1] transition-all hover:-translate-y-0.5 hover:border-white/20"
+                        >
+                          观察
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setAtlasOpen(true)}
+                          className="rounded-full border border-[#22d3ee]/35 bg-[#22d3ee]/12 px-3 py-1.5 text-[11px] font-semibold text-[#a5f3fc] hover:bg-[#22d3ee]/20 transition-colors"
+                        >
+                          查看图鉴
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextPreset = getNextMissionPreset(activeChallenge.id);
+                            launchQuickStart(nextPreset);
+                            showToast(`下一关：${MISSION_BRIEFS[nextPreset].title}`);
+                          }}
+                          className="rounded-full border border-[#f43f5e]/35 bg-[#f43f5e]/12 px-3 py-1.5 text-[11px] font-semibold text-[#fda4af] hover:bg-[#f43f5e]/20 transition-colors"
+                        >
+                          下一关
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="hidden max-w-[260px] shrink-0 flex-wrap justify-end gap-1.5 md:flex">
-                    {challengeInsight.primaryReagents.slice(0, 4).map(name => (
-                      <span key={name} className="rounded-full border border-[#f43f5e]/20 bg-[#f43f5e]/8 px-2 py-1 text-[10px] text-[#fecdd3]">
-                        {name.replace('指示剂', '')}
-                      </span>
-                    ))}
-                  </div>
-                  {challengeQuickReagent && primaryAgentContainerId && !activeChallenge.completed && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        addReagentToContainer(primaryAgentContainerId, challengeQuickReagent, 20);
-                        showToast(`加入 20mL ${challengeQuickReagent}`);
-                      }}
-                      className="shrink-0 rounded-full border border-[#22d3ee]/35 bg-[#22d3ee]/12 px-3 py-1.5 text-[11px] font-semibold text-[#a5f3fc] hover:bg-[#22d3ee]/20 transition-colors"
-                    >
-                      加入 20mL
-                    </button>
-                  )}
-                  {activeChallenge.completed && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextPreset = getNextMissionPreset(activeChallenge.id);
-                        launchQuickStart(nextPreset);
-                        showToast(`下一关：${MISSION_BRIEFS[nextPreset].title}`);
-                      }}
-                      className="shrink-0 rounded-full border border-[#f43f5e]/35 bg-[#f43f5e]/12 px-3 py-1.5 text-[11px] font-semibold text-[#fda4af] hover:bg-[#f43f5e]/20 transition-colors"
-                    >
-                      下一关
-                    </button>
-                  )}
                 </div>
               </div>
             )}
@@ -2985,58 +3104,112 @@ function App() {
             </AnimatePresence>
 
             {placedItems.length === 0 && brokenGlass.length === 0 && gameMode === 'challenge' ? (
-              <div className="flex w-full max-w-[980px] flex-col items-center px-4 pt-[120px] sm:pt-0">
-                <div className={`mb-4 flex w-full items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[rgba(7,11,23,0.58)] px-4 py-3 backdrop-blur-xl ${isTablet ? 'pl-24' : ''}`}>
-                  <div>
-                    <div className="text-[12px] font-semibold text-[#f8fafc]">闯关进度 {completedMissionCount}/{MISSION_SEQUENCE.length}</div>
-                    <div className="mt-1 h-1.5 w-[156px] overflow-hidden rounded-full bg-white/8">
-                      <div className="h-full rounded-full bg-[#22d3ee] transition-all duration-500" style={{ width: `${(completedMissionCount / MISSION_SEQUENCE.length) * 100}%` }} />
+              <div className="flex max-h-full w-full max-w-[1040px] flex-col items-center overflow-y-auto px-4 py-4 pt-[112px] sm:pt-4">
+                <div className={`mb-4 w-full overflow-hidden rounded-[28px] border border-white/8 bg-[rgba(7,11,23,0.62)] backdrop-blur-2xl ${isTablet ? 'pl-24' : ''}`}>
+                  <div className="grid gap-0 md:grid-cols-[0.95fr_1.35fr]">
+                    <div className="relative min-h-[158px] border-b border-white/8 p-5 md:border-b-0 md:border-r">
+                      <div className="absolute -left-16 -top-16 h-44 w-44 rounded-full bg-[#22d3ee]/12 blur-3xl" />
+                      <div className="relative">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#64748b]">样品线索</div>
+                        <div className="mt-2 text-[24px] font-semibold tracking-[-0.03em] text-white">未知样品库</div>
+                        <div className="mt-3 flex items-end gap-3">
+                          <div className="font-mono text-[34px] font-bold leading-none text-[#67e8f9]">{completedMissionCount}/{MISSION_SEQUENCE.length}</div>
+                          <div className="pb-1 text-[12px] text-[#94a3b8]">已解锁</div>
+                        </div>
+                        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/8">
+                          <div className="h-full rounded-full bg-gradient-to-r from-[#22d3ee] via-[#f43f5e] to-[#a855f7] transition-all duration-500" style={{ width: `${(completedMissionCount / MISSION_SEQUENCE.length) * 100}%` }} />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => launchQuickStart('prepCu')}
+                          className="mt-5 rounded-full border border-[#22d3ee]/35 bg-[#22d3ee]/12 px-4 py-2 text-[12px] font-semibold text-[#a5f3fc] transition-all hover:-translate-y-0.5 hover:bg-[#22d3ee]/20"
+                        >
+                          开始推荐演示
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="p-5">
+                      <div className="grid grid-cols-6 gap-2">
+                        {MISSION_SEQUENCE.map((preset, index) => {
+                          const mission = MISSION_BRIEFS[preset];
+                          const isMissionDone = unlockedDiscoveryIds.has(mission.discoveryId);
+                          return (
+                            <button
+                              key={`rail-${mission.challengeId}`}
+                              type="button"
+                              onClick={() => launchQuickStart(mission.preset)}
+                              className={`group flex min-h-[70px] flex-col items-center justify-center gap-1 rounded-2xl border transition-all hover:-translate-y-0.5 ${isMissionDone ? 'border-[#10b981]/26 bg-[#10b981]/10 text-[#bbf7d0]' : 'border-white/8 bg-white/[0.025] text-[#94a3b8] hover:border-[#22d3ee]/28 hover:text-[#a5f3fc]'}`}
+                            >
+                              <span className="font-mono text-[12px] font-semibold">{isMissionDone ? '✓' : String(index + 1).padStart(2, '0')}</span>
+                              <span className="max-w-full truncate px-1 text-[10px]">{mission.signal}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-4 grid grid-cols-3 gap-2 text-[11px] text-[#64748b]">
+                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">沉淀</div>
+                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">显色</div>
+                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">分层/褪色</div>
+                      </div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => launchQuickStart('prepCu')}
-                    className="shrink-0 rounded-full border border-[#22d3ee]/35 bg-[#22d3ee]/12 px-4 py-2 text-[12px] font-semibold text-[#a5f3fc] transition-colors hover:bg-[#22d3ee]/20"
-                  >
-                    开始推荐演示
-                  </button>
                 </div>
+
                 <div className={`grid w-full grid-cols-1 gap-3 md:grid-cols-3 ${isTablet ? 'pl-24' : ''}`}>
                   {MISSION_SEQUENCE.map((preset, index) => {
                     const mission = MISSION_BRIEFS[preset];
                     const accent = getMissionAccentClasses(mission.accent);
                     const isMissionDone = unlockedDiscoveryIds.has(mission.discoveryId);
                     return (
-                      <button
+                      <motion.button
                         key={mission.title}
                         type="button"
                         onClick={() => mission.preset && launchQuickStart(mission.preset)}
-                        className={`group relative overflow-hidden rounded-[22px] border bg-[rgba(7,11,23,0.62)] p-4 text-left backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:bg-[rgba(15,23,42,0.72)] ${isMissionDone ? 'border-[#10b981]/28 shadow-[0_0_24px_rgba(16,185,129,0.10)]' : accent.ring}`}
+                        whileHover={{ y: -3 }}
+                        whileTap={{ scale: 0.985 }}
+                        className={`group relative min-h-[176px] overflow-hidden rounded-[26px] border bg-[rgba(7,11,23,0.66)] p-4 text-left backdrop-blur-xl transition-colors duration-200 hover:bg-[rgba(15,23,42,0.76)] ${isMissionDone ? 'border-[#10b981]/28 shadow-[0_0_24px_rgba(16,185,129,0.10)]' : accent.ring}`}
                       >
-                        <div className={`absolute right-4 top-4 flex h-6 min-w-6 items-center justify-center rounded-full text-[11px] font-bold ${isMissionDone ? 'border border-[#10b981]/30 bg-[#10b981]/12 text-[#86efac]' : accent.dot}`} >
-                          {isMissionDone ? '✓' : ''}
+                        <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-50 blur-2xl transition-opacity group-hover:opacity-80" style={{ backgroundColor: isMissionDone ? '#10b981' : MISSION_SUCCESS_META[mission.challengeId]?.accent }} />
+                        <div className={`absolute right-4 top-4 flex h-7 min-w-7 items-center justify-center rounded-full text-[11px] font-bold ${isMissionDone ? 'border border-[#10b981]/30 bg-[#10b981]/12 text-[#86efac]' : accent.dot}`}>
+                          {isMissionDone ? '✓' : String(index + 1).padStart(2, '0')}
                         </div>
-                        <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">
-                          <span>关卡 {String(index + 1).padStart(2, '0')}</span>
-                          {index === 0 && (
-                            <span className="rounded-full border border-[#22d3ee]/22 bg-[#22d3ee]/10 px-2 py-0.5 tracking-normal text-[#67e8f9]">推荐演示</span>
-                          )}
-                          {isMissionDone && (
-                            <span className="rounded-full border border-[#10b981]/22 bg-[#10b981]/10 px-2 py-0.5 tracking-normal text-[#86efac]">已完成</span>
-                          )}
+                        <div className="relative pr-9">
+                          <div className="mb-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">
+                            <span>{mission.family}</span>
+                            {index === 0 && (
+                              <span className="rounded-full border border-[#22d3ee]/22 bg-[#22d3ee]/10 px-2 py-0.5 tracking-normal text-[#67e8f9]">推荐</span>
+                            )}
+                            {isMissionDone && (
+                              <span className="rounded-full border border-[#10b981]/22 bg-[#10b981]/10 px-2 py-0.5 tracking-normal text-[#86efac]">已完成</span>
+                            )}
+                          </div>
+                          <div className="text-[16px] font-semibold text-[#f8fafc]">{mission.title}</div>
+                          <div className="mt-2 text-[13px] font-medium text-[#cbd5e1]">{mission.signal}</div>
+
+                          <div className="mt-4 flex items-center gap-1.5">
+                            {mission.route.map((step, stepIndex) => (
+                              <div key={step} className="flex min-w-0 items-center gap-1.5">
+                                <span className="truncate rounded-full border border-white/8 bg-white/[0.035] px-2 py-1 text-[10px] text-[#cbd5e1]">{step}</span>
+                                {stepIndex < mission.route.length - 1 && <span className="text-[#475569]">→</span>}
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-1.5">
+                            {mission.reagents.slice(0, 4).map(reagent => (
+                              <span key={reagent} className="rounded-full border border-white/8 bg-black/14 px-2 py-1 text-[10px] text-[#94a3b8]">
+                                {reagent.replace('指示剂', '')}
+                              </span>
+                            ))}
+                          </div>
+
+                          <div className="mt-5 flex items-center justify-between gap-3">
+                            <span className="truncate text-[11px] text-[#64748b]">{mission.branch}</span>
+                            <span className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${isMissionDone ? 'border-[#10b981]/30 bg-[#10b981]/10 text-[#bbf7d0] hover:bg-[#10b981]/16' : accent.button}`}>{isMissionDone ? '再试' : '开始'}</span>
+                          </div>
                         </div>
-                        <div className="text-[15px] font-semibold text-[#f8fafc]">{mission.title}</div>
-                        <div className="mt-4 flex flex-wrap gap-1.5">
-                          {mission.reagents.slice(0, 4).map(reagent => (
-                            <span key={reagent} className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-1 text-[10px] text-[#cbd5e1]">
-                              {reagent}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="mt-5 flex justify-end">
-                          <span className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${isMissionDone ? 'border-[#10b981]/30 bg-[#10b981]/10 text-[#bbf7d0] hover:bg-[#10b981]/16' : accent.button}`}>{isMissionDone ? '再试一次' : '开始制备'}</span>
-                        </div>
-                      </button>
+                      </motion.button>
                     );
                   })}
                 </div>
