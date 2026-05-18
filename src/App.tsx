@@ -3299,7 +3299,7 @@ function App() {
           <section
             ref={workspaceRef}
             data-panel="workspace"
-            className="flex-1 h-full relative rounded-[16px] overflow-hidden flex flex-col items-center justify-center z-0 workspace-canvas shadow-[inset_0_0_100px_rgba(0,0,0,0.5)] border border-[rgba(255,255,255,0.05)] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[rgba(30,41,59,0.3)] to-transparent">
+            className="flex-1 h-full min-h-[calc(100svh-220px)] md:min-h-0 relative rounded-[16px] overflow-hidden flex flex-col items-center justify-center z-0 workspace-canvas shadow-[inset_0_0_100px_rgba(0,0,0,0.5)] border border-[rgba(255,255,255,0.05)] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[rgba(30,41,59,0.3)] to-transparent">
             
             {/* Grid Background Overlay for scientific feel */}
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+CjxwYXRoIGQ9Ik0wIDBoNDB2NDBIMHoiIGZpbGw9Im5vbmUiLz4KPHBhdGggZD0iTTAgNDBoNDBNNDAgMHY0MCIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDMpIiBzdHJva2Utd2lkdGg9IjEiLz4KPC9zdmc+')] opacity-50 pointer-events-none" />
@@ -3372,7 +3372,7 @@ function App() {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.22, ease: 'easeOut' }}
-                  className="absolute left-1/2 top-[118px] z-[55] w-[min(760px,calc(100%-32px))] -translate-x-1/2 overflow-hidden rounded-[26px] border border-white/10 bg-[rgba(7,11,23,0.78)] px-3 py-2.5 shadow-[0_14px_44px_rgba(2,6,23,0.34)] backdrop-blur-2xl"
+                  className="absolute left-1/2 top-[204px] z-[55] w-[min(760px,calc(100%-32px))] -translate-x-1/2 overflow-hidden rounded-[26px] border border-white/10 bg-[rgba(7,11,23,0.78)] px-3 py-2.5 shadow-[0_14px_44px_rgba(2,6,23,0.34)] backdrop-blur-2xl sm:top-[118px]"
                 >
                   <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#22d3ee]/50 to-transparent" />
                   <div className="flex items-center gap-3">
@@ -3581,7 +3581,7 @@ function App() {
                   exit={{ opacity: 0, scale: 0.92, y: -18 }}
                   transition={{ type: 'spring', stiffness: 420, damping: 30 }}
                   className={gameMode === 'challenge'
-                    ? 'pointer-events-none absolute right-4 top-[196px] z-[120] w-[min(280px,calc(100%-32px))] rounded-[22px] border border-white/12 bg-[rgba(7,11,23,0.78)] px-3 py-2.5 text-left shadow-[0_16px_42px_rgba(2,6,23,0.42)] backdrop-blur-2xl'
+                    ? 'pointer-events-none absolute right-4 top-[292px] z-[120] w-[min(280px,calc(100%-32px))] rounded-[22px] border border-white/12 bg-[rgba(7,11,23,0.78)] px-3 py-2.5 text-left shadow-[0_16px_42px_rgba(2,6,23,0.42)] backdrop-blur-2xl sm:top-[196px]'
                     : 'pointer-events-none absolute left-1/2 top-[45%] z-[120] w-[min(360px,calc(100%-40px))] -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-white/14 bg-[rgba(7,11,23,0.86)] px-5 py-4 text-center shadow-[0_28px_70px_rgba(2,6,23,0.55)] backdrop-blur-2xl'}
                 >
                   <div className={gameMode === 'challenge' ? 'mb-2 h-2 w-12 rounded-full' : 'mx-auto mb-3 h-3 w-16 rounded-full'} style={{ backgroundColor: reactionSpotlight.accent, boxShadow: `0 0 34px ${reactionSpotlight.accent}` }} />
@@ -3668,7 +3668,7 @@ function App() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   className={gameMode === 'challenge'
-                    ? 'absolute right-4 top-4 rounded-2xl border border-[#f59e0b]/24 bg-[rgba(7,11,23,0.78)] px-3 py-2 shadow-lg backdrop-blur-2xl z-[300] flex items-center justify-center pointer-events-none'
+                    ? 'absolute right-4 top-[184px] rounded-2xl border border-[#f59e0b]/24 bg-[rgba(7,11,23,0.78)] px-3 py-2 shadow-lg backdrop-blur-2xl z-[300] flex items-center justify-center pointer-events-none sm:top-4'
                     : 'absolute left-1/2 top-[104px] -translate-x-1/2 px-6 py-3 rounded-full glass-panel shadow-lg border border-[#f59e0b]/30 z-[300] flex items-center justify-center pointer-events-none'}
                 >
                   <span className={gameMode === 'challenge' ? 'text-[#fde68a] font-medium text-[12px]' : 'text-[#f59e0b] font-medium text-[14px] drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]'}>
@@ -3687,7 +3687,7 @@ function App() {
                   exit={{ opacity: 0, y: -12, scale: 0.94 }}
                   transition={{ type: 'spring', stiffness: 360, damping: 28 }}
                   className={gameMode === 'challenge'
-                    ? 'absolute right-4 top-[70px] z-[310] w-[min(240px,calc(100%-32px))] rounded-[22px] border border-white/12 bg-[rgba(7,11,23,0.82)] px-3 py-2.5 text-left shadow-[0_18px_48px_rgba(2,6,23,0.42)] backdrop-blur-2xl pointer-events-none'
+                    ? 'absolute right-4 top-[214px] z-[310] w-[min(240px,calc(100%-32px))] rounded-[22px] border border-white/12 bg-[rgba(7,11,23,0.82)] px-3 py-2.5 text-left shadow-[0_18px_48px_rgba(2,6,23,0.42)] backdrop-blur-2xl pointer-events-none sm:top-[70px]'
                     : 'absolute left-1/2 top-[72px] z-[310] w-[260px] -translate-x-1/2 rounded-[24px] border border-white/12 bg-[rgba(7,11,23,0.9)] px-4 py-3 text-center shadow-[0_24px_60px_rgba(2,6,23,0.48)] backdrop-blur-2xl pointer-events-none'}
                 >
                   <div className={gameMode === 'challenge' ? 'mb-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] font-mono text-[11px] font-bold text-white' : 'mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] font-mono text-[13px] font-bold text-white'} style={{ boxShadow: `0 0 28px ${discoveryToast.accent}` }}>
@@ -3710,7 +3710,7 @@ function App() {
                   exit={gameMode === 'challenge' ? { opacity: 0, y: -8, scale: 0.95 } : { opacity: 0, y: eq.y - 20, x: "-50%", scale: 0.95 }}
                   transition={{ type: "spring", stiffness: 100, damping: 15 }}
                   className={gameMode === 'challenge' ? 'fixed flex items-center justify-center pointer-events-none z-[121]' : 'fixed flex items-center justify-center pointer-events-none z-[9999]'}
-                  style={gameMode === 'challenge' ? { right: 20, top: 142 + (index * 40) } : { left: '50%', top: 0 }}
+                  style={gameMode === 'challenge' ? { right: 20, top: (agentViewport.width < 640 ? 330 : 142) + (index * (agentViewport.width < 640 ? 34 : 40)) } : { left: '50%', top: 0 }}
                 >
                   <div className={gameMode === 'challenge' ? 'flex items-center rounded-2xl border border-[#22d3ee]/26 bg-[rgba(10,14,26,0.72)] px-3 py-1.5 shadow-[0_10px_28px_rgba(34,211,238,0.12)] backdrop-blur-xl' : 'px-6 py-3 glass-panel border-[#22d3ee]/60 bg-[#0a0e1a]/80 shadow-[0_0_40px_rgba(34,211,238,0.4)] flex items-center'}>
                     <span 
@@ -3778,7 +3778,7 @@ function App() {
             </AnimatePresence>
 
             {placedItems.length === 0 && brokenGlass.length === 0 && gameMode === 'challenge' ? (
-              <div data-panel="challenge-mission-select" className="absolute inset-0 z-[20] flex w-full flex-col items-center overflow-y-auto px-4 pb-6 pt-[124px] sm:pt-[116px]">
+              <div data-panel="challenge-mission-select" className="absolute inset-0 z-[20] flex w-full flex-col items-center overflow-y-auto px-4 pb-6 pt-[232px] sm:pt-[116px]">
                 <div data-panel="mission-library-card" className={`mb-4 min-h-[224px] w-full overflow-hidden rounded-[28px] border border-white/8 bg-[rgba(7,11,23,0.62)] backdrop-blur-2xl ${isTablet ? 'pl-24' : ''}`}>
                   <div className="grid gap-0 md:grid-cols-[0.95fr_1.35fr]">
                     <div className="relative min-h-[158px] border-b border-white/8 p-5 md:border-b-0 md:border-r">
