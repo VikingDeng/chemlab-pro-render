@@ -3259,123 +3259,133 @@ function App() {
 
             <DashboardReadouts focusedLabel={focusedContainerLabel} boilingPoint={focusedBoilingPoint} phaseLabel={focusedPhaseLabel} pressure={focusedPressure} />
 
-            {/* Challenge HUD */}
+            {/* Compact challenge strip / bottom mission controls */}
             {gameMode === 'challenge' && activeChallenge && challengeInsight && (
-              <div data-panel="challenge-hud" className="absolute left-1/2 top-[118px] z-[55] w-[min(820px,calc(100%-32px))] -translate-x-1/2 overflow-hidden rounded-[24px] border border-white/10 bg-[rgba(7,11,23,0.84)] shadow-[0_22px_70px_rgba(2,6,23,0.46)] backdrop-blur-2xl">
-                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#22d3ee]/55 to-transparent" />
-                <div className="grid gap-3 p-3 md:grid-cols-[1.15fr_1fr]">
-                  <div className="min-w-0">
-                    <div className="flex items-start justify-between gap-3">
+              <>
+                <motion.div
+                  data-panel="challenge-hud"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.22, ease: 'easeOut' }}
+                  className="absolute left-1/2 top-[118px] z-[55] w-[min(760px,calc(100%-32px))] -translate-x-1/2 overflow-hidden rounded-[26px] border border-white/10 bg-[rgba(7,11,23,0.78)] px-3 py-2.5 shadow-[0_14px_44px_rgba(2,6,23,0.34)] backdrop-blur-2xl"
+                >
+                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#22d3ee]/50 to-transparent" />
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.035] px-2 py-0.5 text-[10px] font-semibold text-[#94a3b8]">
+                          {activeMissionBrief?.family || '任务'}
+                        </span>
+                        <div className="min-w-0 truncate text-[14px] font-semibold text-white">{activeChallenge.title}</div>
+                        <span className="hidden shrink-0 text-[11px] text-[#64748b] sm:inline">{activeMissionBrief?.signal || challengeInsight.progressLabel}</span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-1.5 overflow-hidden">
+                        {challengeStepLabels.map((label, index) => {
+                          const stepDone = index < challengeStepCount
+                            ? (challengeInsight.checklist[index]?.done || activeChallenge.completed)
+                            : (activeMissionProof?.checkpoints[index - challengeStepCount]
+                                ? Boolean(activeProofAnswers[activeMissionProof.checkpoints[index - challengeStepCount].id]?.correct)
+                                : false) || activeChallenge.completed;
+                          const stepCurrent = !stepDone && index === challengeDisplayDoneCount;
+                          return (
+                            <div
+                              key={`${label}-${index}`}
+                              title={label}
+                              className={`group flex min-w-0 flex-1 items-center gap-1.5 rounded-full border px-1.5 py-1 transition-colors ${stepDone ? 'border-[#10b981]/24 bg-[#10b981]/10 text-[#bbf7d0]' : stepCurrent ? 'border-[#22d3ee]/28 bg-[#22d3ee]/10 text-[#a5f3fc]' : 'border-white/8 bg-white/[0.025] text-[#64748b]'}`}
+                            >
+                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${stepDone ? 'bg-[#10b981]' : stepCurrent ? 'bg-[#22d3ee]' : 'bg-[#475569]'}`} />
+                              <span className="hidden truncate text-[10px] font-semibold md:block">{label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="font-mono text-[13px] font-semibold text-[#67e8f9]">
+                        {challengeDisplayDoneCount}/{Math.max(1, challengeDisplayStepCount)}
+                      </div>
+                      <div className="mt-1 max-w-[170px] truncate rounded-full border border-[#22d3ee]/20 bg-[#22d3ee]/10 px-2.5 py-1 text-[11px] font-medium text-[#a5f3fc]">
+                        {challengeStageLabel}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {!activeChallenge.completed && challengeProductReady && activeMissionProof && activeProofCurrent && !activeProofSolved ? (
+                  <motion.div
+                    data-panel="challenge-proof-panel"
+                    initial={{ opacity: 0, y: 18, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                    className="absolute bottom-5 left-[58%] z-[68] w-[min(500px,calc(100%-180px))] -translate-x-1/2 rounded-[28px] border border-[#22d3ee]/18 bg-[rgba(7,11,23,0.88)] p-3 shadow-[0_18px_58px_rgba(2,6,23,0.48)] backdrop-blur-2xl"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">
-                          <span>{activeMissionBrief?.family || '任务'}</span>
-                          <span className="rounded-full border border-[#22d3ee]/22 bg-[#22d3ee]/10 px-2 py-0.5 tracking-normal text-[#67e8f9]">
-                            {challengeDisplayDoneCount}/{Math.max(1, challengeDisplayStepCount)}
-                          </span>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#67e8f9]">
+                          证据 {activeProofSolvedCount + 1}/{activeMissionProof.checkpoints.length}
                         </div>
-                        <div className="mt-1 truncate text-[16px] font-semibold text-white">{activeChallenge.title}</div>
+                        <div className="mt-1 truncate text-[13px] font-semibold text-white">{activeProofCurrent.question}</div>
                       </div>
-                      <div className="max-w-[190px] shrink-0 truncate rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-[11px] text-[#cbd5e1]">
-                        现在 · {challengeStageLabel}
+                      <div className="flex flex-wrap gap-1">
+                        {activeMissionProof.checkpoints.map((checkpoint, checkpointIndex) => {
+                          const checkpointDone = Boolean(activeProofAnswers[checkpoint.id]?.correct);
+                          const checkpointCurrent = checkpoint.id === activeProofCurrent.id;
+                          return (
+                            <span
+                              key={checkpoint.id}
+                              className={`rounded-full border px-2 py-0.5 text-[10px] ${checkpointDone ? 'border-[#10b981]/25 bg-[#10b981]/10 text-[#bbf7d0]' : checkpointCurrent ? 'border-[#22d3ee]/28 bg-[#22d3ee]/10 text-[#a5f3fc]' : 'border-white/8 bg-white/[0.025] text-[#64748b]'}`}
+                            >
+                              {checkpointDone ? '✓' : checkpointIndex + 1} {checkpoint.label}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
 
-                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/8">
-                      <div className="h-full rounded-full bg-gradient-to-r from-[#22d3ee] via-[#f43f5e] to-[#a855f7] transition-all duration-500" style={{ width: `${(challengeDisplayDoneCount / Math.max(1, challengeDisplayStepCount)) * 100}%` }} />
-                    </div>
-
-                    <div
-                      className="mt-3 grid gap-1.5 overflow-x-auto pb-1"
-                      style={{ gridTemplateColumns: `repeat(${Math.max(1, challengeStepLabels.length)}, minmax(58px, 1fr))` }}
-                    >
-                      {challengeStepLabels.map((label, index) => {
-                        const stepDone = index < challengeStepCount
-                          ? (challengeInsight.checklist[index]?.done || activeChallenge.completed)
-                          : (activeMissionProof?.checkpoints[index - challengeStepCount]
-                              ? Boolean(activeProofAnswers[activeMissionProof.checkpoints[index - challengeStepCount].id]?.correct)
-                              : false) || activeChallenge.completed;
+                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                      {activeProofCurrent.options.map(option => {
+                        const isSelected = activeProofCurrentAnswer?.selectedId === option.id;
+                        const isWrong = isSelected && activeProofCurrentAnswer?.correct === false;
                         return (
-                          <div
-                            key={`${label}-${index}`}
-                            className={`rounded-2xl border px-2.5 py-2 transition-colors ${stepDone ? 'border-[#10b981]/24 bg-[#10b981]/10 text-[#bbf7d0]' : index === challengeDisplayDoneCount ? 'border-[#22d3ee]/26 bg-[#22d3ee]/10 text-[#a5f3fc]' : 'border-white/8 bg-white/[0.025] text-[#94a3b8]'}`}
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => setMissionProofAnswers(prev => ({
+                              ...prev,
+                              [activeChallenge.id]: {
+                                ...(prev[activeChallenge.id] || {}),
+                                [activeProofCurrent.id]: { selectedId: option.id, correct: option.id === activeProofCurrent.answerId },
+                              },
+                            }))}
+                            className={`rounded-2xl border px-3 py-2 text-left transition-all hover:-translate-y-0.5 ${isWrong ? 'border-[#f43f5e]/35 bg-[#f43f5e]/10' : isSelected ? 'border-[#10b981]/35 bg-[#10b981]/10' : 'border-white/8 bg-white/[0.035] hover:border-[#22d3ee]/30 hover:bg-[#22d3ee]/8'}`}
                           >
-                            <div className="text-[10px] font-semibold">{stepDone ? '✓' : String(index + 1).padStart(2, '0')}</div>
-                            <div className="mt-0.5 truncate text-[11px] font-semibold">{label}</div>
-                          </div>
+                            <div className="text-[12px] font-semibold text-[#f8fafc]">{option.label}</div>
+                            <div className="mt-0.5 truncate text-[10px] text-[#94a3b8]">{option.detail}</div>
+                          </button>
                         );
                       })}
                     </div>
-                  </div>
-
-                  <div className="rounded-[20px] border border-white/8 bg-black/16 p-3">
-                    <div className="flex items-start gap-2">
-                      <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#f43f5e] shadow-[0_0_18px_rgba(244,63,94,0.75)]" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[12px] leading-snug text-[#fce7f3]">
-                          {challengeProductReady && activeMissionProof && !activeProofSolved && !activeChallenge.completed ? '现象已出现，完成证据链。' : challengeInsight.nextHint}
-                        </div>
-                        {activeMissionBrief?.branch && (
-                          <div className="mt-1 truncate text-[11px] text-[#64748b]">{activeMissionBrief.branch} · {activeMissionBrief.signal}</div>
-                        )}
+                    {activeProofCurrentFeedback && (
+                      <div className="mt-2 rounded-2xl border border-[#f43f5e]/18 bg-[#f43f5e]/8 px-3 py-2 text-[11px] leading-snug text-[#fda4af]">
+                        {activeProofCurrentFeedback}
                       </div>
-                    </div>
-
+                    )}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    data-panel="challenge-action-dock"
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    className="absolute bottom-5 left-[58%] z-[58] w-[min(500px,calc(100%-180px))] -translate-x-1/2 rounded-[26px] border border-white/10 bg-[rgba(7,11,23,0.76)] px-3 py-2.5 shadow-[0_16px_46px_rgba(2,6,23,0.38)] backdrop-blur-2xl"
+                  >
                     {!activeChallenge.completed ? (
-                      challengeProductReady && activeMissionProof && activeProofCurrent && !activeProofSolved ? (
-                        <div className="mt-3">
-                          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                            <div className="text-[11px] font-semibold text-[#e2e8f0]">
-                              {activeProofCurrent.question}
-                            </div>
-                            <div className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-0.5 text-[10px] font-semibold text-[#94a3b8]">
-                              证据 {activeProofSolvedCount + 1}/{activeMissionProof.checkpoints.length}
-                            </div>
-                          </div>
-                          <div className="mb-2 flex flex-wrap gap-1">
-                            {activeMissionProof.checkpoints.map((checkpoint, checkpointIndex) => {
-                              const checkpointDone = Boolean(activeProofAnswers[checkpoint.id]?.correct);
-                              const checkpointCurrent = checkpoint.id === activeProofCurrent.id;
-                              return (
-                                <span
-                                  key={checkpoint.id}
-                                  className={`rounded-full border px-2 py-0.5 text-[10px] ${checkpointDone ? 'border-[#10b981]/25 bg-[#10b981]/10 text-[#bbf7d0]' : checkpointCurrent ? 'border-[#22d3ee]/28 bg-[#22d3ee]/10 text-[#a5f3fc]' : 'border-white/8 bg-white/[0.025] text-[#64748b]'}`}
-                                >
-                                  {checkpointDone ? '✓' : checkpointIndex + 1} {checkpoint.label}
-                                </span>
-                              );
-                            })}
-                          </div>
-                          <div className="grid gap-1.5">
-                            {activeProofCurrent.options.map(option => {
-                              const isSelected = activeProofCurrentAnswer?.selectedId === option.id;
-                              const isWrong = isSelected && activeProofCurrentAnswer?.correct === false;
-                              return (
-                                <button
-                                  key={option.id}
-                                  type="button"
-                                  onClick={() => setMissionProofAnswers(prev => ({
-                                    ...prev,
-                                    [activeChallenge.id]: {
-                                      ...(prev[activeChallenge.id] || {}),
-                                      [activeProofCurrent.id]: { selectedId: option.id, correct: option.id === activeProofCurrent.answerId },
-                                    },
-                                  }))}
-                                  className={`rounded-2xl border px-3 py-2 text-left transition-colors ${isWrong ? 'border-[#f43f5e]/35 bg-[#f43f5e]/10' : isSelected ? 'border-[#10b981]/35 bg-[#10b981]/10' : 'border-white/8 bg-white/[0.035] hover:border-[#22d3ee]/30 hover:bg-[#22d3ee]/8'}`}
-                                >
-                                  <div className="text-[12px] font-semibold text-[#f8fafc]">{option.label}</div>
-                                  <div className="mt-0.5 text-[10px] text-[#94a3b8]">{option.detail}</div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                          {activeProofCurrentFeedback && (
-                            <div className="mt-2 rounded-2xl border border-[#f43f5e]/18 bg-[#f43f5e]/8 px-3 py-2 text-[11px] leading-snug text-[#fda4af]">
-                              {activeProofCurrentFeedback}
-                            </div>
-                          )}
+                      <>
+                        <div className="mb-2 flex min-w-0 items-center gap-2 text-[11px] text-[#94a3b8]">
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#f43f5e] shadow-[0_0_14px_rgba(244,63,94,0.7)]" />
+                          <span className="truncate">{challengeInsight.nextHint}</span>
                         </div>
-                      ) : (
-                        <div className="mt-3 flex flex-wrap gap-2">
+                        <div className="flex flex-wrap items-center justify-center gap-2">
                           {challengeActionOptions.map(option => (
                             <button
                               key={option.name}
@@ -3385,8 +3395,9 @@ function App() {
                               }}
                               className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all hover:-translate-y-0.5 ${option.tone === 'next' ? 'border-[#22d3ee]/42 bg-[#22d3ee]/14 text-[#a5f3fc] shadow-[0_0_20px_rgba(34,211,238,0.14)]' : option.tone === 'main' ? 'border-white/12 bg-white/[0.055] text-[#e2e8f0] hover:border-white/20' : 'border-[#f59e0b]/26 bg-[#f59e0b]/8 text-[#fde68a] hover:bg-[#f59e0b]/14'}`}
                             >
-                              <span className="mr-1 opacity-70">{option.label}</span>
-                              {option.name.replace('指示剂', '')}
+                              {option.tone === 'next' && <span className="mr-1 opacity-75">下一步</span>}
+                              {option.tone === 'try' && <span className="mr-1 opacity-70">对照</span>}
+                              {compactMissionLabel(option.name)}
                             </button>
                           ))}
                           <button
@@ -3407,9 +3418,9 @@ function App() {
                             观察
                           </button>
                         </div>
-                      )
+                      </>
                     ) : (
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="flex flex-wrap items-center justify-center gap-2">
                         <button
                           type="button"
                           onClick={() => setAtlasOpen(true)}
@@ -3430,9 +3441,9 @@ function App() {
                         </button>
                       </div>
                     )}
-                  </div>
-                </div>
-              </div>
+                  </motion.div>
+                )}
+              </>
             )}
 
             <AnimatePresence>
