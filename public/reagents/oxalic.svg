@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="144" height="160" viewBox="0 0 144 160" role="img" aria-label="H₂C₂O₄ reagent bottle">
+  <defs>
+    <radialGradient id="bg-oxalic" cx="28%" cy="18%" r="82%">
+      <stop offset="0" stop-color="#f1f5f9" stop-opacity="0.34"/>
+      <stop offset="0.52" stop-color="#0f172a" stop-opacity="0.88"/>
+      <stop offset="1" stop-color="#020617"/>
+    </radialGradient>
+    <linearGradient id="body-oxalic" x1="35" x2="104" y1="24" y2="139" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.72"/>
+      <stop offset="0.42" stop-color="#dbeafe" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#0f172a" stop-opacity="0.52"/>
+    </linearGradient>
+    <linearGradient id="liquid-oxalic" x1="45" x2="102" y1="74" y2="136" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f1f5f9" stop-opacity="0.96"/>
+      <stop offset="1" stop-color="#475569" stop-opacity="0.94"/>
+    </linearGradient>
+    <filter id="grain-oxalic" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="table" tableValues="0 0.045"/></feComponentTransfer>
+    </filter>
+  </defs>
+  <rect width="144" height="160" rx="28" fill="url(#bg-oxalic)"/>
+  <rect width="144" height="160" rx="28" fill="#fff" opacity="0.035" filter="url(#grain-oxalic)"/>
+  <circle cx="33" cy="26" r="34" fill="#f1f5f9" opacity="0.18"/>
+  
+      <ellipse cx="72" cy="141" rx="50" ry="10" fill="#020617" opacity="0.36"/>
+      <path d="M42 45 C42 35 52 32 55 24 H89 C92 32 102 35 102 45 V127 C102 136 95 142 84 142 H60 C49 142 42 136 42 127 Z" fill="url(#body-oxalic)" stroke="rgba(255,255,255,.48)" stroke-width="2"/>
+      <path d="M42 100 C60 87 80 117 104 98 V124 C104 130 95 134 86 134 H58 C49 134 42 130 42 124 Z" fill="url(#liquid-oxalic)" opacity="0.82"/>
+      <rect x="45" y="17" width="54" height="16" rx="5" fill="#1f2937"/>
+      <rect x="50" y="11" width="44" height="8" rx="4" fill="#334155"/>
+      <rect x="49" y="74" width="46" height="34" rx="7" fill="rgba(248,250,252,.9)"/>
+      <path d="M55 48 C59 42 85 40 93 49" stroke="white" opacity=".34" stroke-width="3" stroke-linecap="round"/>
+      <rect x="52" y="51" width="7" height="66" rx="3.5" fill="white" opacity=".28"/>
+    
+  <text x="72" y="92" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="750" fill="#0f172a">H₂C₂O₄</text>
+  <text x="72" y="109" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="9" font-weight="700" fill="#475569">还原</text>
+  <path d="M20 20 C34 8 58 7 71 10" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.28"/>
+</svg>
