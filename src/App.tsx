@@ -128,6 +128,7 @@ type MissionBrief = {
   accent: 'cyan' | 'rose' | 'emerald' | 'amber' | 'violet';
   preset: MissionPreset;
   challengeId: string;
+  discoveryId: string;
   target: string;
 };
 
@@ -193,6 +194,7 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
     accent: 'cyan',
     preset: 'prepCu',
     challengeId: 'c1',
+    discoveryId: 'cu-oh2',
     target: PREP_CU_TARGET,
   },
   prepAg: {
@@ -201,6 +203,7 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
     accent: 'emerald',
     preset: 'prepAg',
     challengeId: 'c2',
+    discoveryId: 'agcl',
     target: PREP_AG_TARGET,
   },
   prepFe: {
@@ -209,6 +212,7 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
     accent: 'rose',
     preset: 'prepFe',
     challengeId: 'c3',
+    discoveryId: 'fe-scn',
     target: PREP_FE_TARGET,
   },
   prepCo2: {
@@ -217,6 +221,7 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
     accent: 'amber',
     preset: 'prepCo2',
     challengeId: 'c4',
+    discoveryId: 'co2',
     target: PREP_CO2_TARGET,
   },
   prepIodine: {
@@ -225,6 +230,7 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
     accent: 'violet',
     preset: 'prepIodine',
     challengeId: 'c5',
+    discoveryId: 'iodine-layer',
     target: PREP_IODINE_TARGET,
   },
   prepMn: {
@@ -233,6 +239,7 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
     accent: 'amber',
     preset: 'prepMn',
     challengeId: 'c6',
+    discoveryId: 'permanganate-fade',
     target: PREP_MN_TARGET,
   },
 };
@@ -1148,8 +1155,14 @@ function App() {
       if (gameMode === 'challenge') {
         setActiveChallenge(null);
       }
+      setMissionCompletionCard(null);
+      setReactionSpotlight(null);
+      setDiscoveryToast(null);
       setFocusedItemId(null); // Clear focus
       setTemperatureHistory([]);
+      setEquations([]);
+      setActiveDrop(null);
+      setInlineContainerFeedback(null);
       setAgentMessages([]);
       setAgentRemoteHeadline('');
       setAgentRemoteSummary('');
@@ -1198,6 +1211,7 @@ function App() {
     setGameMode('challenge');
     setMissionCompletionCard(null);
     setReactionSpotlight(null);
+    setDiscoveryToast(null);
     setActiveChallenge({
       id: mission.challengeId,
       title: mission.title,
@@ -1246,6 +1260,7 @@ function App() {
     setActiveDrop(null);
     setMissionCompletionCard(null);
     setReactionSpotlight(null);
+    setDiscoveryToast(null);
     setActiveChallenge(null);
     setAgentMessages([]);
     setAgentRemoteHeadline('');
@@ -1711,6 +1726,10 @@ function App() {
   const challengeInsight = useMemo(() => computeChallengeInsight(activeChallenge, placedItems), [activeChallenge, placedItems]);
   const discoveryCards = useMemo(() => buildDiscoveryCards(placedItems, unlockedDiscoveryIds), [placedItems, unlockedDiscoveryIds]);
   const unlockedDiscoveryCount = useMemo(() => discoveryCards.filter(card => card.unlocked).length, [discoveryCards]);
+  const completedMissionCount = useMemo(
+    () => MISSION_SEQUENCE.filter(preset => unlockedDiscoveryIds.has(MISSION_BRIEFS[preset].discoveryId)).length,
+    [unlockedDiscoveryIds]
+  );
   const challengeNextAction = challengeInsight?.checklist.find(item => !item.done)?.label || null;
   const challengeGuideTargetId = gameMode === 'challenge' && activeChallenge ? primaryAgentContainerId : null;
   const challengeQuickReagent = challengeNextAction && challengeInsight
@@ -2967,22 +2986,43 @@ function App() {
 
             {placedItems.length === 0 && brokenGlass.length === 0 && gameMode === 'challenge' ? (
               <div className="flex w-full max-w-[980px] flex-col items-center px-4 pt-[120px] sm:pt-0">
+                <div className={`mb-4 flex w-full items-center justify-between gap-3 rounded-[22px] border border-white/8 bg-[rgba(7,11,23,0.58)] px-4 py-3 backdrop-blur-xl ${isTablet ? 'pl-24' : ''}`}>
+                  <div>
+                    <div className="text-[12px] font-semibold text-[#f8fafc]">闯关进度 {completedMissionCount}/{MISSION_SEQUENCE.length}</div>
+                    <div className="mt-1 h-1.5 w-[156px] overflow-hidden rounded-full bg-white/8">
+                      <div className="h-full rounded-full bg-[#22d3ee] transition-all duration-500" style={{ width: `${(completedMissionCount / MISSION_SEQUENCE.length) * 100}%` }} />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => launchQuickStart('prepCu')}
+                    className="shrink-0 rounded-full border border-[#22d3ee]/35 bg-[#22d3ee]/12 px-4 py-2 text-[12px] font-semibold text-[#a5f3fc] transition-colors hover:bg-[#22d3ee]/20"
+                  >
+                    开始推荐演示
+                  </button>
+                </div>
                 <div className={`grid w-full grid-cols-1 gap-3 md:grid-cols-3 ${isTablet ? 'pl-24' : ''}`}>
                   {MISSION_SEQUENCE.map((preset, index) => {
                     const mission = MISSION_BRIEFS[preset];
                     const accent = getMissionAccentClasses(mission.accent);
+                    const isMissionDone = unlockedDiscoveryIds.has(mission.discoveryId);
                     return (
                       <button
                         key={mission.title}
                         type="button"
                         onClick={() => mission.preset && launchQuickStart(mission.preset)}
-                        className={`group relative overflow-hidden rounded-[22px] border bg-[rgba(7,11,23,0.62)] p-4 text-left backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:bg-[rgba(15,23,42,0.72)] ${accent.ring}`}
+                        className={`group relative overflow-hidden rounded-[22px] border bg-[rgba(7,11,23,0.62)] p-4 text-left backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:bg-[rgba(15,23,42,0.72)] ${isMissionDone ? 'border-[#10b981]/28 shadow-[0_0_24px_rgba(16,185,129,0.10)]' : accent.ring}`}
                       >
-                        <div className={`absolute right-4 top-4 h-2.5 w-2.5 rounded-full ${accent.dot}`} />
+                        <div className={`absolute right-4 top-4 flex h-6 min-w-6 items-center justify-center rounded-full text-[11px] font-bold ${isMissionDone ? 'border border-[#10b981]/30 bg-[#10b981]/12 text-[#86efac]' : accent.dot}`} >
+                          {isMissionDone ? '✓' : ''}
+                        </div>
                         <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">
                           <span>关卡 {String(index + 1).padStart(2, '0')}</span>
                           {index === 0 && (
                             <span className="rounded-full border border-[#22d3ee]/22 bg-[#22d3ee]/10 px-2 py-0.5 tracking-normal text-[#67e8f9]">推荐演示</span>
+                          )}
+                          {isMissionDone && (
+                            <span className="rounded-full border border-[#10b981]/22 bg-[#10b981]/10 px-2 py-0.5 tracking-normal text-[#86efac]">已完成</span>
                           )}
                         </div>
                         <div className="text-[15px] font-semibold text-[#f8fafc]">{mission.title}</div>
@@ -2994,7 +3034,7 @@ function App() {
                           ))}
                         </div>
                         <div className="mt-5 flex justify-end">
-                          <span className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${accent.button}`}>开始制备</span>
+                          <span className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${isMissionDone ? 'border-[#10b981]/30 bg-[#10b981]/10 text-[#bbf7d0] hover:bg-[#10b981]/16' : accent.button}`}>{isMissionDone ? '再试一次' : '开始制备'}</span>
                         </div>
                       </button>
                     );
