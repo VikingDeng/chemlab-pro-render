@@ -209,3 +209,99 @@ test('MiMo v2.5 disables thinking to avoid empty final answers', async () => {
     await close(fakeLlm)
   }
 })
+
+test('Lavoisier prompt carries mission proof state for tutor-style guidance', async () => {
+  let capturedRequest
+  const fakeLlm = createServer(async (req, res) => {
+    if (req.method !== 'POST' || req.url !== '/chat/completions') {
+      res.writeHead(404).end()
+      return
+    }
+    let body = ''
+    for await (const chunk of req) body += chunk
+    capturedRequest = JSON.parse(body)
+    const content = JSON.stringify({
+      reply: '现象已出现。原因：Cu²⁺ 遇 OH⁻ 生成蓝绿色 Cu(OH)₂。下一步：选择 Cu²⁺ 证据。',
+      headline: '拉瓦锡：证据链',
+      toolCalls: [],
+    })
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content } }] }))
+  })
+  const fakeUrl = await listen(fakeLlm)
+  process.env.LLM_API_KEY = 'test-key'
+  process.env.LLM_MODEL = 'mimo-v2.5'
+  process.env.LLM_API_URL = fakeUrl
+  process.env.LLM_PROVIDER = 'mimo'
+
+  const server = createLavoisierServer()
+  const baseUrl = await listen(server)
+  try {
+    const data = await postJson(baseUrl, {
+      message: '我该选哪个证据？',
+      context: {
+        mode: 'challenge',
+        challenge: {
+          id: 'c1',
+          title: '未知 A：蓝色沉淀',
+          target: '鉴定未知样品 A，制备蓝绿色 Cu(OH)₂ 沉淀',
+          completed: false,
+        },
+        mission: {
+          id: 'c1',
+          title: '未知 A：蓝色沉淀',
+          family: '沉淀鉴定',
+          signal: '蓝绿色絮状',
+          route: ['样品 A', '加碱', '沉淀'],
+          target: '鉴定未知样品 A，制备蓝绿色 Cu(OH)₂ 沉淀',
+          productReady: true,
+          completed: false,
+          doneCount: 3,
+          stepCount: 6,
+          nextAction: '回答证据：离子',
+          proof: {
+            solvedCount: 0,
+            stepCount: 3,
+            solved: false,
+            current: {
+              label: '离子',
+              question: '蓝绿色絮状沉淀锁定哪个阳离子？',
+              hint: '线索：蓝绿色 + 遇碱沉淀。',
+              options: [
+                { id: 'cu2', label: 'Cu²⁺', detail: '遇 OH⁻ 生成 Cu(OH)₂' },
+                { id: 'ag', label: 'Ag⁺', detail: '更像白色 AgCl' },
+              ],
+            },
+          },
+        },
+        focusedContainer: {
+          id: 'b1',
+          name: '烧杯',
+          type: 'beaker',
+          volume: 40,
+          temperature: 22.4,
+          ph: 9.2,
+          pressure: 1,
+          state: 'precipitate_cu',
+          species: [{ formula: 'Cu(OH)2', label: '氢氧化铜', amount: 0.001 }],
+        },
+        localSignals: { intent: 'precipitation', risks: [] },
+      },
+    })
+
+    const systemPrompt = capturedRequest.messages[0].content
+    assert.match(systemPrompt, /mission\.productReady=true/)
+    assert.match(systemPrompt, /蓝绿色絮状沉淀锁定哪个阳离子/)
+    assert.match(systemPrompt, /线索：蓝绿色/)
+    assert.deepEqual(capturedRequest.chat_template_kwargs, { enable_thinking: false })
+    assert.ok(data.suggestedPrompts.includes('我该选哪个证据'))
+    assert.match(data.reply, /Cu²⁺/)
+  } finally {
+    process.env.LLM_API_KEY = ''
+    process.env.LLM_MODEL = ''
+    process.env.LLM_API_URL = ''
+    process.env.LLM_PROVIDER = ''
+    await close(server)
+    await close(fakeLlm)
+  }
+})

@@ -211,6 +211,70 @@ function sanitizeSpecies(species) {
     .slice(0, 10)
 }
 
+function sanitizeString(value, fallback = undefined, maxLength = 180) {
+  if (typeof value !== 'string') return fallback
+  const trimmed = value.trim()
+  if (!trimmed) return fallback
+  return trimmed.slice(0, maxLength)
+}
+
+function sanitizeStringArray(values, maxItems = 6, maxLength = 40) {
+  if (!Array.isArray(values)) return []
+  return values
+    .map((value) => sanitizeString(value, undefined, maxLength))
+    .filter(Boolean)
+    .slice(0, maxItems)
+}
+
+function sanitizeMissionContext(mission) {
+  if (!mission || typeof mission !== 'object') return null
+  const proof = mission.proof && typeof mission.proof === 'object' ? mission.proof : null
+  const current = proof?.current && typeof proof.current === 'object' ? proof.current : null
+
+  return {
+    id: sanitizeString(mission.id, undefined, 30),
+    title: sanitizeString(mission.title, undefined, 80),
+    family: sanitizeString(mission.family, undefined, 40),
+    signal: sanitizeString(mission.signal, undefined, 40),
+    route: sanitizeStringArray(mission.route, 5, 30),
+    branch: sanitizeString(mission.branch, undefined, 80),
+    target: sanitizeString(mission.target, undefined, 140),
+    completed: Boolean(mission.completed),
+    productReady: Boolean(mission.productReady),
+    doneCount: Number.isFinite(mission.doneCount) ? Number(mission.doneCount) : null,
+    stepCount: Number.isFinite(mission.stepCount) ? Number(mission.stepCount) : null,
+    nextAction: sanitizeString(mission.nextAction, undefined, 60),
+    proof: proof
+      ? {
+          solvedCount: Number.isFinite(proof.solvedCount) ? Number(proof.solvedCount) : 0,
+          stepCount: Number.isFinite(proof.stepCount) ? Number(proof.stepCount) : 0,
+          solved: Boolean(proof.solved),
+          current: current
+            ? {
+                label: sanitizeString(current.label, undefined, 40),
+                question: sanitizeString(current.question, undefined, 100),
+                hint: sanitizeString(current.hint, undefined, 80),
+                selectedFeedback: sanitizeString(current.selectedFeedback, undefined, 120),
+                options: Array.isArray(current.options)
+                  ? current.options
+                      .map((option) => option && typeof option === 'object'
+                        ? {
+                            id: sanitizeString(option.id, undefined, 30),
+                            label: sanitizeString(option.label, undefined, 30),
+                            detail: sanitizeString(option.detail, undefined, 70),
+                            selected: Boolean(option.selected),
+                          }
+                        : null)
+                      .filter(Boolean)
+                      .slice(0, 4)
+                  : [],
+              }
+            : null,
+        }
+      : null,
+  }
+}
+
 function sanitizeLastEvent(lastEvent) {
   if (!lastEvent || typeof lastEvent !== 'object') return null
   return {
@@ -237,6 +301,7 @@ function buildContextDigest(context = {}) {
 
   return {
     mode: typeof context.mode === 'string' ? context.mode : 'free',
+    mission: sanitizeMissionContext(context.mission),
     challenge: context.challenge && typeof context.challenge === 'object'
       ? {
           id: typeof context.challenge.id === 'string' ? context.challenge.id : undefined,
@@ -289,6 +354,15 @@ function buildContextDigest(context = {}) {
 
 function buildSuggestedPrompts(contextDigest) {
   const prompts = ['下一步', '解释现象', '我做对了吗']
+  const mission = contextDigest.mission
+
+  if (mission?.completed) {
+    prompts.unshift('下一关怎么做', '解释刚才现象')
+  } else if (mission?.productReady && mission?.proof && !mission.proof.solved) {
+    prompts.unshift('我该选哪个证据', '解释这个现象')
+  } else if (mission?.nextAction) {
+    prompts.unshift(`为什么要${mission.nextAction.replace(/^加\s*/, '加')}`)
+  }
 
   if (contextDigest.focusedContainer?.name) {
     prompts.unshift('分析当前容器')
@@ -364,11 +438,11 @@ function normalizeAssistantText(text) {
     .trim()
 }
 
-function compactAssistantText(text, maxChars = 180) {
+function compactAssistantText(text, maxChars = 160) {
   const normalized = normalizeAssistantText(text)
   if (!normalized) return ''
   const sentences = normalized.match(/[^。！？.!?]+[。！？.!?]?/g) || [normalized]
-  let compact = sentences.slice(0, 2).join('').trim()
+  let compact = sentences.slice(0, 3).join('').trim()
   if (compact.length > maxChars) {
     compact = `${compact.slice(0, maxChars).replace(/[，,；;：:]?[^，,；;：:。！？.!?]*$/, '')}。`
   }
@@ -452,7 +526,10 @@ function buildLlmInstruction(contextDigest) {
   return [
     '你是“拉瓦锡”，一个面向化学实验平台的智能化学家助手。',
     '你需要结合实验上下文、最近对话和可用 skill，给出简洁、可执行、具备化学解释的建议。',
-    '严格按上下文说话：只有在 focusedContainer.species、containers.species、lastEvent、challenge.target 或最近用户消息中明确出现的物质/离子/沉淀，才可以点名；不要根据 intent、模式或常识臆测 Fe²⁺、Cu²⁺、Ag⁺ 等具体体系。',
+    '如果 mission 存在，优先围绕 mission.title、mission.target、mission.nextAction 和 mission.proof.current 回答；这是当前演示的真实任务状态。',
+    '当 mission.productReady=true 且 mission.proof.current 存在时，先确认“现象已出现”，再用当前题目、选项、hint 帮用户判断证据；不要重复长路线。',
+    '当 mission.completed=true 时，建议用户解释现象或进入下一关；不要继续要求加同一主线试剂。',
+    '严格按上下文说话：只有在 focusedContainer.species、containers.species、lastEvent、challenge.target、mission.target/route/proof 或最近用户消息中明确出现的物质/离子/沉淀，才可以点名；不要根据 intent、模式或常识臆测 Fe²⁺、Cu²⁺、Ag⁺ 等具体体系。',
     '如果上下文没有明确试剂或主容器，就说“还没拿到具体体系/需要先聚焦容器或查看日志”，不要编造实验。',
     '不要把内部字段名或调试信息说给用户：禁止输出“risks为空”“context显示”“localSignals”“沙盒模式下风险较低”等表述。可改写为“当前读数未显示温度、压力或满量风险”。',
     '安全建议必须先基于当前读数和已知物质；未知物质时只给通用 PPE、小体积加料、通风、避免飞溅建议。',

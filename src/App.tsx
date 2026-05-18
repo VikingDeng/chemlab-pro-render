@@ -127,6 +127,7 @@ type MissionProofCheckpoint = {
   question: string;
   answerId: string;
   success: string;
+  hint?: string;
   options: MissionProofOption[];
 };
 
@@ -311,6 +312,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '蓝绿色絮状沉淀锁定哪个阳离子？',
         answerId: 'cu2',
         success: 'Cu²⁺ 被锁定。',
+        hint: '线索：蓝绿色 + 遇碱沉淀。',
         options: [
           { id: 'cu2', label: 'Cu²⁺', detail: '遇 OH⁻ 生成 Cu(OH)₂' },
           { id: 'ag', label: 'Ag⁺', detail: '更像白色 AgCl' },
@@ -323,6 +325,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: 'NaOH 在这一步提供了什么？',
         answerId: 'oh',
         success: 'OH⁻ 是沉淀剂。',
+        hint: '线索：NaOH 的关键粒子是 OH⁻。',
         options: [
           { id: 'oh', label: 'OH⁻', detail: '把 Cu²⁺ 拉成难溶沉淀' },
           { id: 'cl', label: 'Cl⁻', detail: '对应银盐检验' },
@@ -335,6 +338,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '若先加入过量氨水，更可能看到什么？',
         answerId: 'deep-blue',
         success: '深蓝色支持铜氨络合。',
+        hint: '线索：铜氨络合常呈深蓝。',
         options: [
           { id: 'deep-blue', label: '深蓝溶液', detail: '铜氨络合物' },
           { id: 'white-clot', label: '白色凝乳', detail: 'AgCl 特征' },
@@ -351,6 +355,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '白色凝乳状沉淀最可能是什么？',
         answerId: 'agcl',
         success: 'AgCl 被锁定。',
+        hint: '线索：白色凝乳状 + 氯离子。',
         options: [
           { id: 'gas', label: 'CO₂↑', detail: '应表现为气泡' },
           { id: 'agcl', label: 'AgCl↓', detail: 'Ag⁺ + Cl⁻' },
@@ -363,6 +368,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '若用硝酸代替盐酸，少了哪种关键离子？',
         answerId: 'chloride',
         success: 'Cl⁻ 是本关变量。',
+        hint: '线索：换酸时 H⁺ 仍在，Cl⁻ 消失。',
         options: [
           { id: 'chloride', label: 'Cl⁻', detail: '决定 AgCl 沉淀' },
           { id: 'hydroxide', label: 'OH⁻', detail: '对应氢氧化物沉淀' },
@@ -375,6 +381,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '这类现象属于哪种判断？',
         answerId: 'insoluble-salt',
         success: '难溶盐沉淀成立。',
+        hint: '线索：离子结合后析出固体。',
         options: [
           { id: 'neutralization', label: '中和放热', detail: '主要看 pH 与温度' },
           { id: 'insoluble-salt', label: '难溶盐沉淀', detail: '离子结合后析出' },
@@ -391,6 +398,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '血红色来自哪类变化？',
         answerId: 'complex',
         success: '络合显色成立。',
+        hint: '线索：没有沉淀/分层，颜色突然加深。',
         options: [
           { id: 'complex', label: '络合显色', detail: 'Fe³⁺ + SCN⁻' },
           { id: 'neutral', label: '酸碱中和', detail: '主要改变 pH' },
@@ -403,6 +411,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '本关主要检出的铁离子价态是？',
         answerId: 'fe3',
         success: 'Fe³⁺ 与 SCN⁻ 显血红。',
+        hint: '线索：SCN⁻ 的经典检出对象是 Fe³⁺。',
         options: [
           { id: 'fe2', label: 'Fe²⁺', detail: '常见浅绿色' },
           { id: 'fe3', label: 'Fe³⁺', detail: '与 SCN⁻ 血红' },
@@ -415,6 +424,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '若先加 NaOH，最可能干扰成什么？',
         answerId: 'feoh3',
         success: 'OH⁻ 会抢先沉淀 Fe³⁺。',
+        hint: '线索：Fe³⁺ 遇 OH⁻ 常变红褐沉淀。',
         options: [
           { id: 'feoh3', label: '红褐沉淀', detail: 'Fe(OH)₃' },
           { id: 'agcl', label: '白色沉淀', detail: 'AgCl 路线' },
@@ -431,6 +441,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '连续气泡最能说明样品 D 含什么？',
         answerId: 'carbonate',
         success: '碳酸盐被锁定。',
+        hint: '线索：碳酸盐遇酸会持续放气。',
         options: [
           { id: 'carbonate', label: 'CO₃²⁻', detail: '遇酸放 CO₂' },
           { id: 'cu2', label: 'Cu²⁺', detail: '遇碱沉淀' },
@@ -443,6 +454,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '盐酸在这里的关键作用是？',
         answerId: 'h-plus',
         success: 'H⁺ 触发碳酸盐放气。',
+        hint: '线索：酸提供 H⁺，推动 CO₂ 生成。',
         options: [
           { id: 'h-plus', label: '提供 H⁺', detail: '推动 CO₂ 生成' },
           { id: 'oh', label: '提供 OH⁻', detail: '会偏碱' },
@@ -455,6 +467,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '这一步生成的无色气体应判断为？',
         answerId: 'co2',
         success: 'CO₂ 与碳酸盐证据吻合。',
+        hint: '线索：碳酸盐 + 酸 → CO₂。',
         options: [
           { id: 'h2', label: 'H₂', detail: '通常金属+酸' },
           { id: 'co2', label: 'CO₂', detail: '碳酸盐+酸' },
@@ -471,6 +484,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '紫色集中在有机层，说明发生了什么？',
         answerId: 'partition',
         success: '碘进入有机相。',
+        hint: '线索：两层液体，颜色偏向一层。',
         options: [
           { id: 'precipitate', label: '沉淀', detail: '不会形成两层' },
           { id: 'partition', label: '分配/萃取', detail: 'I₂ 进入有机相' },
@@ -483,6 +497,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '使用 CCl₄ 时，紫色层通常在哪一侧？',
         answerId: 'bottom',
         success: 'CCl₄ 密度大，沉在下层。',
+        hint: '线索：CCl₄ 密度大于水。',
         options: [
           { id: 'top', label: '上层', detail: '更像正己烷' },
           { id: 'bottom', label: '下层', detail: 'CCl₄ 密度大于水' },
@@ -495,6 +510,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '这个现象主要利用碘的哪种性质？',
         answerId: 'nonpolar',
         success: '相似相溶解释分配。',
+        hint: '线索：碘更易进入非极性相。',
         options: [
           { id: 'nonpolar', label: '更亲非极性相', detail: '有机层显紫' },
           { id: 'strong-acid', label: '强酸性', detail: '不是本关核心' },
@@ -511,6 +527,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '高锰酸钾褪色需要哪个条件？',
         answerId: 'acid-redox',
         success: '酸性还原条件成立。',
+        hint: '线索：草酸要在酸性条件下还原 MnO₄⁻。',
         options: [
           { id: 'base', label: '强碱环境', detail: '不符合本关路线' },
           { id: 'acid-redox', label: '酸性还原', detail: '草酸 + 硫酸' },
@@ -523,6 +540,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '紫色的 MnO₄⁻ 在反应中扮演什么角色？',
         answerId: 'oxidant',
         success: 'MnO₄⁻ 是氧化剂。',
+        hint: '线索：紫色褪去表示 MnO₄⁻ 被还原。',
         options: [
           { id: 'indicator', label: '酸碱指示剂', detail: '不是单纯变色剂' },
           { id: 'oxidant', label: '氧化剂', detail: '被还原后褪色' },
@@ -535,6 +553,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         question: '本关更适合用硫酸而不是盐酸，原因是？',
         answerId: 'avoid-cl2',
         success: '避免氯离子被氧化成 Cl₂。',
+        hint: '线索：强氧化体系里要避开 Cl⁻。',
         options: [
           { id: 'avoid-cl2', label: '避免 Cl₂', detail: '盐酸可能被氧化' },
           { id: 'make-agcl', label: '生成 AgCl', detail: '没有银离子' },
@@ -552,6 +571,25 @@ function getNextMissionPreset(challengeId: string) {
 
 function getMissionSuccessMeta(challengeId: string) {
   return MISSION_SUCCESS_META[challengeId] || { product: '目标现象', formula: '✓', accent: '#22d3ee' };
+}
+
+function compactMissionLabel(value: string) {
+  return value
+    .replace(/[（(].*?[）)]/g, '')
+    .replace('指示剂', '')
+    .trim();
+}
+
+function buildMissionProofFeedback(checkpoint: MissionProofCheckpoint, selectedId?: string) {
+  const selected = checkpoint.options.find(option => option.id === selectedId);
+  const correct = checkpoint.options.find(option => option.id === checkpoint.answerId);
+  const clue = checkpoint.hint || (correct ? `线索：${correct.detail}。` : '线索：对照刚出现的现象。');
+
+  if (!selected) {
+    return clue;
+  }
+
+  return `不是 ${selected.label}：${selected.detail}。${clue}`;
 }
 
 function readStoredDiscoveryIds() {
@@ -2067,6 +2105,9 @@ function App() {
   const activeProofSolvedCount = activeMissionProof?.checkpoints.filter(checkpoint => activeProofAnswers[checkpoint.id]?.correct).length ?? 0;
   const activeProofCurrent = activeMissionProof?.checkpoints.find(checkpoint => !activeProofAnswers[checkpoint.id]?.correct);
   const activeProofCurrentAnswer = activeProofCurrent ? activeProofAnswers[activeProofCurrent.id] : undefined;
+  const activeProofCurrentFeedback = activeProofCurrent && activeProofCurrentAnswer?.correct === false
+    ? buildMissionProofFeedback(activeProofCurrent, activeProofCurrentAnswer.selectedId)
+    : null;
   const activeProofSolved = Boolean(activeMissionProof && activeProofSolvedCount === activeMissionProof.checkpoints.length);
   const discoveryCards = useMemo(() => buildDiscoveryCards(placedItems, unlockedDiscoveryIds), [placedItems, unlockedDiscoveryIds]);
   const unlockedDiscoveryCount = useMemo(() => discoveryCards.filter(card => card.unlocked).length, [discoveryCards]);
@@ -2099,6 +2140,16 @@ function App() {
       || (challengeNextAction === '有机相' ? actionPool.find(name => name.includes('四氯化碳')) : undefined)
       || null;
   }, [challengeInsight, challengeNextAction]);
+  const challengeStageLabel = useMemo(() => {
+    if (!activeChallenge) return '选推荐演示';
+    if (activeChallenge.completed) return '下一关';
+    if (challengeProductReady && activeMissionProof && !activeProofSolved) {
+      return activeProofCurrent ? `证据：${activeProofCurrent.label}` : '答证据链';
+    }
+    if (challengeQuickReagent) return `加${compactMissionLabel(challengeQuickReagent)}`;
+    if (challengeNextAction) return `做 ${compactMissionLabel(challengeNextAction)}`;
+    return '观察';
+  }, [activeChallenge, activeMissionProof, activeProofCurrent, activeProofSolved, challengeNextAction, challengeProductReady, challengeQuickReagent]);
   const challengeActionOptions = useMemo(() => {
     if (!challengeInsight || !primaryAgentContainerId || activeChallenge?.completed) return [];
     const options: Array<{ name: string; label: string; tone: 'next' | 'main' | 'try'; volume: number }> = [];
@@ -2189,13 +2240,19 @@ function App() {
   }, [agentRemoteSummary, handleAgentQuickAction, primaryAgentContainerId, syncReadouts]);
 
   const agentSkillPrompts = useMemo(() => {
+    const missionPrompts = activeChallenge?.completed
+      ? ['解释刚才现象', '下一关怎么做']
+      : challengeProductReady && activeMissionProof && !activeProofSolved
+      ? ['我该选哪个证据', '解释这个现象']
+      : [];
     const localPrompts = [
+      ...missionPrompts,
       ...(challengeInsight?.suggestedPrompts || []),
       ...(primaryAgentContainer ? ['分析当前容器'] : []),
       ...(dragGuide?.kind === 'reagent' && dragGuide.targetId && dragGuide.name ? [`${dragGuide.name}加到当前容器会怎样`] : []),
     ];
     return dedupePromptStrings([...localPrompts, ...agentSuggestedPrompts]).slice(0, 3);
-  }, [agentSuggestedPrompts, challengeInsight, dragGuide, primaryAgentContainer]);
+  }, [activeChallenge?.completed, activeMissionProof, activeProofSolved, agentSuggestedPrompts, challengeInsight, challengeProductReady, dragGuide, primaryAgentContainer]);
   const agentDockSide = useMemo(() => {
     return agentPosition.x + AGENT_ORB_WIDTH / 2 >= agentViewport.width / 2 ? 'right' : 'left';
   }, [agentPosition.x, agentViewport.width]);
@@ -2267,6 +2324,39 @@ function App() {
           organicColor: item.chemState.organicColor || null,
           species: summarizeAgentSpecies(item.chemState),
         }));
+      const missionContext = activeMissionBrief ? {
+        id: activeMissionBrief.challengeId,
+        title: activeMissionBrief.title,
+        family: activeMissionBrief.family,
+        signal: activeMissionBrief.signal,
+        route: activeMissionBrief.route,
+        branch: activeMissionBrief.branch,
+        target: activeMissionBrief.target,
+        completed: Boolean(activeChallenge?.completed),
+        productReady: challengeProductReady,
+        doneCount: challengeDisplayDoneCount,
+        stepCount: challengeDisplayStepCount,
+        nextAction: challengeProductReady && activeMissionProof && !activeProofSolved
+          ? (activeProofCurrent ? `回答证据：${activeProofCurrent.label}` : '完成证据链')
+          : challengeStageLabel,
+        proof: activeMissionProof ? {
+          solvedCount: activeProofSolvedCount,
+          stepCount: activeMissionProof.checkpoints.length,
+          solved: activeProofSolved,
+          current: activeProofCurrent ? {
+            label: activeProofCurrent.label,
+            question: activeProofCurrent.question,
+            hint: activeProofCurrent.hint || null,
+            selectedFeedback: activeProofCurrentFeedback,
+            options: activeProofCurrent.options.map(option => ({
+              id: option.id,
+              label: option.label,
+              detail: option.detail,
+              selected: activeProofCurrentAnswer?.selectedId === option.id,
+            })),
+          } : null,
+        } : null,
+      } : null;
 
       const requestBody = JSON.stringify({
         message: trimmed,
@@ -2274,6 +2364,7 @@ function App() {
         context: {
           mode: gameMode,
           challenge: activeChallenge,
+          mission: missionContext,
           focusedContainer: primaryContainer ? {
             id: primaryContainer.id,
             name: primaryContainer.name,
@@ -2402,7 +2493,7 @@ function App() {
         agentAbortControllerRef.current = null;
       }
     }
-  }, [activeChallenge, agentLastEvent, agentMessages, agentState.goal, agentState.intent, agentState.risks, appendAgentMessage, appendUserMessage, gameMode, placedItems, primaryAgentContainerId, runAgentToolCalls, lavoisierApiUrl, setAgentDraft, setAgentExpanded]);
+  }, [activeChallenge, activeMissionBrief, activeMissionProof, activeProofCurrent, activeProofCurrentAnswer, activeProofCurrentFeedback, activeProofSolved, activeProofSolvedCount, agentLastEvent, agentMessages, agentState.goal, agentState.intent, agentState.risks, appendAgentMessage, appendUserMessage, challengeDisplayDoneCount, challengeDisplayStepCount, challengeProductReady, challengeStageLabel, gameMode, placedItems, primaryAgentContainerId, runAgentToolCalls, lavoisierApiUrl, setAgentDraft, setAgentExpanded]);
 
   const submitAgentQuery = useCallback((query: string) => {
     void requestLavoisierApi(query, { includeUserMessage: true });
@@ -3184,8 +3275,8 @@ function App() {
                         </div>
                         <div className="mt-1 truncate text-[16px] font-semibold text-white">{activeChallenge.title}</div>
                       </div>
-                      <div className="shrink-0 rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-[11px] text-[#cbd5e1]">
-                        {activeMissionBrief?.signal || challengeInsight.progressLabel}
+                      <div className="max-w-[190px] shrink-0 truncate rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-[11px] text-[#cbd5e1]">
+                        现在 · {challengeStageLabel}
                       </div>
                     </div>
 
@@ -3224,7 +3315,7 @@ function App() {
                           {challengeProductReady && activeMissionProof && !activeProofSolved && !activeChallenge.completed ? '现象已出现，完成证据链。' : challengeInsight.nextHint}
                         </div>
                         {activeMissionBrief?.branch && (
-                          <div className="mt-1 truncate text-[11px] text-[#64748b]">{activeMissionBrief.branch}</div>
+                          <div className="mt-1 truncate text-[11px] text-[#64748b]">{activeMissionBrief.branch} · {activeMissionBrief.signal}</div>
                         )}
                       </div>
                     </div>
@@ -3277,8 +3368,10 @@ function App() {
                               );
                             })}
                           </div>
-                          {activeProofCurrentAnswer?.correct === false && (
-                            <div className="mt-2 text-[11px] text-[#fda4af]">证据不匹配，再看现象。</div>
+                          {activeProofCurrentFeedback && (
+                            <div className="mt-2 rounded-2xl border border-[#f43f5e]/18 bg-[#f43f5e]/8 px-3 py-2 text-[11px] leading-snug text-[#fda4af]">
+                              {activeProofCurrentFeedback}
+                            </div>
                           )}
                         </div>
                       ) : (
@@ -3410,7 +3503,7 @@ function App() {
                       }}
                       className="rounded-2xl border border-[#10b981]/30 bg-[#10b981]/10 px-3 py-2 text-[12px] font-semibold text-[#bbf7d0] hover:bg-[#10b981]/16 transition-colors"
                     >
-                      问拉瓦锡
+                      解释现象
                     </button>
                     <button
                       type="button"
