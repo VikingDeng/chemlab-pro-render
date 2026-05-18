@@ -2794,7 +2794,7 @@ function App() {
 
             {/* Challenge HUD */}
             {gameMode === 'challenge' && activeChallenge && challengeInsight && (
-              <div className="absolute left-1/2 top-[122px] z-[55] w-[min(840px,calc(100%-32px))] -translate-x-1/2 overflow-hidden rounded-[24px] border border-white/10 bg-[rgba(7,11,23,0.84)] shadow-[0_22px_70px_rgba(2,6,23,0.46)] backdrop-blur-2xl">
+              <div className="absolute left-1/2 top-[210px] z-[55] w-[min(840px,calc(100%-32px))] -translate-x-1/2 overflow-hidden rounded-[24px] border border-white/10 bg-[rgba(7,11,23,0.84)] shadow-[0_22px_70px_rgba(2,6,23,0.46)] backdrop-blur-2xl xl:top-[146px]">
                 <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#22d3ee]/55 to-transparent" />
                 <div className="grid gap-3 p-3 md:grid-cols-[1.15fr_1fr]">
                   <div className="min-w-0">
@@ -3104,7 +3104,7 @@ function App() {
             </AnimatePresence>
 
             {placedItems.length === 0 && brokenGlass.length === 0 && gameMode === 'challenge' ? (
-              <div className="flex max-h-full w-full max-w-[1040px] flex-col items-center overflow-y-auto px-4 py-4 pt-[112px] sm:pt-4">
+              <div className="absolute inset-0 z-[20] flex w-full flex-col items-center overflow-y-auto px-4 pb-6 pt-[216px] xl:pt-[156px]">
                 <div className={`mb-4 w-full overflow-hidden rounded-[28px] border border-white/8 bg-[rgba(7,11,23,0.62)] backdrop-blur-2xl ${isTablet ? 'pl-24' : ''}`}>
                   <div className="grid gap-0 md:grid-cols-[0.95fr_1.35fr]">
                     <div className="relative min-h-[158px] border-b border-white/8 p-5 md:border-b-0 md:border-r">
