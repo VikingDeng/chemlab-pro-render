@@ -1285,8 +1285,6 @@ function App() {
   const [activeDrop, setActiveDrop] = useState<{targetId: string, reagentName: string, x: number, y: number, maxAdd: number} | null>(null);
   const [dropVolume, setDropVolume] = useState<number>(50);
 
-  // Holographic Equations state
-  const [equations, setEquations] = useState<{id: string, text: string, x: number, y: number}[]>([]);
   const [reactionSpotlight, setReactionSpotlight] = useState<ReactionSpotlight | null>(null);
   const [missionCompletionCard, setMissionCompletionCard] = useState<MissionCompletionCard | null>(null);
   const [missionCue, setMissionCue] = useState<MissionCue | null>(null);
@@ -1388,7 +1386,7 @@ function App() {
      showToast("✅ 热力学数据导出成功");
   };
 
-  const showInlineContainerHint = useCallback((hint: ContainerHintCard, duration = 2400) => {
+  const showInlineContainerHint = useCallback((hint: ContainerHintCard, duration = 1600) => {
     setInlineContainerFeedback(hint);
     if (inlineContainerFeedbackTimeoutRef.current) {
       window.clearTimeout(inlineContainerFeedbackTimeoutRef.current);
@@ -1663,7 +1661,6 @@ function App() {
       setDiscoveryToast(null);
       setFocusedItemId(null); // Clear focus
       setTemperatureHistory([]);
-      setEquations([]);
       setActiveDrop(null);
       setInlineContainerFeedback(null);
       setAgentMessages([]);
@@ -1745,7 +1742,6 @@ function App() {
     setBrokenGlass([]);
     setFocusedItemId(nextFocusedId);
     setTemperatureHistory([]);
-    setEquations([]);
     setActiveDrop(null);
     syncReadouts(nextItems.find(item => item.id === nextFocusedId)?.chemState);
     playSound('place');
@@ -1767,7 +1763,6 @@ function App() {
     setBrokenGlass([]);
     setFocusedItemId(null);
     setTemperatureHistory([]);
-    setEquations([]);
     setActiveDrop(null);
     setMissionCompletionCard(null);
     setMissionCue(null);
@@ -2027,26 +2022,12 @@ function App() {
       playSound('pour');
     }
 
-    const equationText = result.equation;
-    if (equationText) {
-      const eqId = createRuntimeId('equation');
-      setEquations(prev => [...prev, {
-        id: eqId,
-        text: equationText,
-        x: window.innerWidth / 2,
-        y: 120
-      }]);
-      setTimeout(() => {
-        setEquations(prev => prev.filter(e => e.id !== eqId));
-      }, 4500);
-    }
-
     const spotlight = buildReactionSpotlight(reagentName, result);
     if (spotlight) {
       setReactionSpotlight(spotlight);
       window.setTimeout(() => {
         setReactionSpotlight(current => current?.id === spotlight.id ? null : current);
-      }, 2600);
+      }, 1800);
     }
     recordDiscoveryUnlocks(result.newState);
 
@@ -2856,14 +2837,14 @@ function App() {
     const newlyUnlocked = unlockedCards.find(card => !previousIds.has(card.id));
     lastUnlockedDiscoveryIdsRef.current = new Set(unlockedCards.map(card => card.id));
 
-    if (!newlyUnlocked) return;
+    if (!newlyUnlocked || gameMode === 'challenge') return;
     setDiscoveryToast(newlyUnlocked);
     const timer = window.setTimeout(() => {
       setDiscoveryToast(current => current?.id === newlyUnlocked.id ? null : current);
     }, 3200);
 
     return () => window.clearTimeout(timer);
-  }, [discoveryCards]);
+  }, [discoveryCards, gameMode]);
 
   useEffect(() => {
     if (!agentExpanded) return;
@@ -3748,18 +3729,24 @@ function App() {
               {reactionSpotlight && (
                 <motion.div
                   key={reactionSpotlight.id}
-                  initial={{ opacity: 0, scale: 0.86, y: 24 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.92, y: -18 }}
-                  transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+                  initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.99 }}
+                  transition={{ duration: 0.18, ease: 'easeOut' }}
                   className={gameMode === 'challenge'
-                    ? 'pointer-events-none absolute right-4 top-[292px] z-[120] w-[min(280px,calc(100%-32px))] rounded-[22px] border border-white/12 bg-[rgba(7,11,23,0.78)] px-3 py-2.5 text-left shadow-[0_16px_42px_rgba(2,6,23,0.42)] backdrop-blur-2xl sm:top-[196px]'
-                    : 'pointer-events-none absolute left-1/2 top-[45%] z-[120] w-[min(360px,calc(100%-40px))] -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-white/14 bg-[rgba(7,11,23,0.86)] px-5 py-4 text-center shadow-[0_28px_70px_rgba(2,6,23,0.55)] backdrop-blur-2xl'}
+                    ? 'pointer-events-none absolute bottom-[108px] left-4 z-[118] w-[min(360px,calc(100%-32px))] overflow-hidden rounded-2xl border border-white/10 bg-[rgba(7,11,23,0.62)] px-3 py-2 text-left shadow-[0_12px_32px_rgba(2,6,23,0.34)] backdrop-blur-xl'
+                    : 'pointer-events-none absolute bottom-[108px] left-1/2 z-[118] w-[min(380px,calc(100%-40px))] -translate-x-1/2 overflow-hidden rounded-2xl border border-white/10 bg-[rgba(7,11,23,0.66)] px-3.5 py-2.5 text-left shadow-[0_14px_36px_rgba(2,6,23,0.36)] backdrop-blur-xl'}
                 >
-                  <div className={gameMode === 'challenge' ? 'mb-2 h-2 w-12 rounded-full' : 'mx-auto mb-3 h-3 w-16 rounded-full'} style={{ backgroundColor: reactionSpotlight.accent, boxShadow: `0 0 34px ${reactionSpotlight.accent}` }} />
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#67e8f9]">发现现象</div>
-                  <div className={gameMode === 'challenge' ? 'mt-1 truncate text-[14px] font-semibold text-white' : 'mt-1 text-[18px] font-semibold text-white'}>{reactionSpotlight.title}</div>
-                  <div className="mt-1 truncate font-mono text-[11px] text-[#94a3b8]">{reactionSpotlight.detail}</div>
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full shadow-[0_0_18px_currentColor]"
+                      style={{ backgroundColor: reactionSpotlight.accent, color: reactionSpotlight.accent }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-semibold text-white">{reactionSpotlight.title}</div>
+                      <div className="mt-0.5 truncate font-mono text-[10.5px] text-[#94a3b8]">{reactionSpotlight.detail}</div>
+                    </div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -3851,49 +3838,22 @@ function App() {
             </AnimatePresence>
 
             <AnimatePresence>
-              {discoveryToast && (
+              {discoveryToast && gameMode !== 'challenge' && (
                 <motion.div
                   key={discoveryToast.id}
-                  initial={{ opacity: 0, y: 22, scale: 0.86 }}
+                  initial={{ opacity: 0, y: 12, scale: 0.96 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -12, scale: 0.94 }}
-                  transition={{ type: 'spring', stiffness: 360, damping: 28 }}
-                  className={gameMode === 'challenge'
-                    ? 'absolute right-4 top-[214px] z-[310] w-[min(240px,calc(100%-32px))] rounded-[22px] border border-white/12 bg-[rgba(7,11,23,0.82)] px-3 py-2.5 text-left shadow-[0_18px_48px_rgba(2,6,23,0.42)] backdrop-blur-2xl pointer-events-none sm:top-[70px]'
-                    : 'absolute left-1/2 top-[72px] z-[310] w-[260px] -translate-x-1/2 rounded-[24px] border border-white/12 bg-[rgba(7,11,23,0.9)] px-4 py-3 text-center shadow-[0_24px_60px_rgba(2,6,23,0.48)] backdrop-blur-2xl pointer-events-none'}
+                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                  transition={{ duration: 0.16, ease: 'easeOut' }}
+                  className="pointer-events-none absolute bottom-[156px] left-1/2 z-[119] flex w-[min(300px,calc(100%-48px))] -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-[rgba(7,11,23,0.58)] px-3 py-1.5 shadow-[0_10px_28px_rgba(2,6,23,0.28)] backdrop-blur-xl"
                 >
-                  <div className={gameMode === 'challenge' ? 'mb-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] font-mono text-[11px] font-bold text-white' : 'mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] font-mono text-[13px] font-bold text-white'} style={{ boxShadow: `0 0 28px ${discoveryToast.accent}` }}>
-                    {discoveryToast.formula}
-                  </div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#67e8f9]">发现新现象</div>
-                  <div className="mt-1 truncate text-[14px] font-semibold text-[#f8fafc]">{discoveryToast.title}</div>
-                  <div className="mt-1 text-[11px] text-[#94a3b8]">已加入反应图鉴</div>
+                  <span
+                    className="h-2 w-2 rounded-full shadow-[0_0_14px_currentColor]"
+                    style={{ backgroundColor: discoveryToast.accent, color: discoveryToast.accent }}
+                  />
+                  <span className="min-w-0 truncate text-[11px] font-semibold text-[#cbd5e1]">图鉴记录 · {discoveryToast.title}</span>
                 </motion.div>
               )}
-            </AnimatePresence>
-
-            {/* Floating Holographic Equations */}
-            <AnimatePresence>
-              {equations.map((eq, index) => (
-                <motion.div
-                  key={eq.id}
-                  initial={gameMode === 'challenge' ? { opacity: 0, y: -8, scale: 0.95 } : { opacity: 0, y: eq.y + 40, x: "-50%", scale: 0.8 }}
-                  animate={gameMode === 'challenge' ? { opacity: 1, y: 0, scale: 1 } : { opacity: 1, y: eq.y, x: "-50%", scale: 1 }}
-                  exit={gameMode === 'challenge' ? { opacity: 0, y: -8, scale: 0.95 } : { opacity: 0, y: eq.y - 20, x: "-50%", scale: 0.95 }}
-                  transition={{ type: "spring", stiffness: 100, damping: 15 }}
-                  className={gameMode === 'challenge' ? 'fixed flex items-center justify-center pointer-events-none z-[121]' : 'fixed flex items-center justify-center pointer-events-none z-[9999]'}
-                  style={gameMode === 'challenge' ? { right: 20, top: (agentViewport.width < 640 ? 330 : 142) + (index * (agentViewport.width < 640 ? 34 : 40)) } : { left: '50%', top: 0 }}
-                >
-                  <div className={gameMode === 'challenge' ? 'flex items-center rounded-2xl border border-[#22d3ee]/26 bg-[rgba(10,14,26,0.72)] px-3 py-1.5 shadow-[0_10px_28px_rgba(34,211,238,0.12)] backdrop-blur-xl' : 'px-6 py-3 glass-panel border-[#22d3ee]/60 bg-[#0a0e1a]/80 shadow-[0_0_40px_rgba(34,211,238,0.4)] flex items-center'}>
-                    <span 
-                      className={gameMode === 'challenge' ? 'text-[#a5f3fc] text-[12px] font-semibold tracking-wide whitespace-nowrap' : 'text-[#22d3ee] text-[18px] drop-shadow-[0_0_12px_rgba(34,211,238,1)] font-bold tracking-wider whitespace-nowrap'}
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                    >
-                      {eq.text}
-                    </span>
-                  </div>
-                </motion.div>
-              ))}
             </AnimatePresence>
 
             {/* Volume Control Modal Overlay */}
@@ -4510,11 +4470,13 @@ function App() {
                 )}
 
                 {(() => {
-                  const activeHint = inlineContainerFeedback?.targetId === item.id
+                  const inlineHint = inlineContainerFeedback?.targetId === item.id
                     ? inlineContainerFeedback
-                    : dragTargetHint?.targetId === item.id
+                    : null;
+                  const targetHint = dragTargetHint?.targetId === item.id
                     ? dragTargetHint
                     : null;
+                  const activeHint = inlineHint || targetHint;
 
                   if (!activeHint || (item.type !== 'beaker' && item.type !== 'flask' && item.type !== 'testtube' && item.type !== 'burette')) {
                     return null;
@@ -4530,6 +4492,32 @@ function App() {
                     : activeHint.tone === 'warning'
                     ? 'text-amber-300'
                     : 'text-[#67e8f9]';
+                  const dotColor = activeHint.tone === 'success'
+                    ? '#34d399'
+                    : activeHint.tone === 'warning'
+                    ? '#f59e0b'
+                    : '#22d3ee';
+
+                  if (inlineHint) {
+                    return (
+                      <motion.div
+                        key={`${item.id}-${activeHint.title}-${activeHint.detail}`}
+                        initial={{ opacity: 0, y: -3, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -3, scale: 0.98 }}
+                        transition={{ duration: 0.16, ease: 'easeOut' }}
+                        className={`absolute left-1/2 top-full mt-1.5 -translate-x-1/2 pointer-events-none max-w-[190px] rounded-full border px-2.5 py-1.5 shadow-[0_10px_24px_rgba(2,6,23,0.28)] backdrop-blur-xl ${toneClass}`}
+                      >
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span
+                            className="h-1.5 w-1.5 shrink-0 rounded-full shadow-[0_0_10px_currentColor]"
+                            style={{ backgroundColor: dotColor, color: dotColor }}
+                          />
+                          <span className="truncate text-[10.5px] font-semibold text-white/90">{activeHint.title}</span>
+                        </div>
+                      </motion.div>
+                    );
+                  }
 
                   return (
                     <motion.div
