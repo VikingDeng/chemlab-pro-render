@@ -90,6 +90,18 @@ type WorkspaceDragGuide = {
   message?: string;
 };
 
+function getDragGuideDigest(guide: WorkspaceDragGuide | null) {
+  if (!guide) return 'none';
+  return [
+    guide.kind,
+    guide.type ?? '',
+    guide.name,
+    guide.inWorkspace ? '1' : '0',
+    guide.targetId ?? '',
+    guide.message ?? '',
+  ].join('|');
+}
+
 type HintTone = 'info' | 'success' | 'warning';
 
 type ContainerHintCard = {
@@ -1219,6 +1231,7 @@ function App() {
   const [isTablet, setIsTablet] = useState(() => (typeof window === 'undefined' ? false : window.innerWidth < 1180));
   const [activeRightPanelTab, setActiveRightPanelTab] = useState<'reagents' | 'logs'>('reagents');
   const [dragGuide, setDragGuide] = useState<WorkspaceDragGuide | null>(null);
+  const dragGuideDigestRef = useRef(getDragGuideDigest(null));
   
   // Drag and Drop state
   const [placedItems, setPlacedItems] = useState<PlacedItem[]>([]);
@@ -1244,6 +1257,13 @@ function App() {
       : { temp: ROOM_TEMPERATURE, ph: 7.0 };
     const customEvent = new CustomEvent('tempSync', { detail });
     window.dispatchEvent(customEvent);
+  }, []);
+
+  const updateDragGuide = useCallback((nextGuide: WorkspaceDragGuide | null) => {
+    const nextDigest = getDragGuideDigest(nextGuide);
+    if (dragGuideDigestRef.current === nextDigest) return;
+    dragGuideDigestRef.current = nextDigest;
+    setDragGuide(nextGuide);
   }, []);
 
   const saveSnapshot = (
@@ -2068,7 +2088,7 @@ function App() {
       const customEvent = event as CustomEvent<{ active?: boolean; kind?: 'equipment' | 'reagent'; type?: string; name?: string; point?: { x: number; y: number } }>;
       const isActive = customEvent.detail?.active;
       if (!isActive) {
-        setDragGuide(null);
+        updateDragGuide(null);
         return;
       }
 
@@ -2108,7 +2128,7 @@ function App() {
         message = target ? `释放以将漏斗挂载到：${target.name}` : '将漏斗拖到烧杯、锥形瓶或试管上方';
       }
 
-      setDragGuide({ kind, type, name, inWorkspace, targetId, message });
+      updateDragGuide({ kind, type, name, inWorkspace, targetId, message });
     };
     window.addEventListener('workspaceDragState', handleWorkspaceDragState);
 
@@ -2264,7 +2284,7 @@ function App() {
       window.removeEventListener('buretteDrip', handleBuretteDrip);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- quick-add uses setPlacedItems functional updates and refs for live containers.
-  }, [showInlineContainerHint, showToast, syncReadouts]);
+  }, [showInlineContainerHint, showToast, syncReadouts, updateDragGuide]);
 
   const agentState = useMemo(() => inferAgentState({
     items: placedItems,
@@ -4098,7 +4118,11 @@ function App() {
                   }
 
                   const targetElement = e.currentTarget as HTMLDivElement;
-                  targetElement.setPointerCapture(e.pointerId);
+                  try {
+                    targetElement.setPointerCapture(e.pointerId);
+                  } catch {
+                    // Synthetic smoke tests and some edge browsers can miss active pointer capture.
+                  }
 
                   const startX = e.clientX;
                   const startY = e.clientY;
@@ -4118,100 +4142,133 @@ function App() {
                   // Add boundary constraints for dragging so items don't get lost off-screen
                   const workspaceRect = workspaceRef.current?.getBoundingClientRect();
 
-                    const onPointerMove = (moveEvent: React.PointerEvent<HTMLDivElement> | PointerEvent) => {
+                  const applyDragMoveToState = (current: PlacedItem[], newX: number, newY: number, nextVelocity: { x: number; y: number }) => {
+                    // Calculate if pipettes or phmeters are dipped into something
+                    let updatedChemState = item.chemState;
+                    const movingItem = current.find(i => i.id === item.id) || item;
+                    if (movingItem.type === 'funnel') {
+                      const target = getClosestFunnelTarget(current.filter(i => i.id !== movingItem.id), newX, newY);
+                      updateDragGuide({
+                        kind: 'equipment',
+                        type: 'funnel',
+                        name: movingItem.name,
+                        inWorkspace: true,
+                        targetId: target?.id || null,
+                        message: target ? `释放以将漏斗挂载到：${target.name}` : '将漏斗拖到烧杯、锥形瓶或试管上方',
+                      });
+                    } else if (LIQUID_CONTAINER_TYPES.has(movingItem.type)) {
+                      const guide = getContainerDragGuide(current, { ...movingItem, x: newX, y: newY });
+                      updateDragGuide({
+                        kind: 'equipment',
+                        type: movingItem.type,
+                        name: movingItem.name,
+                        inWorkspace: true,
+                        targetId: guide.targetId,
+                        message: guide.message,
+                      });
+                    } else {
+                      updateDragGuide(null);
+                    }
+
+                    if (item.type === 'phmeter') {
+                      const container = current.find(c => (c.type === 'beaker' || c.type === 'flask' || c.type === 'testtube') && Math.sqrt(Math.pow(c.x - newX, 2) + Math.pow(c.y - (newY + 60), 2)) < 50);
+                      updatedChemState = container ? container.chemState : createEmptyState(); // Air / clean
+                    }
+
+                    // If moving a rack, move all its attached test tubes
+                    if (item.type === 'testtubes') {
+                      return current.map(i => {
+                        if (i.id === item.id) return { ...i, x: newX, y: newY, velocity: nextVelocity };
+                        if (i.type === 'testtube' && i.rackId === item.id && i.rackSlot !== undefined) {
+                          const slotXOffset = (i.rackSlot - 2.5) * (180 / 6);
+                          return { ...i, x: newX + slotXOffset, y: newY - 20, velocity: nextVelocity };
+                        }
+                        return i;
+                      });
+                    }
+
+                    return current.map(i => {
+                      if (i.id === item.id) {
+                        // If moving a testtube, detach it from rack
+                        return { ...i, x: newX, y: newY, velocity: nextVelocity, rackId: undefined, rackSlot: undefined, chemState: item.type === 'phmeter' ? updatedChemState : i.chemState };
+                      }
+                      return i;
+                    });
+                  };
+
+                  let latestDragMove: { x: number; y: number; velocity: { x: number; y: number } } | null = null;
+                  let dragMoveFrameId: number | null = null;
+
+                  const applyLatestDragMove = () => {
+                    dragMoveFrameId = null;
+                    const nextMove = latestDragMove;
+                    latestDragMove = null;
+                    if (!nextMove) return;
+                    setPlacedItems(current => applyDragMoveToState(current, nextMove.x, nextMove.y, nextMove.velocity));
+                  };
+
+                  const scheduleDragMove = (nextMove: { x: number; y: number; velocity: { x: number; y: number } }) => {
+                    latestDragMove = nextMove;
+                    if (dragMoveFrameId !== null) return;
+                    dragMoveFrameId = requestAnimationFrame(applyLatestDragMove);
+                  };
+
+                  const flushDragMove = () => {
+                    if (dragMoveFrameId !== null) {
+                      cancelAnimationFrame(dragMoveFrameId);
+                      dragMoveFrameId = null;
+                    }
+                    const nextMove = latestDragMove;
+                    latestDragMove = null;
+                    if (!nextMove) return;
+                    setPlacedItems(current => applyDragMoveToState(current, nextMove.x, nextMove.y, nextMove.velocity));
+                  };
+
+                  const onPointerMove = (moveEvent: React.PointerEvent<HTMLDivElement> | PointerEvent) => {
                     moveEvent.preventDefault();
                     const dx = moveEvent.clientX - startX;
                     const dy = moveEvent.clientY - startY;
-                    
+
                     let newX = initialX + dx;
                     let newY = initialY + dy;
-                    
+
                     // Simple boundary clamping
                     if (workspaceRect) {
                       newX = Math.max(0, Math.min(workspaceRect.width - 50, newX));
                       newY = Math.max(0, Math.min(workspaceRect.height - 50, newY));
                     }
-                    
+
                     const currentTime = Date.now();
                     const dt = currentTime - lastTime;
                     if (dt > 0) {
                       velocity = {
                         x: ((moveEvent.clientX - lastX) / dt) * 1000,
-                        y: ((moveEvent.clientY - lastY) / dt) * 1000
+                        y: ((moveEvent.clientY - lastY) / dt) * 1000,
                       };
                     }
                     lastX = moveEvent.clientX;
                     lastY = moveEvent.clientY;
                     lastTime = currentTime;
-                    
-                    setPlacedItems(current => {
-                       // Calculate if pipettes or phmeters are dipped into something
-                       let updatedChemState = item.chemState;
-                       const movingItem = current.find(i => i.id === item.id) || item;
-                       if (movingItem.type === 'funnel') {
-                         const target = getClosestFunnelTarget(current.filter(i => i.id !== movingItem.id), newX, newY);
-                         setDragGuide({
-                           kind: 'equipment',
-                           type: 'funnel',
-                           name: movingItem.name,
-                           inWorkspace: true,
-                           targetId: target?.id || null,
-                           message: target ? `释放以将漏斗挂载到：${target.name}` : '将漏斗拖到烧杯、锥形瓶或试管上方',
-                         });
-                       } else if (LIQUID_CONTAINER_TYPES.has(movingItem.type)) {
-                         const guide = getContainerDragGuide(current, { ...movingItem, x: newX, y: newY });
-                         setDragGuide({
-                           kind: 'equipment',
-                           type: movingItem.type,
-                           name: movingItem.name,
-                           inWorkspace: true,
-                           targetId: guide.targetId,
-                           message: guide.message,
-                         });
-                       } else {
-                         setDragGuide(null);
-                       }
-                       if (item.type === 'phmeter') {
-                         const container = current.find(c => (c.type === 'beaker' || c.type === 'flask' || c.type === 'testtube') && Math.sqrt(Math.pow(c.x - newX, 2) + Math.pow(c.y - (newY + 60), 2)) < 50);
-                         if (container) {
-                           updatedChemState = container.chemState;
-                         } else {
-                           updatedChemState = createEmptyState(); // Air / clean
-                         }
-                       }
-
-                       // If moving a rack, move all its attached test tubes
-                       if (item.type === 'testtubes') {
-                         return current.map(i => {
-                           if (i.id === item.id) return { ...i, x: newX, y: newY, velocity };
-                           if (i.type === 'testtube' && i.rackId === item.id && i.rackSlot !== undefined) {
-                             const slotXOffset = (i.rackSlot - 2.5) * (180 / 6);
-                             return { ...i, x: newX + slotXOffset, y: newY - 20, velocity };
-                           }
-                           return i;
-                         });
-                       } else {
-                         return current.map(i => {
-                           if (i.id === item.id) {
-                             // If moving a testtube, detach it from rack
-                             return { ...i, x: newX, y: newY, velocity, rackId: undefined, rackSlot: undefined, chemState: item.type === 'phmeter' ? updatedChemState : i.chemState };
-                           }
-                           return i;
-                         });
-                       }
-                    });
+                    scheduleDragMove({ x: newX, y: newY, velocity: { ...velocity } });
                   };
-                  
+
                   const onPointerUp = (upEvent: React.PointerEvent<HTMLDivElement> | PointerEvent) => {
-                    targetElement.releasePointerCapture(upEvent.pointerId);
+                    try {
+                      if (targetElement.hasPointerCapture(upEvent.pointerId)) {
+                        targetElement.releasePointerCapture(upEvent.pointerId);
+                      }
+                    } catch {
+                      // Keep cleanup resilient when the pointer was not captured.
+                    }
                     targetElement.removeEventListener('pointermove', onPointerMove);
                     targetElement.removeEventListener('pointerup', onPointerUp);
-                    
+                    flushDragMove();
+
                     targetElement.style.zIndex = '';
                     targetElement.style.cursor = 'grab';
                     targetElement.style.filter = '';
                     targetElement.style.transform = 'scale(1)';
-                    setDragGuide(null);
+                    updateDragGuide(null);
 
                     const speed = Math.sqrt(velocity.x**2 + velocity.y**2);
 
