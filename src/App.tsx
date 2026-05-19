@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { flushSync } from 'react-dom'
 import { RotateCcw } from 'lucide-react'
 import { Beaker, FlaskConical, Flame, TestTubes, TestTube, Pipette, Gauge, Menu, X, ChevronUp, ChevronDown, Droplets, Thermometer, PenTool, Blend, Cable, BookOpen } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -4102,19 +4103,9 @@ function App() {
 
                   e.stopPropagation();
                   
-                  // Move item to front
-                  setPlacedItems(current => {
-                    const idx = current.findIndex(i => i.id === item.id);
-                    if (idx < 0) return current;
-                    const newArr = [...current];
-                    const [removed] = newArr.splice(idx, 1);
-                    newArr.push(removed);
-                    return newArr;
-                  });
-
-                  if (item.type === 'beaker' || item.type === 'flask' || item.type === 'testtube') {
-                    setFocusedItemId(item.id);
-                    syncReadouts(item.chemState);
+	                  if (item.type === 'beaker' || item.type === 'flask' || item.type === 'testtube') {
+	                    setFocusedItemId(item.id);
+	                    syncReadouts(item.chemState);
                   }
 
                   const targetElement = e.currentTarget as HTMLDivElement;
@@ -4133,22 +4124,29 @@ function App() {
                   let lastTime = Date.now();
                   let velocity = { x: 0, y: 0 };
                   
-                  // Visual feedback
-                  targetElement.style.zIndex = '100';
-                  targetElement.style.cursor = 'grabbing';
-                  targetElement.style.filter = 'brightness(1.1) drop-shadow(0 15px 20px rgba(0,0,0,0.3))';
-                  targetElement.style.transform = 'scale(1.05)';
+	                  // Visual feedback
+	                  targetElement.style.zIndex = '100';
+	                  targetElement.style.cursor = 'grabbing';
+	                  targetElement.style.opacity = '0.98';
+	                  targetElement.style.transform = 'scale(1.02)';
 
-                  // Add boundary constraints for dragging so items don't get lost off-screen
-                  const workspaceRect = workspaceRef.current?.getBoundingClientRect();
+	                  // Add boundary constraints for dragging so items don't get lost off-screen
+	                  const workspaceRect = workspaceRef.current?.getBoundingClientRect();
+	                  const attachedDragElements = item.type === 'testtubes'
+	                    ? placedItemsRef.current
+	                      .filter(i => i.type === 'testtube' && i.rackId === item.id)
+	                      .map(i => document.querySelector<HTMLElement>(`[data-placed-item-id="${i.id}"]`))
+	                      .filter((element): element is HTMLElement => Boolean(element))
+	                    : [];
+	                  targetElement.style.willChange = 'transform';
+	                  attachedDragElements.forEach(element => {
+	                    element.style.willChange = 'transform';
+	                  });
 
-                  const applyDragMoveToState = (current: PlacedItem[], newX: number, newY: number, nextVelocity: { x: number; y: number }) => {
-                    // Calculate if pipettes or phmeters are dipped into something
-                    let updatedChemState = item.chemState;
-                    const movingItem = current.find(i => i.id === item.id) || item;
-                    if (movingItem.type === 'funnel') {
-                      const target = getClosestFunnelTarget(current.filter(i => i.id !== movingItem.id), newX, newY);
-                      updateDragGuide({
+	                  const updateDragMoveGuide = (current: PlacedItem[], movingItem: PlacedItem, newX: number, newY: number) => {
+	                    if (movingItem.type === 'funnel') {
+	                      const target = getClosestFunnelTarget(current.filter(i => i.id !== movingItem.id), newX, newY);
+	                      updateDragGuide({
                         kind: 'equipment',
                         type: 'funnel',
                         name: movingItem.name,
@@ -4166,63 +4164,98 @@ function App() {
                         targetId: guide.targetId,
                         message: guide.message,
                       });
-                    } else {
-                      updateDragGuide(null);
-                    }
+	                    } else {
+	                      updateDragGuide(null);
+	                    }
+	                  };
 
-                    if (item.type === 'phmeter') {
-                      const container = current.find(c => (c.type === 'beaker' || c.type === 'flask' || c.type === 'testtube') && Math.sqrt(Math.pow(c.x - newX, 2) + Math.pow(c.y - (newY + 60), 2)) < 50);
+	                  const applyDragMoveToState = (current: PlacedItem[], newX: number, newY: number, nextVelocity: { x: number; y: number }) => {
+	                    // Calculate if pipettes or phmeters are dipped into something
+	                    let updatedChemState = item.chemState;
+
+	                    if (item.type === 'phmeter') {
+	                      const container = current.find(c => (c.type === 'beaker' || c.type === 'flask' || c.type === 'testtube') && Math.sqrt(Math.pow(c.x - newX, 2) + Math.pow(c.y - (newY + 60), 2)) < 50);
                       updatedChemState = container ? container.chemState : createEmptyState(); // Air / clean
                     }
 
                     // If moving a rack, move all its attached test tubes
-                    if (item.type === 'testtubes') {
-                      return current.map(i => {
-                        if (i.id === item.id) return { ...i, x: newX, y: newY, velocity: nextVelocity };
-                        if (i.type === 'testtube' && i.rackId === item.id && i.rackSlot !== undefined) {
-                          const slotXOffset = (i.rackSlot - 2.5) * (180 / 6);
+	                    if (item.type === 'testtubes') {
+	                      const nextItems = current.map(i => {
+	                        if (i.id === item.id) return { ...i, x: newX, y: newY, velocity: nextVelocity };
+	                        if (i.type === 'testtube' && i.rackId === item.id && i.rackSlot !== undefined) {
+	                          const slotXOffset = (i.rackSlot - 2.5) * (180 / 6);
                           return { ...i, x: newX + slotXOffset, y: newY - 20, velocity: nextVelocity };
-                        }
-                        return i;
-                      });
-                    }
+	                        }
+	                        return i;
+	                      });
+	                      const rackIndex = nextItems.findIndex(i => i.id === item.id);
+	                      if (rackIndex < 0) return nextItems;
+	                      const promoted = [...nextItems];
+	                      const [rack] = promoted.splice(rackIndex, 1);
+	                      promoted.push(rack);
+	                      return promoted;
+	                    }
 
-                    return current.map(i => {
-                      if (i.id === item.id) {
-                        // If moving a testtube, detach it from rack
-                        return { ...i, x: newX, y: newY, velocity: nextVelocity, rackId: undefined, rackSlot: undefined, chemState: item.type === 'phmeter' ? updatedChemState : i.chemState };
-                      }
-                      return i;
-                    });
-                  };
+	                    const nextItems = current.map(i => {
+	                      if (i.id === item.id) {
+	                        // If moving a testtube, detach it from rack
+	                        return { ...i, x: newX, y: newY, velocity: nextVelocity, rackId: undefined, rackSlot: undefined, chemState: item.type === 'phmeter' ? updatedChemState : i.chemState };
+	                      }
+	                      return i;
+	                    });
+	                    const movingIndex = nextItems.findIndex(i => i.id === item.id);
+	                    if (movingIndex < 0) return nextItems;
+	                    const promoted = [...nextItems];
+	                    const [movingItem] = promoted.splice(movingIndex, 1);
+	                    promoted.push(movingItem);
+	                    return promoted;
+	                  };
 
-                  let latestDragMove: { x: number; y: number; velocity: { x: number; y: number } } | null = null;
-                  let dragMoveFrameId: number | null = null;
+	                  type DragMovePreview = { x: number; y: number; dx: number; dy: number; velocity: { x: number; y: number } };
+	                  let latestDragMove: DragMovePreview | null = null;
+	                  let lastDragMove: DragMovePreview = { x: initialX, y: initialY, dx: 0, dy: 0, velocity };
+	                  let hasDragMove = false;
+	                  let dragMoveFrameId: number | null = null;
 
-                  const applyLatestDragMove = () => {
-                    dragMoveFrameId = null;
-                    const nextMove = latestDragMove;
-                    latestDragMove = null;
-                    if (!nextMove) return;
-                    setPlacedItems(current => applyDragMoveToState(current, nextMove.x, nextMove.y, nextMove.velocity));
-                  };
+	                  const applyPreviewTransform = (nextMove: DragMovePreview) => {
+	                    targetElement.style.transform = `translate3d(${nextMove.dx}px, ${nextMove.dy}px, 0) scale(1.02)`;
+	                    attachedDragElements.forEach(element => {
+	                      element.style.transform = `translate3d(${nextMove.dx}px, ${nextMove.dy}px, 0)`;
+	                    });
+	                  };
 
-                  const scheduleDragMove = (nextMove: { x: number; y: number; velocity: { x: number; y: number } }) => {
-                    latestDragMove = nextMove;
-                    if (dragMoveFrameId !== null) return;
-                    dragMoveFrameId = requestAnimationFrame(applyLatestDragMove);
-                  };
+	                  const applyLatestDragMove = () => {
+	                    dragMoveFrameId = null;
+	                    const nextMove = latestDragMove;
+	                    latestDragMove = null;
+	                    if (!nextMove) return;
+	                    lastDragMove = nextMove;
+	                    applyPreviewTransform(nextMove);
+	                    const current = placedItemsRef.current;
+	                    const movingItem = current.find(i => i.id === item.id) || item;
+	                    updateDragMoveGuide(current, movingItem, nextMove.x, nextMove.y);
+	                  };
 
-                  const flushDragMove = () => {
-                    if (dragMoveFrameId !== null) {
-                      cancelAnimationFrame(dragMoveFrameId);
-                      dragMoveFrameId = null;
-                    }
-                    const nextMove = latestDragMove;
-                    latestDragMove = null;
-                    if (!nextMove) return;
-                    setPlacedItems(current => applyDragMoveToState(current, nextMove.x, nextMove.y, nextMove.velocity));
-                  };
+	                  const scheduleDragMove = (nextMove: DragMovePreview) => {
+	                    hasDragMove = true;
+	                    latestDragMove = nextMove;
+	                    if (dragMoveFrameId !== null) return;
+	                    dragMoveFrameId = requestAnimationFrame(applyLatestDragMove);
+	                  };
+
+	                  const flushDragMove = () => {
+	                    if (dragMoveFrameId !== null) {
+	                      cancelAnimationFrame(dragMoveFrameId);
+	                      dragMoveFrameId = null;
+	                    }
+	                    const nextMove = latestDragMove ?? lastDragMove;
+	                    latestDragMove = null;
+	                    if (!hasDragMove) return;
+	                    lastDragMove = nextMove;
+	                    flushSync(() => {
+	                      setPlacedItems(current => applyDragMoveToState(current, nextMove.x, nextMove.y, nextMove.velocity));
+	                    });
+	                  };
 
                   const onPointerMove = (moveEvent: React.PointerEvent<HTMLDivElement> | PointerEvent) => {
                     moveEvent.preventDefault();
@@ -4249,8 +4282,8 @@ function App() {
                     lastX = moveEvent.clientX;
                     lastY = moveEvent.clientY;
                     lastTime = currentTime;
-                    scheduleDragMove({ x: newX, y: newY, velocity: { ...velocity } });
-                  };
+	                    scheduleDragMove({ x: newX, y: newY, dx, dy, velocity: { ...velocity } });
+	                  };
 
                   const onPointerUp = (upEvent: React.PointerEvent<HTMLDivElement> | PointerEvent) => {
                     try {
@@ -4264,11 +4297,17 @@ function App() {
                     targetElement.removeEventListener('pointerup', onPointerUp);
                     flushDragMove();
 
-                    targetElement.style.zIndex = '';
-                    targetElement.style.cursor = 'grab';
-                    targetElement.style.filter = '';
-                    targetElement.style.transform = 'scale(1)';
-                    updateDragGuide(null);
+	                    targetElement.style.zIndex = '';
+	                    targetElement.style.cursor = 'grab';
+	                    targetElement.style.filter = '';
+	                    targetElement.style.opacity = '';
+	                    targetElement.style.transform = '';
+	                    targetElement.style.willChange = '';
+	                    attachedDragElements.forEach(element => {
+	                      element.style.transform = '';
+	                      element.style.willChange = '';
+	                    });
+	                    updateDragGuide(null);
 
                     const speed = Math.sqrt(velocity.x**2 + velocity.y**2);
 
@@ -4502,6 +4541,7 @@ function App() {
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }} 
                 transition={{ type: "spring", stiffness: 800, damping: 50 }}
+                data-placed-item-id={item.id}
                 className={`absolute flex flex-col items-center justify-center cursor-grab active:cursor-grabbing interactive-item ${item.type === 'testtube' && item.rackId ? 'z-[15]' : ''} ${item.type === 'testtubes' ? 'z-[10]' : ''} ${highlightedTargetId === item.id ? 'drop-shadow-[0_0_18px_rgba(34,211,238,0.6)]' : ''}`}
                 style={{ 
                   left: item.x,
