@@ -6,12 +6,12 @@ Images are used as small educational UI thumbnails; chemistry behavior remains d
 
 | Local file | Shown as | Source | Author | License | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `unknown-a.jpg` | Unknown sample bottle A | [A laboratory apparatus 11.jpg](https://commons.wikimedia.org/wiki/File:A_laboratory_apparatus_11.jpg) | Goodymeraj | CC0 1.0 |  |
-| `unknown-b.jpg` | Unknown reagent bottle B | [A laboratory reagent 01.jpg](https://commons.wikimedia.org/wiki/File:A_laboratory_reagent_01.jpg) | Goodymeraj | CC0 1.0 |  |
-| `unknown-c.jpg` | Unknown reagent set C | [Laboratory reagents.jpg](https://commons.wikimedia.org/wiki/File:Laboratory_reagents.jpg) | Goodymeraj | CC0 1.0 |  |
-| `unknown-d.jpg` | Unknown reagent bottle D | [A laboratory reagent 02.jpg](https://commons.wikimedia.org/wiki/File:A_laboratory_reagent_02.jpg) | Goodymeraj | CC0 1.0 |  |
-| `unknown-e.jpg` | Unknown lab sample E | [A laboratory apparatus 08.jpg](https://commons.wikimedia.org/wiki/File:A_laboratory_apparatus_08.jpg) | Goodymeraj | CC0 1.0 |  |
-| `unknown-f.jpg` | Unknown lab sample F | [A laboratory apparatus for holding reagents.jpg](https://commons.wikimedia.org/wiki/File:A_laboratory_apparatus_for_holding_reagents.jpg) | Goodymeraj | CC0 1.0 |  |
+| `unknown-a.jpg` | Unknown sample A — blue aqueous sample | [CopperSulphate.JPG](https://commons.wikimedia.org/wiki/File:CopperSulphate.JPG) | The mad scientist~commonswiki | Public domain | visual appearance matched to hidden CuSO4 sample without exposing the answer in UI |
+| `unknown-b.jpg` | Unknown sample B — colorless/white sample | [Sample of silver nitrate (AgNO3).jpg](https://commons.wikimedia.org/wiki/File:Sample_of_silver_nitrate_(AgNO3).jpg) | Leiem | CC BY-SA 4.0 | visual appearance matched to hidden AgNO3 sample; the UI still shows only sample B |
+| `unknown-c.jpg` | Unknown sample C — amber aqueous sample | [FeCl3 solution.jpg](https://commons.wikimedia.org/wiki/File:FeCl3_solution.jpg) | Choij | Public domain | visual appearance matched to hidden FeCl3 sample without exposing the answer in UI |
+| `unknown-d.jpg` | Unknown sample D — white carbonate sample | [Natriumcarbonat 01.jpg](https://commons.wikimedia.org/wiki/File:Natriumcarbonat_01.jpg) | Geoprofi Lars | CC BY-SA 4.0 | visual appearance matched to hidden Na2CO3 sample; aqueous simulator behavior remains unchanged |
+| `unknown-e.jpg` | Unknown sample E — brown iodine water sample | [Iodine solution.jpg](https://commons.wikimedia.org/wiki/File:Iodine_solution.jpg) | Farhang Amini | CC BY-SA 4.0 | visual appearance matched to hidden iodine-water sample without exposing the answer in UI |
+| `unknown-f.jpg` | Unknown sample F — purple oxidizer sample | [Potassium permanganate solutions 2.JPG](https://commons.wikimedia.org/wiki/File:Potassium_permanganate_solutions_2.JPG) | Leiem | CC BY-SA 4.0 | visual appearance matched to hidden KMnO4 sample without exposing the answer in UI |
 | `hcl.jpg` | Hydrochloric acid bottle | [Hydrochloric Acid ( Hcl).jpg](https://commons.wikimedia.org/wiki/File:Hydrochloric_Acid_(_Hcl).jpg) | Stephanie cheks | CC BY-SA 4.0 |  |
 | `h2so4.jpg` | Sulfuric acid bottle | [Bottle-H2SO4.jpg](https://commons.wikimedia.org/wiki/File:Bottle-H2SO4.jpg) | Hugo | CC BY-SA 4.0 |  |
 | `hno3.jpg` | Nitric acid bottle | [Nitric acid 70 WarChem.jpg](https://commons.wikimedia.org/wiki/File:Nitric_acid_70_WarChem.jpg) | Aleksander Sobolewski | CC BY-SA 4.0 |  |

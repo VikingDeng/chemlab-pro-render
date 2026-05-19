@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import html
+import subprocess
 import time
 import urllib.parse
 import urllib.request
@@ -22,45 +23,51 @@ USER_AGENT = "ChemLabProDemo/1.0 (educational local asset downloader; contact: l
 PHOTOS = [
     {
         "slug": "unknown-a",
-        "title": "A laboratory apparatus 11.jpg",
-        "label": "Unknown sample bottle A",
-        "author": "Goodymeraj",
-        "license": "CC0 1.0",
+        "title": "CopperSulphate.JPG",
+        "label": "Unknown sample A — blue aqueous sample",
+        "author": "The mad scientist~commonswiki",
+        "license": "Public domain",
+        "note": "visual appearance matched to hidden CuSO4 sample without exposing the answer in UI",
     },
     {
         "slug": "unknown-b",
-        "title": "A laboratory reagent 01.jpg",
-        "label": "Unknown reagent bottle B",
-        "author": "Goodymeraj",
-        "license": "CC0 1.0",
+        "title": "Sample of silver nitrate (AgNO3).jpg",
+        "label": "Unknown sample B — colorless/white sample",
+        "author": "Leiem",
+        "license": "CC BY-SA 4.0",
+        "note": "visual appearance matched to hidden AgNO3 sample; the UI still shows only sample B",
     },
     {
         "slug": "unknown-c",
-        "title": "Laboratory reagents.jpg",
-        "label": "Unknown reagent set C",
-        "author": "Goodymeraj",
-        "license": "CC0 1.0",
+        "title": "FeCl3 solution.jpg",
+        "label": "Unknown sample C — amber aqueous sample",
+        "author": "Choij",
+        "license": "Public domain",
+        "note": "visual appearance matched to hidden FeCl3 sample without exposing the answer in UI",
     },
     {
         "slug": "unknown-d",
-        "title": "A laboratory reagent 02.jpg",
-        "label": "Unknown reagent bottle D",
-        "author": "Goodymeraj",
-        "license": "CC0 1.0",
+        "title": "Natriumcarbonat 01.jpg",
+        "label": "Unknown sample D — white carbonate sample",
+        "author": "Geoprofi Lars",
+        "license": "CC BY-SA 4.0",
+        "note": "visual appearance matched to hidden Na2CO3 sample; aqueous simulator behavior remains unchanged",
     },
     {
         "slug": "unknown-e",
-        "title": "A laboratory apparatus 08.jpg",
-        "label": "Unknown lab sample E",
-        "author": "Goodymeraj",
-        "license": "CC0 1.0",
+        "title": "Iodine solution.jpg",
+        "label": "Unknown sample E — brown iodine water sample",
+        "author": "Farhang Amini",
+        "license": "CC BY-SA 4.0",
+        "note": "visual appearance matched to hidden iodine-water sample without exposing the answer in UI",
     },
     {
         "slug": "unknown-f",
-        "title": "A laboratory apparatus for holding reagents.jpg",
-        "label": "Unknown lab sample F",
-        "author": "Goodymeraj",
-        "license": "CC0 1.0",
+        "title": "Potassium permanganate solutions 2.JPG",
+        "label": "Unknown sample F — purple oxidizer sample",
+        "author": "Leiem",
+        "license": "CC BY-SA 4.0",
+        "note": "visual appearance matched to hidden KMnO4 sample without exposing the answer in UI",
     },
     {
         "slug": "hcl",
@@ -259,10 +266,10 @@ def is_jpeg(data: bytes) -> bool:
     return data.startswith(b"\xff\xd8\xff") and data.endswith(b"\xff\xd9")
 
 
-def fetch_image(entry: dict[str, str], dest: Path) -> None:
+def fetch_image(entry: dict[str, str], dest: Path) -> bool:
     if dest.exists() and is_jpeg(dest.read_bytes()):
         print(f"    kept existing {dest.name}", flush=True)
-        return
+        return False
 
     headers = {"User-Agent": USER_AGENT}
     last_error: Exception | None = None
@@ -278,7 +285,7 @@ def fetch_image(entry: dict[str, str], dest: Path) -> None:
                 tmp = dest.with_suffix(dest.suffix + ".tmp")
                 tmp.write_bytes(data)
                 tmp.replace(dest)
-                return
+                return True
             except urllib.error.HTTPError as exc:
                 last_error = exc
                 if exc.code == 404:
@@ -291,6 +298,39 @@ def fetch_image(entry: dict[str, str], dest: Path) -> None:
                 last_error = exc
                 if attempt < 4:
                     time.sleep(1.5 * attempt)
+
+        # urllib can hit intermittent TLS EOFs on Wikimedia. curl is more
+        # tolerant in local runs, so use it as a reproducibility fallback.
+        tmp = dest.with_suffix(dest.suffix + ".tmp")
+        try:
+            subprocess.run(
+                [
+                    "curl",
+                    "--fail",
+                    "--location",
+                    "--silent",
+                    "--show-error",
+                    "--retry",
+                    "2",
+                    "--retry-delay",
+                    "2",
+                    "--max-time",
+                    "60",
+                    "--user-agent",
+                    USER_AGENT,
+                    url,
+                    "--output",
+                    str(tmp),
+                ],
+                check=True,
+            )
+            if not is_jpeg(tmp.read_bytes()):
+                raise RuntimeError(f"curl downloaded a non-JPEG response for {entry['title']}")
+            tmp.replace(dest)
+            return True
+        except Exception as exc:  # noqa: BLE001 - command-line fallback wrapper
+            last_error = exc
+            tmp.unlink(missing_ok=True)
         # Try the next URL candidate, usually original file after thumbnail miss.
     raise RuntimeError(f"failed to download {entry['title']}: {last_error}")
 
@@ -336,8 +376,9 @@ def main() -> None:
     for index, entry in enumerate(PHOTOS, start=1):
         dest = OUTPUT_DIR / f"{entry['slug']}.jpg"
         print(f"[{index:02d}/{len(PHOTOS)}] {entry['slug']}: {entry['title']}", flush=True)
-        fetch_image(entry, dest)
-        time.sleep(DELAY_SECONDS)
+        downloaded = fetch_image(entry, dest)
+        if downloaded:
+            time.sleep(DELAY_SECONDS)
     write_attribution()
     print(f"Downloaded {len(PHOTOS)} real photos to {OUTPUT_DIR}")
 
