@@ -228,7 +228,12 @@ const AGENT_ORB_WIDTH = 84;
 const AGENT_ORB_HEIGHT = 84;
 const AGENT_FLOATING_MARGIN = 14;
 const AGENT_REQUEST_TIMEOUT_MS = 18000;
-const MISSION_MIN_INTEGRITY = 60;
+const MISSION_MIN_INTEGRITY = 70;
+const MISSION_HINT_PENALTY = 5;
+const MISSION_PROOF_PENALTY = 18;
+const MISSION_PREDICTION_PENALTY = 22;
+const MISSION_WRONG_ORDER_PENALTY = 12;
+const MISSION_SIDE_REAGENT_PENALTY = 8;
 const PUBLIC_LAVOISIER_API_URL = 'https://chemlab-pro.onrender.com/api/lavoisier';
 const PREP_CU_TARGET = '鉴定未知样品 A，制备蓝绿色 Cu(OH)₂ 沉淀';
 const PREP_AG_TARGET = '鉴定未知样品 B，制备白色 AgCl 沉淀';
@@ -730,6 +735,24 @@ function getNextMissionPreset(challengeId: string) {
   return MISSION_SEQUENCE[(currentIndex + 1 + MISSION_SEQUENCE.length) % MISSION_SEQUENCE.length];
 }
 
+function getMissionSequenceIndexFromChallengeId(challengeId: string) {
+  return MISSION_SEQUENCE.findIndex(preset => MISSION_BRIEFS[preset].challengeId === challengeId);
+}
+
+function getMissionUnlockText(challengeId: string) {
+  const index = getMissionSequenceIndexFromChallengeId(challengeId);
+  if (index < 0 || index >= MISSION_SEQUENCE.length - 1) return '全部关卡已解锁';
+  const nextMission = MISSION_BRIEFS[MISSION_SEQUENCE[index + 1]];
+  return `已解锁第 ${index + 2} 关 · ${nextMission.title}`;
+}
+
+function isMissionUnlocked(index: number, completedIds: Set<string>) {
+  if (index <= 0) return true;
+  return MISSION_SEQUENCE
+    .slice(0, index)
+    .every(preset => completedIds.has(MISSION_BRIEFS[preset].challengeId));
+}
+
 function getMissionSuccessMeta(challengeId: string) {
   return MISSION_SUCCESS_META[challengeId] || { product: '目标现象', formula: '✓', accent: '#22d3ee' };
 }
@@ -809,14 +832,14 @@ function getMissionReagentEvent(
 
   if (isPrimary && !productReady && !matchesCurrentStep) {
     return {
-      penalty: 10,
+      penalty: MISSION_WRONG_ORDER_PENALTY,
       message: `顺序偏离：当前应先${compactMissionLabel(nextAction || '观察')}`,
     };
   }
 
   if (isSecondary && !productReady) {
     return {
-      penalty: 6,
+      penalty: MISSION_SIDE_REAGENT_PENALTY,
       message: `支线消耗：${compactMissionLabel(reagentName)}`,
     };
   }
@@ -838,6 +861,10 @@ function buildMissionProofFeedback(checkpoint: MissionProofCheckpoint, selectedI
 
 function isMissionPredictionCheckpoint(checkpoint: MissionProofCheckpoint) {
   return checkpoint.stage === 'predict';
+}
+
+function getMissionProofPenalty(checkpoint: MissionProofCheckpoint) {
+  return isMissionPredictionCheckpoint(checkpoint) ? MISSION_PREDICTION_PENALTY : MISSION_PROOF_PENALTY;
 }
 
 function getMissionEvidenceScore(
@@ -1213,12 +1240,13 @@ function MissionEvidenceBar({
     : safeValue >= 80
     ? 'from-[#10b981] via-[#22d3ee] to-[#67e8f9]'
     : 'from-[#f59e0b] via-[#22d3ee] to-[#38bdf8]';
+  const hpFillClass = isCritical ? 'from-[#f43f5e] to-[#f59e0b]' : 'from-[#10b981] to-[#22d3ee]';
 
   return (
     <div className={compact ? 'min-w-[140px]' : 'w-full'}>
       <div className="mb-1 flex items-center justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#64748b]">证据强度</span>
-        <span className={`font-mono text-[12px] font-bold ${isCritical ? 'text-[#fda4af]' : 'text-[#a5f3fc]'}`}>{safeValue}%</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#64748b]">{compact ? '证据' : '证据强度'}</span>
+        <span className={`font-mono text-[12px] font-bold ${isCritical ? 'text-[#fda4af]' : 'text-[#a5f3fc]'}`}>{safeValue}% · HP {safeIntegrity}</span>
       </div>
       <div className="relative h-3 overflow-hidden rounded-full border border-white/10 bg-black/30 shadow-[inset_0_0_14px_rgba(2,6,23,0.65)]">
         <motion.div
@@ -1235,9 +1263,14 @@ function MissionEvidenceBar({
         </div>
       </div>
       {!compact && (
-        <div className={`mt-1 text-[10px] ${isCritical ? 'text-[#fda4af]' : 'text-[#64748b]'}`}>
-          样本可信度 {safeIntegrity}%{isCritical ? ` · 低于通关线 ${MISSION_MIN_INTEGRITY}%` : ''}
-        </div>
+        <>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/24">
+            <div className={`h-full rounded-full bg-gradient-to-r ${hpFillClass}`} style={{ width: `${safeIntegrity}%` }} />
+          </div>
+          <div className={`mt-1 text-[10px] ${isCritical ? 'text-[#fda4af]' : 'text-[#64748b]'}`}>
+            样本可信度 {safeIntegrity}%{isCritical ? ` · 低于通关线 ${MISSION_MIN_INTEGRITY}%` : ` · 通关线 ${MISSION_MIN_INTEGRITY}%`}
+          </div>
+        </>
       )}
     </div>
   );
@@ -1795,6 +1828,20 @@ function App() {
       if (currentVolume + volumeML > capacity) {
         showToast(`🚫 ${target.name} 容量不足，无法加入 ${volumeML}mL`);
         return currentItems;
+      }
+
+      if (gameMode === 'challenge' && activeChallenge && !activeChallenge.completed) {
+        const runStats = missionRunStats[activeChallenge.id] || createMissionRunStats();
+        if (runStats.integrity < MISSION_MIN_INTEGRITY) {
+          showMissionCue({
+            title: '样本失效',
+            detail: `可信度 ${runStats.integrity}% · 重开本关`,
+            accent: '#f43f5e',
+            tone: 'side',
+          }, 2600);
+          showToast('样本可信度不足，请重开本关');
+          return currentItems;
+        }
       }
 
       if (gameMode === 'challenge' && shouldBlockMissionReagentForPrediction(reagentName)) {
@@ -2711,19 +2758,21 @@ function App() {
   const activeProofSolved = Boolean(activeMissionProof && activeProofSolvedCount === activeMissionProof.checkpoints.length);
   const activeProofStageLabel = getMissionProofStageLabel(activeProofCurrent?.stage);
   const activeProofStageAccent = getMissionProofStageAccent(activeProofCurrent?.stage);
-  const showMissionProofPanel = Boolean(
-    activeChallenge
-    && !activeChallenge.completed
-    && activeMissionProof
-    && activeProofCurrent
-    && !activeProofSolved
-    && (shouldShowPredictionGate || challengeProductReady),
-  );
   const activeMissionStats = activeChallenge
     ? (missionRunStats[activeChallenge.id] || createMissionRunStats())
     : createMissionRunStats();
   const activeMissionGrade = getMissionGrade(activeMissionStats.integrity);
   const activeMissionCanComplete = activeMissionStats.integrity >= MISSION_MIN_INTEGRITY;
+  const activeMissionFailed = Boolean(activeChallenge && !activeChallenge.completed && activeMissionStats.integrity < MISSION_MIN_INTEGRITY);
+  const showMissionProofPanel = Boolean(
+    activeChallenge
+    && !activeChallenge.completed
+    && !activeMissionFailed
+    && activeMissionProof
+    && activeProofCurrent
+    && !activeProofSolved
+    && (shouldShowPredictionGate || challengeProductReady),
+  );
   const activeMissionEvidenceScore = getMissionEvidenceScore(challengeProductReady, activeMissionProof, activeProofAnswers);
   const discoveryCards = useMemo(() => buildDiscoveryCards(placedItems, unlockedDiscoveryIds), [placedItems, unlockedDiscoveryIds]);
   const unlockedDiscoveryCount = useMemo(() => discoveryCards.filter(card => card.unlocked).length, [discoveryCards]);
@@ -2737,6 +2786,18 @@ function App() {
   }, [completedMissionIds]);
   const currentLevelPreset = MISSION_SEQUENCE[currentLevelIndex] || MISSION_SEQUENCE[0];
   const currentMissionBrief = MISSION_BRIEFS[currentLevelPreset];
+  const lockedMissionCount = useMemo(
+    () => MISSION_SEQUENCE.filter((_, index) => !isMissionUnlocked(index, completedMissionIds)).length,
+    [completedMissionIds]
+  );
+  const launchMissionFromSelect = (preset: MissionPreset, index: number) => {
+    if (!isMissionUnlocked(index, completedMissionIds)) {
+      const requiredMission = MISSION_BRIEFS[MISSION_SEQUENCE[Math.max(0, index - 1)]];
+      showToast(`先完成第 ${index} 关：${requiredMission.title}`);
+      return;
+    }
+    launchQuickStart(preset);
+  };
   const activeMissionPreset = useMemo(
     () => activeChallenge ? MISSION_SEQUENCE.find(preset => MISSION_BRIEFS[preset].challengeId === activeChallenge.id) : undefined,
     [activeChallenge]
@@ -2773,6 +2834,7 @@ function App() {
   const challengeStageLabel = useMemo(() => {
     if (!activeChallenge) return '选一关';
     if (activeChallenge.completed) return '下一关';
+    if (activeMissionFailed) return '样本失效';
     if (challengeProductReady && activeProofSolved && !activeMissionCanComplete) return '样本失效';
     if (shouldShowPredictionGate && activePredictionCheckpoint) {
       return `预测：${activePredictionCheckpoint.label}`;
@@ -2783,9 +2845,10 @@ function App() {
     if (challengeQuickReagent) return `加${compactMissionLabel(challengeQuickReagent)}`;
     if (challengeNextAction) return `做 ${compactMissionLabel(challengeNextAction)}`;
     return '观察';
-  }, [activeChallenge, activeMissionCanComplete, activeMissionProof, activePredictionCheckpoint, activeProofCurrent, activeProofSolved, challengeNextAction, challengeProductReady, challengeQuickReagent, shouldShowPredictionGate]);
+  }, [activeChallenge, activeMissionCanComplete, activeMissionFailed, activeMissionProof, activePredictionCheckpoint, activeProofCurrent, activeProofSolved, challengeNextAction, challengeProductReady, challengeQuickReagent, shouldShowPredictionGate]);
   const challengeActionOptions = useMemo(() => {
     if (!challengeInsight || !primaryAgentContainerId || activeChallenge?.completed) return [];
+    if (activeMissionFailed) return [];
     if (shouldShowPredictionGate) return [];
     const options: ChallengeActionOption[] = [];
     const pushOption = (name: string, label: string, tone: 'next' | 'main' | 'try', volume = 20) => {
@@ -2801,7 +2864,7 @@ function App() {
       .forEach(name => pushOption(name, '主线', 'main'));
     challengeInsight.secondaryReagents.slice(0, 2).forEach(name => pushOption(name, '支线', 'try', 10));
     return options.slice(0, 4);
-  }, [activeChallenge?.completed, challengeInsight, challengeQuickReagent, primaryAgentContainerId, shouldShowPredictionGate]);
+  }, [activeChallenge?.completed, activeMissionFailed, challengeInsight, challengeQuickReagent, primaryAgentContainerId, shouldShowPredictionGate]);
   const challengePrimaryAction = useMemo(
     () => challengeActionOptions.find(option => option.tone === 'next')
       || challengeActionOptions.find(option => option.tone === 'main')
@@ -2899,7 +2962,18 @@ function App() {
     lastAgentNoteRef.current = { at: Date.now(), message: note };
     window.dispatchEvent(new CustomEvent('agentNote', { detail: { message: note } }));
     showToast('📝 已把当前建议写入观察日志');
-  }, [agentRemoteSummary, isTablet, primaryAgentContainerId, showToast, syncReadouts]);
+  }, [
+    agentRemoteSummary,
+    isTablet,
+    primaryAgentContainerId,
+    setActiveRightPanelTab,
+    setBottomSheetOpen,
+    setFocusedItemId,
+    setReagentFocusSignal,
+    setRightPanelPulse,
+    showToast,
+    syncReadouts,
+  ]);
 
   const runAgentToolCalls = useCallback((toolCalls?: AgentToolCall[]) => {
     if (!toolCalls?.length) return;
@@ -3465,6 +3539,20 @@ function App() {
         return currentItems;
       }
 
+      if (gameMode === 'challenge' && activeChallenge && !activeChallenge.completed) {
+        const runStats = missionRunStats[activeChallenge.id] || createMissionRunStats();
+        if (runStats.integrity < MISSION_MIN_INTEGRITY) {
+          showMissionCue({
+            title: '样本失效',
+            detail: `可信度 ${runStats.integrity}% · 重开本关`,
+            accent: '#f43f5e',
+            tone: 'side',
+          }, 2600);
+          showToast('样本可信度不足，请重开本关');
+          return currentItems;
+        }
+      }
+
       if (gameMode === 'challenge' && shouldBlockMissionReagentForPrediction(activeDrop.reagentName)) {
         promptMissionPredictionGate();
         showToast('先完成预测，再验证现象');
@@ -3482,10 +3570,10 @@ function App() {
           penalty = 18;
           message = `非本关试剂：${compactMissionLabel(activeDrop.reagentName)}`;
         } else if (isPrimary && !challengeProductReady && !matchesCurrentStep) {
-          penalty = 10;
+          penalty = MISSION_WRONG_ORDER_PENALTY;
           message = `顺序偏离：当前应先${compactMissionLabel(challengeNextAction || '观察')}`;
         } else if (isSecondary && !challengeProductReady) {
-          penalty = 6;
+          penalty = MISSION_SIDE_REAGENT_PENALTY;
           message = `支线消耗：${compactMissionLabel(activeDrop.reagentName)}`;
         }
 
@@ -4060,7 +4148,7 @@ function App() {
 	                      <button
 	                        type="button"
 	                        onClick={() => {
-	                          recordMissionEvent(activeChallenge.id, 'hint', 3, '使用拉瓦锡提示');
+	                          recordMissionEvent(activeChallenge.id, 'hint', MISSION_HINT_PENALTY, '使用拉瓦锡提示');
 	                          submitAgentQuery('这道证据题应该怎么判断？请结合当前现象给一个提示。');
 	                        }}
 	                        className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-2.5 py-1 text-[10px] font-semibold text-[#a5f3fc] hover:bg-[#22d3ee]/16 transition-colors"
@@ -4097,10 +4185,11 @@ function App() {
 	                                  tone: 'proof',
 	                                });
 	                              } else {
-	                                recordMissionEvent(activeChallenge.id, 'proof', 15, `证据误判：${option.label}`);
+	                                const penalty = getMissionProofPenalty(activeProofCurrent);
+	                                recordMissionEvent(activeChallenge.id, 'proof', penalty, `证据误判：${option.label}`);
 	                                showMissionCue({
 	                                  title: '证据扣分',
-	                                  detail: `不是 ${option.label} · -15`,
+	                                  detail: `不是 ${option.label} · -${penalty}`,
 	                                  accent: '#f43f5e',
 	                                  tone: 'side',
 	                                }, 2600);
@@ -4144,13 +4233,16 @@ function App() {
                     transition={{ duration: 0.2, ease: 'easeOut' }}
                     className="absolute bottom-5 left-1/2 z-[58] w-[min(520px,calc(100%-32px))] -translate-x-1/2 rounded-[26px] border border-white/10 bg-[rgba(7,11,23,0.76)] px-3 py-2.5 shadow-[0_16px_46px_rgba(2,6,23,0.38)] backdrop-blur-2xl sm:left-[58%] sm:w-[min(500px,calc(100%-180px))]"
                   >
-	                    {!activeChallenge.completed && challengeProductReady && activeProofSolved && !activeMissionCanComplete ? (
+	                    {!activeChallenge.completed && activeMissionFailed ? (
 	                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
 	                        <div className="min-w-0">
-	                          <div className="text-[12px] font-semibold text-[#fda4af]">样本可信度不足</div>
+	                          <div className="text-[12px] font-semibold text-[#fda4af]">样本失效</div>
 	                          <div className="mt-1 text-[11px] leading-snug text-[#94a3b8]">
-	                            当前 {activeMissionStats.integrity}% ，低于通关线 {MISSION_MIN_INTEGRITY}%。错误试剂或证据误判会让本次结果失效。
+	                            当前 {activeMissionStats.integrity}% ，通关线 {MISSION_MIN_INTEGRITY}%。乱序、误判和提示都会扣分。
 	                          </div>
+	                          {activeMissionStats.lastPenalty && (
+	                            <div className="mt-1 truncate text-[11px] text-[#fda4af]">{activeMissionStats.lastPenalty}</div>
+	                          )}
 	                        </div>
 	                        <div className="flex flex-wrap justify-end gap-1.5">
 	                          <button
@@ -4234,7 +4326,7 @@ function App() {
 	                            <button
 	                              type="button"
 	                              onClick={() => {
-	                                recordMissionEvent(activeChallenge.id, 'hint', 3, '使用拉瓦锡提示');
+	                                recordMissionEvent(activeChallenge.id, 'hint', MISSION_HINT_PENALTY, '使用拉瓦锡提示');
 	                                submitAgentQuery('结合当前关卡，下一步该怎么做？');
 	                              }}
 	                              className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-3 py-2 text-[11px] font-semibold text-[#a5f3fc] transition-all hover:-translate-y-0.5 hover:bg-[#22d3ee]/16"
@@ -4360,6 +4452,7 @@ function App() {
 		                      <div className="mt-1 text-[12px] text-[#94a3b8]">
 		                        可信度 {missionCompletionCard.integrity}% · 失误 {missionCompletionCard.mistakes}
 		                      </div>
+		                      <div className="mt-1 truncate text-[11px] text-[#86efac]">{getMissionUnlockText(missionCompletionCard.challengeId)}</div>
 		                    </div>
 	                  </div>
 	                  <div className="mt-3 rounded-[18px] border border-white/8 bg-white/[0.025] px-3 py-2">
@@ -4498,13 +4591,14 @@ function App() {
                       <div className="relative">
                         <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#64748b]">闯关进度</div>
 	                        <div className="mt-2 text-[24px] font-semibold tracking-[-0.03em] text-white">实验侦探</div>
-                        <div className="mt-3 flex items-end gap-3">
-                          <div className="font-mono text-[34px] font-bold leading-none text-[#67e8f9]">{completedMissionCount}/{MISSION_SEQUENCE.length}</div>
-                          <div className="pb-1 text-[12px] text-[#94a3b8]">已完成</div>
-                        </div>
-                        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/8">
-                          <div className="h-full rounded-full bg-gradient-to-r from-[#22d3ee] via-[#f43f5e] to-[#a855f7] transition-all duration-500" style={{ width: `${(completedMissionCount / MISSION_SEQUENCE.length) * 100}%` }} />
-                        </div>
+	                        <div className="mt-3 flex items-end gap-3">
+	                          <div className="font-mono text-[34px] font-bold leading-none text-[#67e8f9]">{completedMissionCount}/{MISSION_SEQUENCE.length}</div>
+	                          <div className="pb-1 text-[12px] text-[#94a3b8]">已完成</div>
+	                        </div>
+	                        <div className="mt-1 text-[11px] text-[#64748b]">{lockedMissionCount > 0 ? `${lockedMissionCount} 关待解锁` : '全线开放'}</div>
+	                        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/8">
+	                          <div className="h-full rounded-full bg-gradient-to-r from-[#22d3ee] via-[#f43f5e] to-[#a855f7] transition-all duration-500" style={{ width: `${(completedMissionCount / MISSION_SEQUENCE.length) * 100}%` }} />
+	                        </div>
                         <button
                           type="button"
                           onClick={() => launchQuickStart(currentLevelPreset)}
@@ -4517,22 +4611,26 @@ function App() {
 
                     <div className="p-5">
                       <div className="grid grid-cols-6 gap-2">
-                        {MISSION_SEQUENCE.map((preset, index) => {
-                          const mission = MISSION_BRIEFS[preset];
-                          const isMissionDone = completedMissionIds.has(mission.challengeId);
-                          const isCurrentLevel = index === currentLevelIndex && !isMissionDone;
-                          return (
-                            <button
-                              key={`rail-${mission.challengeId}`}
-                              type="button"
-                              onClick={() => launchQuickStart(mission.preset)}
-                              className={`group flex min-h-[70px] flex-col items-center justify-center gap-1 rounded-2xl border transition-all hover:-translate-y-0.5 ${isMissionDone ? 'border-[#10b981]/26 bg-[#10b981]/10 text-[#bbf7d0]' : isCurrentLevel ? 'border-[#22d3ee]/35 bg-[#22d3ee]/12 text-[#a5f3fc] shadow-[0_0_18px_rgba(34,211,238,0.10)]' : 'border-white/8 bg-white/[0.025] text-[#94a3b8] hover:border-[#22d3ee]/28 hover:text-[#a5f3fc]'}`}
-                            >
-                              <span className="font-mono text-[12px] font-semibold">{isMissionDone ? '✓' : String(index + 1).padStart(2, '0')}</span>
-                              <span className="max-w-full truncate px-1 text-[10px]">{isCurrentLevel ? '当前关' : mission.signal}</span>
-                            </button>
-                          );
-                        })}
+	                        {MISSION_SEQUENCE.map((preset, index) => {
+	                          const mission = MISSION_BRIEFS[preset];
+	                          const isMissionDone = completedMissionIds.has(mission.challengeId);
+	                          const isCurrentLevel = index === currentLevelIndex && !isMissionDone;
+	                          const unlocked = isMissionUnlocked(index, completedMissionIds);
+	                          const isLocked = !unlocked;
+	                          return (
+	                            <button
+	                              key={`rail-${mission.challengeId}`}
+	                              type="button"
+	                              data-locked={isLocked ? 'true' : undefined}
+	                              title={isLocked ? `先完成第 ${index} 关` : mission.title}
+	                              onClick={() => launchMissionFromSelect(mission.preset, index)}
+	                              className={`group flex min-h-[70px] flex-col items-center justify-center gap-1 rounded-2xl border transition-all ${isLocked ? 'cursor-not-allowed border-white/5 bg-black/16 text-[#475569]' : 'hover:-translate-y-0.5'} ${isMissionDone ? 'border-[#10b981]/26 bg-[#10b981]/10 text-[#bbf7d0]' : isCurrentLevel ? 'border-[#22d3ee]/35 bg-[#22d3ee]/12 text-[#a5f3fc] shadow-[0_0_18px_rgba(34,211,238,0.10)]' : isLocked ? '' : 'border-white/8 bg-white/[0.025] text-[#94a3b8] hover:border-[#22d3ee]/28 hover:text-[#a5f3fc]'}`}
+	                            >
+	                              <span className="font-mono text-[12px] font-semibold">{isMissionDone ? '✓' : isLocked ? '锁' : String(index + 1).padStart(2, '0')}</span>
+	                              <span className="max-w-full truncate px-1 text-[10px]">{isLocked ? '未解锁' : isCurrentLevel ? '当前关' : mission.signal}</span>
+	                            </button>
+	                          );
+	                        })}
                       </div>
                       <div className="mt-4 grid grid-cols-3 gap-2 text-[11px] text-[#64748b]">
 	                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">预测</div>
@@ -4609,31 +4707,34 @@ function App() {
                   <div className="mission-path-panel rounded-[28px] border border-white/8 bg-[rgba(7,11,23,0.58)] p-4 backdrop-blur-xl">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div>
-                        <div className="text-[12px] font-semibold text-[#e2e8f0]">关卡路线</div>
-                        <div className="mt-0.5 text-[11px] text-[#64748b]">{completedMissionCount}/{MISSION_SEQUENCE.length} 已完成</div>
+	                        <div className="text-[12px] font-semibold text-[#e2e8f0]">逐关解锁</div>
+	                        <div className="mt-0.5 text-[11px] text-[#64748b]">{completedMissionCount}/{MISSION_SEQUENCE.length} 已完成</div>
                       </div>
                       <div className="h-2 w-2 rounded-full bg-[#67e8f9] shadow-[0_0_16px_rgba(103,232,249,0.7)]" />
                     </div>
                     <div className="space-y-2">
                       {MISSION_SEQUENCE.map((preset, index) => {
-                        const mission = MISSION_BRIEFS[preset];
-                        const isMissionDone = completedMissionIds.has(mission.challengeId);
-                        const isCurrentLevel = index === currentLevelIndex && !isMissionDone;
-                        return (
-                          <button
-                            key={`path-${mission.challengeId}`}
-                            type="button"
-                            onClick={() => launchQuickStart(mission.preset)}
-                            className={`mission-path-item flex w-full items-center gap-3 rounded-2xl border px-3 py-2 text-left transition-all ${isMissionDone ? 'border-[#10b981]/24 bg-[#10b981]/8' : isCurrentLevel ? 'border-[#22d3ee]/32 bg-[#22d3ee]/10' : 'border-white/7 bg-white/[0.025] hover:border-[#22d3ee]/22 hover:bg-white/[0.04]'}`}
-                          >
-                            <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold ${isMissionDone ? 'bg-[#10b981]/14 text-[#86efac]' : isCurrentLevel ? 'bg-[#22d3ee]/16 text-[#67e8f9]' : 'bg-white/[0.04] text-[#94a3b8]'}`}>
-                              {isMissionDone ? '✓' : String(index + 1).padStart(2, '0')}
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-[13px] font-medium text-[#e2e8f0]">{mission.title}</span>
-                              <span className="block truncate text-[11px] text-[#64748b]">{mission.signal}</span>
-                            </span>
-                          </button>
+	                        const mission = MISSION_BRIEFS[preset];
+	                        const isMissionDone = completedMissionIds.has(mission.challengeId);
+	                        const isCurrentLevel = index === currentLevelIndex && !isMissionDone;
+	                        const unlocked = isMissionUnlocked(index, completedMissionIds);
+	                        const isLocked = !unlocked;
+	                        return (
+	                          <button
+	                            key={`path-${mission.challengeId}`}
+	                            type="button"
+	                            data-locked={isLocked ? 'true' : undefined}
+	                            onClick={() => launchMissionFromSelect(mission.preset, index)}
+	                            className={`mission-path-item flex w-full items-center gap-3 rounded-2xl border px-3 py-2 text-left transition-all ${isLocked ? 'cursor-not-allowed border-white/5 bg-black/14 opacity-65' : ''} ${isMissionDone ? 'border-[#10b981]/24 bg-[#10b981]/8' : isCurrentLevel ? 'border-[#22d3ee]/32 bg-[#22d3ee]/10' : isLocked ? '' : 'border-white/7 bg-white/[0.025] hover:border-[#22d3ee]/22 hover:bg-white/[0.04]'}`}
+	                          >
+	                            <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold ${isMissionDone ? 'bg-[#10b981]/14 text-[#86efac]' : isCurrentLevel ? 'bg-[#22d3ee]/16 text-[#67e8f9]' : isLocked ? 'bg-black/20 text-[#475569]' : 'bg-white/[0.04] text-[#94a3b8]'}`}>
+	                              {isMissionDone ? '✓' : isLocked ? '锁' : String(index + 1).padStart(2, '0')}
+	                            </span>
+	                            <span className="min-w-0 flex-1">
+	                              <span className={`block truncate text-[13px] font-medium ${isLocked ? 'text-[#64748b]' : 'text-[#e2e8f0]'}`}>{mission.title}</span>
+	                              <span className="block truncate text-[11px] text-[#64748b]">{isLocked ? '完成上一关后开放' : mission.signal}</span>
+	                            </span>
+	                          </button>
                         );
                       })}
                     </div>
