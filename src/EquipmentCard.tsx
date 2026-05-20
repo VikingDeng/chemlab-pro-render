@@ -23,22 +23,97 @@ export function EquipmentCard({
   onDragEnd,
 }: EquipmentCardProps) {
   const [dragGhost, setDragGhost] = React.useState<{ x: number; y: number } | null>(null);
-  const emitWorkspaceDragState = (active: boolean, point?: { x: number; y: number }) => {
-    window.dispatchEvent(new CustomEvent('workspaceDragState', {
-      detail: {
-        active,
-        kind: 'equipment',
-        type: dragType,
-        name,
-        point,
+  const dragGhostRef = React.useRef<HTMLDivElement>(null);
+  const dragGhostPointRef = React.useRef<{ x: number; y: number } | null>(null);
+  const dragGhostFrameRef = React.useRef<number | null>(null);
+  const pendingWorkspaceDragStateRef = React.useRef<{
+    active: boolean;
+    kind: 'equipment';
+    type?: string;
+    name: string;
+    point?: { x: number; y: number };
+  } | null>(null);
+  const workspaceDragStateFrameRef = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (dragGhostFrameRef.current !== null) {
+        cancelAnimationFrame(dragGhostFrameRef.current);
       }
-    }));
+      if (workspaceDragStateFrameRef.current !== null) {
+        cancelAnimationFrame(workspaceDragStateFrameRef.current);
+      }
+    };
+  }, []);
+
+  const dispatchWorkspaceDragState = (detail: NonNullable<typeof pendingWorkspaceDragStateRef.current>) => {
+    window.dispatchEvent(new CustomEvent('workspaceDragState', { detail }));
   };
-  const updateDragGhost = (point: { x: number; y: number }) => setDragGhost(point);
+
+  const emitWorkspaceDragState = (active: boolean, point?: { x: number; y: number }) => {
+    const detail = {
+      active,
+      kind: 'equipment' as const,
+      type: dragType,
+      name,
+      point,
+    };
+
+    if (!active) {
+      if (workspaceDragStateFrameRef.current !== null) {
+        cancelAnimationFrame(workspaceDragStateFrameRef.current);
+        workspaceDragStateFrameRef.current = null;
+      }
+      pendingWorkspaceDragStateRef.current = null;
+      dispatchWorkspaceDragState(detail);
+      return;
+    }
+
+    pendingWorkspaceDragStateRef.current = detail;
+    if (workspaceDragStateFrameRef.current !== null) return;
+
+    workspaceDragStateFrameRef.current = requestAnimationFrame(() => {
+      workspaceDragStateFrameRef.current = null;
+      const nextDetail = pendingWorkspaceDragStateRef.current;
+      pendingWorkspaceDragStateRef.current = null;
+      if (nextDetail) {
+        dispatchWorkspaceDragState(nextDetail);
+      }
+    });
+  };
+
+  const positionDragGhost = (point: { x: number; y: number }) => {
+    dragGhostPointRef.current = point;
+    if (dragGhostFrameRef.current !== null) return;
+
+    dragGhostFrameRef.current = requestAnimationFrame(() => {
+      dragGhostFrameRef.current = null;
+      const nextPoint = dragGhostPointRef.current;
+      const ghostElement = dragGhostRef.current;
+      if (!nextPoint || !ghostElement) return;
+      ghostElement.style.transform = `translate3d(${nextPoint.x}px, ${nextPoint.y}px, 0) translate(-50%, -50%)`;
+    });
+  };
+
+  const beginDragGhost = (point: { x: number; y: number }) => {
+    setDragGhost(point);
+    positionDragGhost(point);
+  };
+
+  const clearDragGhost = () => {
+    if (dragGhostFrameRef.current !== null) {
+      cancelAnimationFrame(dragGhostFrameRef.current);
+      dragGhostFrameRef.current = null;
+    }
+    dragGhostPointRef.current = null;
+    setDragGhost(null);
+  };
+
   const ghost = dragGhost ? (
     <div
-      className="pointer-events-none fixed z-[9999] flex min-h-[52px] w-[190px] -translate-x-1/2 -translate-y-1/2 items-center gap-3 rounded-2xl border border-white/16 bg-[rgba(8,13,24,0.92)] px-4 py-3 text-white shadow-[0_20px_54px_rgba(2,6,23,0.56),0_0_22px_rgba(34,211,238,0.12)] backdrop-blur-xl will-change-transform"
-      style={{ left: dragGhost.x, top: dragGhost.y }}
+      ref={dragGhostRef}
+      className="pointer-events-none fixed left-0 top-0 z-[9999] flex min-h-[52px] w-[190px] items-center gap-3 rounded-2xl border border-white/16 bg-[rgba(8,13,24,0.92)] px-4 py-3 text-white shadow-[0_20px_54px_rgba(2,6,23,0.56),0_0_22px_rgba(34,211,238,0.12)] backdrop-blur-xl will-change-transform"
+      style={{ transform: `translate3d(${dragGhost.x}px, ${dragGhost.y}px, 0) translate(-50%, -50%)` }}
     >
       <span className="text-[#67e8f9]">{icon}</span>
       <span className="min-w-0">
@@ -59,15 +134,15 @@ export function EquipmentCard({
           dragMomentum={false}
           onDragStart={(_event, info) => {
             emitWorkspaceDragState(true, info.point);
-            updateDragGhost(info.point);
+            beginDragGhost(info.point);
           }}
           onDrag={(_event, info) => {
             emitWorkspaceDragState(true, info.point);
-            updateDragGhost(info.point);
+            positionDragGhost(info.point);
           }}
           onDragEnd={(event, info) => {
             emitWorkspaceDragState(false);
-            setDragGhost(null);
+            clearDragGhost();
             onDragEnd?.(event, info);
           }}
           whileDrag={{ scale: 0.98, zIndex: 100, opacity: 0.3, cursor: 'grabbing' }}
@@ -91,15 +166,15 @@ export function EquipmentCard({
         dragMomentum={false}
         onDragStart={(_event, info) => {
           emitWorkspaceDragState(true, info.point);
-          updateDragGhost(info.point);
+          beginDragGhost(info.point);
         }}
         onDrag={(_event, info) => {
           emitWorkspaceDragState(true, info.point);
-          updateDragGhost(info.point);
+          positionDragGhost(info.point);
         }}
         onDragEnd={(event, info) => {
           emitWorkspaceDragState(false);
-          setDragGhost(null);
+          clearDragGhost();
           onDragEnd?.(event, info);
         }}
         whileDrag={{ scale: 0.98, zIndex: 100, opacity: 0.3, cursor: 'grabbing' }}

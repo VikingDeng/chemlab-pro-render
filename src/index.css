@@ -3,53 +3,82 @@
 
 :root {
   /* Background */
-  --bg-base: #060913; /* slightly darker to make glass pop */
-  --bg-elevated: #111827;
-  --bg-glass: rgba(255, 255, 255, 0.03);
+  --bg-base: #030612;
+  --bg-elevated: #0b1020;
+  --bg-glass: rgba(10, 16, 31, 0.72);
   
   /* Border */
-  --border-glass: rgba(255, 255, 255, 0.06);
-  --border-focus: rgba(34, 211, 238, 0.50);
+  --border-glass: rgba(226, 232, 240, 0.08);
+  --border-focus: rgba(94, 234, 212, 0.44);
   
   /* Text */
   --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #475569;
-  --text-formula: #22d3ee;
+  --text-secondary: #9aa8bc;
+  --text-muted: #536179;
+  --text-formula: #67e8f9;
   
   /* Accent */
-  --accent-cyan: #22d3ee;
-  --accent-cyan-glow: rgba(34, 211, 238, 0.15);
+  --accent-cyan: #67e8f9;
+  --accent-cyan-glow: rgba(103, 232, 249, 0.13);
   --accent-amber: #f59e0b;
   --accent-emerald: #10b981;
   --accent-rose: #f43f5e;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 body {
-  background-color: var(--bg-base);
+  background:
+    radial-gradient(circle at 50% -12%, rgba(56, 189, 248, 0.13) 0%, rgba(56, 189, 248, 0.035) 32%, transparent 58%),
+    radial-gradient(circle at 100% 8%, rgba(168, 85, 247, 0.12) 0%, transparent 36%),
+    radial-gradient(circle at 0% 100%, rgba(16, 185, 129, 0.08) 0%, transparent 42%),
+    linear-gradient(180deg, #050816 0%, #02040c 100%);
   color: var(--text-primary);
   font-family: 'Inter', system-ui, sans-serif;
   overflow: hidden;
+  letter-spacing: -0.01em;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.32;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.021) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(circle at 50% 35%, black 0%, transparent 72%);
 }
 
 @utility glass-panel {
-  background: linear-gradient(145deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.062) 0%, rgba(255,255,255,0.018) 100%),
+    rgba(6, 10, 22, 0.72);
+  backdrop-filter: blur(18px) saturate(118%);
+  -webkit-backdrop-filter: blur(18px) saturate(118%);
   border: 1px solid var(--border-glass);
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
-  border-radius: 16px;
+  border-top-color: rgba(255, 255, 255, 0.13);
+  box-shadow:
+    0 22px 70px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  border-radius: 22px;
 }
 
 @utility workspace-canvas {
-  background-color: var(--bg-base);
-  background-image: 
-    radial-gradient(circle at 50% 0%, rgba(34, 211, 238, 0.08) 0%, transparent 50%),
-    radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-  background-size: 100% 100%, 32px 32px;
-  box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+  background-color: #050815;
+  background-image:
+    radial-gradient(ellipse at 50% 45%, rgba(20, 184, 166, 0.115) 0%, rgba(20, 184, 166, 0.035) 34%, transparent 68%),
+    radial-gradient(circle at 45% 12%, rgba(125, 211, 252, 0.08) 0%, transparent 38%),
+    linear-gradient(180deg, rgba(12, 19, 36, 0.92) 0%, rgba(3, 6, 18, 0.98) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    inset 0 -90px 130px rgba(0,0,0,0.42),
+    0 28px 90px rgba(0,0,0,0.36);
 }
 
 .interactive-item {
@@ -63,10 +92,233 @@ body {
   will-change: left, top, transform;
 }
 .interactive-item:hover {
-  background: rgba(255,255,255,0.06);
-  box-shadow: 0 4px 15px rgba(0,0,0,0.2), 
-              0 0 0 1px rgba(34, 211, 238, 0.40),
-              0 0 20px rgba(34, 211, 238, 0.15);
+  background: rgba(255,255,255,0.045);
+  box-shadow:
+    0 10px 24px rgba(0,0,0,0.24),
+    0 0 0 1px rgba(103, 232, 249, 0.24);
+}
+
+.chem-studio-shell {
+  isolation: isolate;
+}
+
+.chem-studio-shell::before,
+.chem-studio-shell::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.chem-studio-shell::before {
+  inset: 12px;
+  border-radius: 32px;
+  background:
+    radial-gradient(circle at 24% 14%, rgba(34, 211, 238, 0.08), transparent 32%),
+    radial-gradient(circle at 75% 78%, rgba(168, 85, 247, 0.075), transparent 34%),
+    linear-gradient(180deg, rgba(255,255,255,0.018), transparent 38%);
+}
+
+.chem-studio-shell::after {
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.34) 100%);
+}
+
+.app-command-bar,
+.app-status-bar {
+  background:
+    linear-gradient(180deg, rgba(17, 24, 39, 0.88), rgba(5, 9, 20, 0.78));
+  border-color: rgba(226, 232, 240, 0.09);
+  box-shadow: 0 18px 54px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.065);
+}
+
+.app-command-bar {
+  border-radius: 20px;
+}
+
+.app-command-bar > div:first-child > div:first-child {
+  letter-spacing: -0.035em;
+  text-shadow: 0 10px 34px rgba(103, 232, 249, 0.14);
+}
+
+.tool-rail,
+.inspector-rail [data-panel="reagent-shelf"],
+.inspector-rail [data-panel="observation-log"] {
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.74), rgba(4, 8, 18, 0.82));
+  border-color: rgba(226,232,240,0.075);
+}
+
+.tool-rail {
+  border-radius: 22px;
+}
+
+.tool-rail .interactive-item {
+  border-bottom-color: rgba(226,232,240,0.045);
+}
+
+.tool-rail .interactive-item:hover {
+  background: rgba(103, 232, 249, 0.045);
+  box-shadow: inset 2px 0 0 rgba(103, 232, 249, 0.44);
+}
+
+.studio-workspace {
+  position: relative;
+}
+
+.studio-workspace::before {
+  content: "";
+  position: absolute;
+  left: 11%;
+  right: 11%;
+  bottom: 10%;
+  height: 28%;
+  border-radius: 999px;
+  background:
+    radial-gradient(ellipse at center, rgba(103, 232, 249, 0.105) 0%, rgba(103, 232, 249, 0.025) 48%, transparent 72%);
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+.studio-workspace::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent 0 49.8%, rgba(103,232,249,0.045) 50%, transparent 50.2%),
+    linear-gradient(0deg, transparent 0 49.8%, rgba(103,232,249,0.035) 50%, transparent 50.2%);
+  background-size: 120px 120px;
+  opacity: 0.28;
+  mask-image: radial-gradient(ellipse at 50% 48%, black 0%, transparent 68%);
+  pointer-events: none;
+}
+
+[data-panel="dashboard-readouts"] {
+  border-radius: 24px !important;
+  background:
+    linear-gradient(180deg, rgba(15,23,42,0.84), rgba(7,11,23,0.72)) !important;
+  box-shadow: 0 20px 58px rgba(0,0,0,0.26), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+}
+
+[data-panel="challenge-mission-select"] {
+  scrollbar-gutter: stable;
+}
+
+.mission-hero,
+.mission-card {
+  box-shadow: 0 26px 80px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.055);
+}
+
+.mission-hero {
+  background:
+    linear-gradient(135deg, rgba(9, 15, 31, 0.92), rgba(6, 10, 24, 0.72)),
+    radial-gradient(circle at 14% 22%, rgba(103, 232, 249, 0.14), transparent 36%) !important;
+}
+
+.mission-card {
+  transform: translateZ(0);
+}
+
+.mission-card::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: 25px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.052), transparent 44%);
+  pointer-events: none;
+}
+
+.mission-card:hover {
+  border-color: rgba(103,232,249,0.34) !important;
+  box-shadow: 0 28px 88px rgba(0,0,0,0.34), 0 0 0 1px rgba(103,232,249,0.09);
+}
+
+.mission-card-current {
+  background:
+    linear-gradient(135deg, rgba(8, 16, 34, 0.96), rgba(5, 9, 22, 0.72)),
+    radial-gradient(circle at 74% 24%, rgba(103, 232, 249, 0.18), transparent 34%) !important;
+}
+
+.mission-card-current::after {
+  content: "";
+  position: absolute;
+  right: 28px;
+  bottom: 22px;
+  width: 168px;
+  height: 168px;
+  border-radius: 999px;
+  border: 1px solid rgba(103,232,249,0.12);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(103,232,249,0.12), transparent 58%),
+    repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,0.055) 0 1px, transparent 1px 18px);
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.mission-focus-row {
+  align-items: stretch;
+}
+
+.mission-spotlight {
+  box-shadow:
+    0 34px 96px rgba(0,0,0,0.34),
+    0 0 0 1px rgba(103,232,249,0.07),
+    inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+.mission-spotlight::after {
+  right: 36px;
+  bottom: 28px;
+  width: 196px;
+  height: 196px;
+  opacity: 0.34;
+}
+
+.mission-path-panel {
+  box-shadow: 0 26px 80px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.052);
+}
+
+.mission-path-item {
+  transform: translateZ(0);
+}
+
+.mission-path-item:hover {
+  transform: translate3d(3px, 0, 0);
+}
+
+[data-panel="challenge-hud"],
+[data-panel="challenge-action-dock"],
+[data-panel="challenge-proof-panel"] {
+  box-shadow: 0 22px 70px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+}
+
+[data-panel="reagent-shelf"] img {
+  filter: contrast(1.04) saturate(0.95);
+}
+
+[data-panel="reagent-shelf"] [class*="rounded-xl"]:hover {
+  border-color: rgba(103,232,249,0.22);
+}
+
+[data-panel="observation-log"] {
+  color-scheme: dark;
+}
+
+.lavoisier-panel {
+  background:
+    linear-gradient(180deg, rgba(15,23,42,0.98), rgba(5,9,20,0.96)) !important;
+  border-color: rgba(226,232,240,0.11) !important;
+  box-shadow:
+    0 34px 100px rgba(0,0,0,0.52),
+    0 0 0 1px rgba(103,232,249,0.055),
+    inset 0 1px 0 rgba(255,255,255,0.08) !important;
+}
+
+.premium-agent-orb {
+  box-shadow:
+    0 18px 56px rgba(0,0,0,0.44),
+    0 0 0 1px rgba(103,232,249,0.10),
+    inset 0 1px 0 rgba(255,255,255,0.14) !important;
 }
 
 /* Custom scrollbar for sleeker UI */

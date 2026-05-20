@@ -2326,6 +2326,7 @@ function App() {
     return firstOpen === -1 ? MISSION_SEQUENCE.length - 1 : firstOpen;
   }, [completedMissionIds]);
   const currentLevelPreset = MISSION_SEQUENCE[currentLevelIndex] || MISSION_SEQUENCE[0];
+  const currentMissionBrief = MISSION_BRIEFS[currentLevelPreset];
   const activeMissionPreset = useMemo(
     () => activeChallenge ? MISSION_SEQUENCE.find(preset => MISSION_BRIEFS[preset].challengeId === activeChallenge.id) : undefined,
     [activeChallenge]
@@ -2514,7 +2515,8 @@ function App() {
   const agentVerticalPlacement = useMemo(() => {
     return agentPosition.y + AGENT_ORB_HEIGHT / 2 >= agentViewport.height / 2 ? 'up' : 'down';
   }, [agentPosition.y, agentViewport.height]);
-  const showFloatingAgent = true;
+  const isMissionSelectOpen = gameMode === 'challenge' && placedItems.length === 0 && brokenGlass.length === 0;
+  const showFloatingAgent = !isMissionSelectOpen || agentExpanded;
 
   const appendAgentMessage = useCallback((text: string) => {
     setAgentMessages(prev => [...prev, { id: createRuntimeId('agent-msg'), role: 'agent' as const, text }].slice(-8));
@@ -3313,9 +3315,9 @@ function App() {
   return (
     <>
       {/* Main App Container */}
-      <div className="flex w-full max-w-[1440px] min-h-screen md:h-screen mx-auto text-[var(--text-primary)] font-sans flex-col relative overflow-hidden" style={{ background: 'var(--bg-base)' }}>
+      <div className="chem-studio-shell flex w-full max-w-[1440px] min-h-screen md:h-screen mx-auto text-[var(--text-primary)] font-sans flex-col relative overflow-hidden" style={{ background: 'var(--bg-base)' }}>
         {/* TOP BAR */}
-        <header className="min-h-[56px] w-[calc(100%-24px)] flex items-center justify-between flex-wrap gap-3 px-6 py-3 shrink-0 glass-panel mx-auto mt-3">
+        <header className="app-command-bar min-h-[56px] w-[calc(100%-24px)] flex items-center justify-between flex-wrap gap-3 px-6 py-3 shrink-0 glass-panel mx-auto mt-3">
           <div className="flex items-center gap-4">
             <div className="font-bold text-[18px] text-white">ChemLab Pro</div>
             <div className="h-4 w-[1px] bg-[rgba(255,255,255,0.15)]"></div>
@@ -3363,10 +3365,10 @@ function App() {
         </header>
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 flex gap-3 min-h-0 w-full mt-3 px-3 relative">
+        <main className="flex-1 flex gap-4 min-h-0 w-full mt-3 px-3 relative">
           
           {/* LEFT SIDEBAR - Desktop (Fixed) & Tablet (Collapsed/Overlay) */}
-          <aside className={`h-full flex flex-col shrink-0 transition-all duration-250 ease-out z-30 ${isTablet ? (sidebarOpen ? 'absolute left-3 top-0 bottom-0 w-[260px] glass-panel shadow-2xl p-4 pointer-events-auto' : 'absolute left-3 top-0 bottom-0 w-0 overflow-hidden p-0 pointer-events-none') : 'w-[260px] glass-panel p-4'}`}>
+          <aside className={`h-full flex flex-col shrink-0 transition-all duration-250 ease-out z-30 ${isTablet ? (sidebarOpen ? 'absolute left-3 top-0 bottom-0 w-[260px] glass-panel shadow-2xl p-4 pointer-events-auto' : 'absolute left-3 top-0 bottom-0 w-0 overflow-hidden p-0 pointer-events-none') : 'w-[260px] tool-rail glass-panel p-4'}`}>
             <div className={`flex items-center justify-between mb-4 ${isTablet && !sidebarOpen ? 'opacity-0' : 'opacity-100'}`}>
               <h2 className="text-[#e2e8f0] text-[16px] font-semibold">{gameMode === 'challenge' ? '可用器材' : '器材库'}</h2>
               <button 
@@ -3407,7 +3409,7 @@ function App() {
           <section
             ref={workspaceRef}
             data-panel="workspace"
-            className="flex-1 h-full min-h-[calc(100svh-220px)] md:min-h-0 relative rounded-[16px] overflow-hidden flex flex-col items-center justify-center z-0 workspace-canvas shadow-[inset_0_0_100px_rgba(0,0,0,0.5)] border border-[rgba(255,255,255,0.05)] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[rgba(30,41,59,0.3)] to-transparent">
+            className="studio-workspace flex-1 h-full min-h-[calc(100svh-220px)] md:min-h-0 relative rounded-[24px] overflow-hidden flex flex-col items-center justify-center z-0 workspace-canvas border border-[rgba(255,255,255,0.06)]">
             
             {/* Grid Background Overlay for scientific feel */}
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+CjxwYXRoIGQ9Ik0wIDBoNDB2NDBIMHoiIGZpbGw9Im5vbmUiLz4KPHBhdGggZD0iTTAgNDBoNDBNNDAgMHY0MCIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDMpIiBzdHJva2Utd2lkdGg9IjEiLz4KPC9zdmc+')] opacity-50 pointer-events-none" />
@@ -3432,7 +3434,7 @@ function App() {
             )}
             
             {/* Global Undo Button and Thermo Chart */}
-            <div className="absolute bottom-4 left-4 z-[9999] flex flex-col items-start gap-2 pointer-events-none max-w-[220px]">
+            <div className={`absolute bottom-4 left-4 z-[9999] flex flex-col items-start gap-2 pointer-events-none max-w-[220px] ${isMissionSelectOpen ? 'hidden' : ''}`}>
               {isTablet && !sidebarOpen && (
                 <button
                   onClick={() => setSidebarOpen(true)}
@@ -3931,8 +3933,8 @@ function App() {
             </AnimatePresence>
 
             {placedItems.length === 0 && brokenGlass.length === 0 && gameMode === 'challenge' ? (
-              <div data-panel="challenge-mission-select" className="absolute inset-0 z-[20] flex w-full flex-col items-center overflow-y-auto px-4 pb-6 pt-[232px] sm:pt-[116px]">
-                <div data-panel="mission-library-card" className={`mb-4 min-h-[224px] w-full overflow-hidden rounded-[28px] border border-white/8 bg-[rgba(7,11,23,0.62)] backdrop-blur-2xl ${isTablet ? 'pl-24' : ''}`}>
+              <div data-panel="challenge-mission-select" className="mission-select absolute inset-0 z-[20] flex w-full flex-col items-center overflow-y-auto px-5 pb-7 pt-[232px] sm:pt-[116px]">
+                <div data-panel="mission-library-card" className={`mission-hero mb-4 min-h-[224px] w-full overflow-hidden rounded-[30px] border border-white/8 bg-[rgba(7,11,23,0.62)] backdrop-blur-2xl ${isTablet ? 'pl-24' : ''}`}>
                   <div className="grid gap-0 md:grid-cols-[0.95fr_1.35fr]">
                     <div className="relative min-h-[158px] border-b border-white/8 p-5 md:border-b-0 md:border-r">
                       <div className="absolute -left-16 -top-16 h-44 w-44 rounded-full bg-[#22d3ee]/12 blur-3xl" />
@@ -3984,67 +3986,101 @@ function App() {
                   </div>
                 </div>
 
-                <div className={`grid w-full grid-cols-1 gap-3 md:grid-cols-3 ${isTablet ? 'pl-24' : ''}`}>
-                  {MISSION_SEQUENCE.map((preset, index) => {
-                    const mission = MISSION_BRIEFS[preset];
+                <div className={`mission-focus-row grid w-full grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_310px] ${isTablet ? 'pl-24' : ''}`}>
+                  {(() => {
+                    const mission = currentMissionBrief;
                     const accent = getMissionAccentClasses(mission.accent);
                     const isMissionDone = completedMissionIds.has(mission.challengeId);
-                    const isCurrentLevel = index === currentLevelIndex && !isMissionDone;
                     return (
                       <motion.button
-                        key={mission.title}
+                        key={mission.challengeId}
                         type="button"
-                        onClick={() => mission.preset && launchQuickStart(mission.preset)}
+                        onClick={() => launchQuickStart(mission.preset)}
                         whileHover={{ y: -3 }}
                         whileTap={{ scale: 0.985 }}
-                        className={`group relative min-h-[176px] overflow-hidden rounded-[26px] border bg-[rgba(7,11,23,0.66)] p-4 text-left backdrop-blur-xl transition-colors duration-200 hover:bg-[rgba(15,23,42,0.76)] ${isMissionDone ? 'border-[#10b981]/28 shadow-[0_0_24px_rgba(16,185,129,0.10)]' : isCurrentLevel ? 'border-[#22d3ee]/42 shadow-[0_0_30px_rgba(34,211,238,0.13)]' : accent.ring}`}
+                        className={`mission-card mission-card-current mission-spotlight group relative min-h-[238px] overflow-hidden rounded-[28px] border bg-[rgba(7,11,23,0.66)] p-6 text-left backdrop-blur-xl transition-colors duration-200 hover:bg-[rgba(15,23,42,0.76)] ${isMissionDone ? 'border-[#10b981]/28' : 'border-[#22d3ee]/42'}`}
                       >
-                        <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-50 blur-2xl transition-opacity group-hover:opacity-80" style={{ backgroundColor: isMissionDone ? '#10b981' : MISSION_SUCCESS_META[mission.challengeId]?.accent }} />
-                        <div className={`absolute right-4 top-4 flex h-7 min-w-7 items-center justify-center rounded-full text-[11px] font-bold ${isMissionDone ? 'border border-[#10b981]/30 bg-[#10b981]/12 text-[#86efac]' : accent.dot}`}>
-                          {isMissionDone ? '✓' : String(index + 1).padStart(2, '0')}
-                        </div>
-                        <div className="relative pr-9">
-                          <div className="mb-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">
-                            <span>第 {index + 1} 关</span>
-                            <span>{mission.family}</span>
-                            <span className="rounded-full border border-white/8 bg-white/[0.035] px-2 py-0.5 tracking-normal text-[#94a3b8]">
-                              证据链 {MISSION_PROOFS[mission.challengeId]?.checkpoints.length || 0}
-                            </span>
-                            {isCurrentLevel && (
-                              <span className="rounded-full border border-[#22d3ee]/22 bg-[#22d3ee]/10 px-2 py-0.5 tracking-normal text-[#67e8f9]">当前</span>
-                            )}
-                            {isMissionDone && (
-                              <span className="rounded-full border border-[#10b981]/22 bg-[#10b981]/10 px-2 py-0.5 tracking-normal text-[#86efac]">已完成</span>
-                            )}
-                          </div>
-                          <div className="text-[16px] font-semibold text-[#f8fafc]">{mission.title}</div>
-                          <div className="mt-2 text-[13px] font-medium text-[#cbd5e1]">{mission.signal}</div>
-
-                          <div className="mt-4 flex items-center gap-1.5">
-                            {mission.route.map((step, stepIndex) => (
-                              <div key={step} className="flex min-w-0 items-center gap-1.5">
-                                <span className="truncate rounded-full border border-white/8 bg-white/[0.035] px-2 py-1 text-[10px] text-[#cbd5e1]">{step}</span>
-                                {stepIndex < mission.route.length - 1 && <span className="text-[#475569]">→</span>}
-                              </div>
-                            ))}
-                          </div>
-
-                          <div className="mt-4 flex flex-wrap gap-1.5">
-                            {mission.reagents.slice(0, 4).map(reagent => (
-                              <span key={reagent} className="rounded-full border border-white/8 bg-black/14 px-2 py-1 text-[10px] text-[#94a3b8]">
-                                {reagent.replace('指示剂', '')}
+                        <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full opacity-55 blur-2xl transition-opacity group-hover:opacity-85" style={{ backgroundColor: isMissionDone ? '#10b981' : MISSION_SUCCESS_META[mission.challengeId]?.accent }} />
+                        <div className="relative grid h-full gap-5 md:grid-cols-[minmax(0,1fr)_220px]">
+                          <div className="min-w-0">
+                            <div className="mb-3 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">
+                              <span>第 {currentLevelIndex + 1} 关</span>
+                              <span>{mission.family}</span>
+                              <span className="rounded-full border border-white/8 bg-white/[0.035] px-2 py-0.5 tracking-normal text-[#94a3b8]">
+                                证据链 {MISSION_PROOFS[mission.challengeId]?.checkpoints.length || 0}
                               </span>
-                            ))}
+                              <span className={`rounded-full border px-2 py-0.5 tracking-normal ${isMissionDone ? 'border-[#10b981]/22 bg-[#10b981]/10 text-[#86efac]' : 'border-[#22d3ee]/22 bg-[#22d3ee]/10 text-[#67e8f9]'}`}>
+                                {isMissionDone ? '已完成' : '当前'}
+                              </span>
+                            </div>
+                            <div className="text-[28px] font-semibold leading-tight tracking-[-0.045em] text-[#f8fafc]">{mission.title}</div>
+                            <div className="mt-3 text-[15px] font-medium text-[#cbd5e1]">{mission.signal}</div>
+                            <div className="mt-6 flex flex-wrap items-center gap-2">
+                              {mission.route.map((step, stepIndex) => (
+                                <div key={step} className="flex min-w-0 items-center gap-2">
+                                  <span className="truncate rounded-full border border-white/8 bg-white/[0.04] px-3 py-1.5 text-[11px] text-[#dbeafe]">{step}</span>
+                                  {stepIndex < mission.route.length - 1 && <span className="text-[#475569]">→</span>}
+                                </div>
+                              ))}
+                            </div>
                           </div>
 
-                          <div className="mt-5 flex items-center justify-between gap-3">
-                            <span className="truncate text-[11px] text-[#64748b]">{mission.branch}</span>
-                            <span className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${isMissionDone ? 'border-[#10b981]/30 bg-[#10b981]/10 text-[#bbf7d0] hover:bg-[#10b981]/16' : isCurrentLevel ? 'border-[#22d3ee]/35 bg-[#22d3ee]/12 text-[#a5f3fc]' : accent.button}`}>{isMissionDone ? '再试' : isCurrentLevel ? '继续' : '挑战'}</span>
+                          <div className="relative flex min-h-[132px] flex-col justify-between rounded-[24px] border border-white/8 bg-black/15 p-4">
+                            <div className={`absolute right-4 top-4 flex h-9 min-w-9 items-center justify-center rounded-full text-[12px] font-bold ${isMissionDone ? 'border border-[#10b981]/30 bg-[#10b981]/12 text-[#86efac]' : accent.dot}`}>
+                              {isMissionDone ? '✓' : String(currentLevelIndex + 1).padStart(2, '0')}
+                            </div>
+                            <div className="pr-12">
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#64748b]">关键试剂</div>
+                              <div className="mt-3 flex flex-wrap gap-1.5">
+                                {mission.reagents.map(reagent => (
+                                  <span key={reagent} className="rounded-full border border-white/8 bg-black/18 px-2.5 py-1 text-[11px] text-[#cbd5e1]">
+                                    {reagent.replace('指示剂', '')}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="mt-5 flex items-center justify-between gap-3">
+                              <span className="min-w-0 truncate text-[12px] text-[#64748b]">{mission.branch}</span>
+                              <span className={`shrink-0 rounded-full border px-4 py-2 text-[12px] font-semibold transition-colors ${isMissionDone ? 'border-[#10b981]/30 bg-[#10b981]/10 text-[#bbf7d0] hover:bg-[#10b981]/16' : accent.button}`}>{isMissionDone ? '再试' : '开始'}</span>
+                            </div>
                           </div>
                         </div>
                       </motion.button>
                     );
-                  })}
+                  })()}
+
+                  <div className="mission-path-panel rounded-[28px] border border-white/8 bg-[rgba(7,11,23,0.58)] p-4 backdrop-blur-xl">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[12px] font-semibold text-[#e2e8f0]">关卡路线</div>
+                        <div className="mt-0.5 text-[11px] text-[#64748b]">{completedMissionCount}/{MISSION_SEQUENCE.length} 已完成</div>
+                      </div>
+                      <div className="h-2 w-2 rounded-full bg-[#67e8f9] shadow-[0_0_16px_rgba(103,232,249,0.7)]" />
+                    </div>
+                    <div className="space-y-2">
+                      {MISSION_SEQUENCE.map((preset, index) => {
+                        const mission = MISSION_BRIEFS[preset];
+                        const isMissionDone = completedMissionIds.has(mission.challengeId);
+                        const isCurrentLevel = index === currentLevelIndex && !isMissionDone;
+                        return (
+                          <button
+                            key={`path-${mission.challengeId}`}
+                            type="button"
+                            onClick={() => launchQuickStart(mission.preset)}
+                            className={`mission-path-item flex w-full items-center gap-3 rounded-2xl border px-3 py-2 text-left transition-all ${isMissionDone ? 'border-[#10b981]/24 bg-[#10b981]/8' : isCurrentLevel ? 'border-[#22d3ee]/32 bg-[#22d3ee]/10' : 'border-white/7 bg-white/[0.025] hover:border-[#22d3ee]/22 hover:bg-white/[0.04]'}`}
+                          >
+                            <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold ${isMissionDone ? 'bg-[#10b981]/14 text-[#86efac]' : isCurrentLevel ? 'bg-[#22d3ee]/16 text-[#67e8f9]' : 'bg-white/[0.04] text-[#94a3b8]'}`}>
+                              {isMissionDone ? '✓' : String(index + 1).padStart(2, '0')}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[13px] font-medium text-[#e2e8f0]">{mission.title}</span>
+                              <span className="block truncate text-[11px] text-[#64748b]">{mission.signal}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : placedItems.length === 0 && brokenGlass.length === 0 ? (
@@ -4667,7 +4703,7 @@ function App() {
               ? bottomSheetOpen
                 ? 'absolute bottom-3 left-3 right-3 z-20 flex h-[60vh] min-h-0 shrink-0 flex-col gap-3 overflow-hidden rounded-[22px] bg-[#0a0e1a]/90 transition-all duration-250 ease-out'
                 : 'absolute bottom-3 left-1/2 z-20 flex h-[48px] w-[184px] -translate-x-1/2 shrink-0 flex-col overflow-hidden rounded-full transition-all duration-250 ease-out'
-              : 'relative z-20 flex h-full min-h-0 w-[320px] shrink-0 flex-col gap-3 overflow-hidden'
+              : 'inspector-rail relative z-20 flex h-full min-h-0 w-[320px] shrink-0 flex-col gap-3 overflow-hidden'
           }>
             {/* Tablet drag handle */}
             <button 
@@ -4736,7 +4772,7 @@ function App() {
                   data-panel="lavoisier-panel"
                   className={`absolute w-[min(392px,calc(100vw-24px))] ${agentDockSide === 'right' ? 'right-[calc(100%+14px)]' : 'left-[calc(100%+14px)]'} ${agentVerticalPlacement === 'up' ? 'bottom-0' : 'top-0'} ${agentVerticalPlacement === 'up' ? (agentDockSide === 'right' ? 'origin-bottom-right' : 'origin-bottom-left') : (agentDockSide === 'right' ? 'origin-top-right' : 'origin-top-left')}`}
                 >
-                  <div className="rounded-[30px] border border-white/10 bg-[rgba(7,11,23,0.96)] backdrop-blur-2xl px-4 py-4 shadow-[0_26px_80px_rgba(2,6,23,0.52)]">
+                  <div className="lavoisier-panel rounded-[30px] border border-white/10 bg-[rgba(7,11,23,0.96)] backdrop-blur-2xl px-4 py-4 shadow-[0_26px_80px_rgba(2,6,23,0.52)]">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex items-center gap-3 text-[#e2e8f0]">
                         <div className="relative h-12 w-12 shrink-0 rounded-full border border-white/12 bg-[rgba(15,23,42,0.82)] p-1 shadow-[inset_0_1px_12px_rgba(255,255,255,0.12),0_0_24px_rgba(34,211,238,0.12)]">
@@ -4871,7 +4907,7 @@ function App() {
               }}
               aria-label="拖动或展开拉瓦锡助手"
               title={agentHasFreshUpdate ? (agentRemoteHeadline || '实验有变化') : '问拉瓦锡'}
-              className={`group relative h-[84px] w-[84px] rounded-full border border-white/12 bg-[rgba(8,12,24,0.84)] backdrop-blur-xl overflow-visible shadow-[0_18px_42px_rgba(2,6,23,0.38)] select-none touch-none transition-transform hover:scale-[1.03] ${agentIsDragging ? 'cursor-grabbing scale-[1.04]' : 'cursor-grab'}`}
+              className={`premium-agent-orb group relative h-[84px] w-[84px] rounded-full border border-white/12 bg-[rgba(8,12,24,0.84)] backdrop-blur-xl overflow-visible shadow-[0_18px_42px_rgba(2,6,23,0.38)] select-none touch-none transition-transform hover:scale-[1.03] ${agentIsDragging ? 'cursor-grabbing scale-[1.04]' : 'cursor-grab'}`}
               style={{ boxShadow: `${agentIntentMeta.orbGlow}, 0 18px 42px rgba(2,6,23,0.38)` }}
             >
               <motion.span
@@ -4910,7 +4946,7 @@ function App() {
         </main>
 
         {/* BOTTOM STATUS BAR */}
-        <footer className="min-h-[36px] w-[calc(100%-24px)] mt-3 mb-3 flex items-center justify-between flex-wrap gap-x-4 gap-y-1.5 px-6 py-2 shrink-0 z-10 text-[12px] text-[#94a3b8] glass-panel mx-auto relative">
+        <footer className="app-status-bar min-h-[36px] w-[calc(100%-24px)] mt-3 mb-3 flex items-center justify-between flex-wrap gap-x-4 gap-y-1.5 px-6 py-2 shrink-0 z-10 text-[12px] text-[#94a3b8] glass-panel mx-auto relative">
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse"></div>
