@@ -292,6 +292,21 @@ body::before {
   box-shadow: 0 22px 70px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.06) !important;
 }
 
+.phenomenon-tag {
+  animation: phenomenon-breathe 1.8s ease-in-out infinite;
+}
+
+@keyframes phenomenon-breathe {
+  0%, 100% { filter: saturate(1); }
+  50% { filter: saturate(1.24) brightness(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phenomenon-tag {
+    animation: none;
+  }
+}
+
 [data-panel="reagent-shelf"] img {
   filter: contrast(1.04) saturate(0.95);
 }

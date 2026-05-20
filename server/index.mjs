@@ -245,6 +245,9 @@ function sanitizeMissionContext(mission) {
     stepCount: Number.isFinite(mission.stepCount) ? Number(mission.stepCount) : null,
     evidenceScore: Number.isFinite(mission.evidenceScore) ? Number(mission.evidenceScore) : null,
     integrity: Number.isFinite(mission.integrity) ? Number(mission.integrity) : null,
+    hintUses: Number.isFinite(mission.hintUses) ? Number(mission.hintUses) : null,
+    lastPenalty: sanitizeString(mission.lastPenalty, undefined, 80),
+    coachLine: sanitizeString(mission.coachLine, undefined, 80),
     nextAction: sanitizeString(mission.nextAction, undefined, 60),
     proof: proof
       ? {
@@ -441,7 +444,7 @@ function normalizeAssistantText(text) {
     .trim()
 }
 
-function compactAssistantText(text, maxChars = 160) {
+function compactAssistantText(text, maxChars = 140) {
   const normalized = normalizeAssistantText(text)
   if (!normalized) return ''
   const sentences = normalized.match(/[^。！？.!?]+[。！？.!?]?/g) || [normalized]
@@ -537,7 +540,7 @@ function buildLlmInstruction(contextDigest) {
     '如果上下文没有明确试剂或主容器，就说“还没拿到具体体系/需要先聚焦容器或查看日志”，不要编造实验。',
     '不要把内部字段名或调试信息说给用户：禁止输出“risks为空”“context显示”“localSignals”“沙盒模式下风险较低”等表述。可改写为“当前读数未显示温度、压力或满量风险”。',
     '安全建议必须先基于当前读数和已知物质；未知物质时只给通用 PPE、小体积加料、通风、避免飞溅建议。',
-    'reply 字段要像产品内实验导师，不要像报告：禁止 Markdown、粗体、项目符号和长编号清单；总长尽量低于 140 个中文字符。',
+    'reply 字段要像产品内实验导师，不要像报告：禁止 Markdown、粗体、项目符号和长编号清单；总长尽量低于 110 个中文字符。',
     '回答“解释现象/下一步/做对了吗”这类演示问题时，优先用最多 3 行短句：现象：…；原因：…；下一步：…。信息不足时只说缺什么和一个最小动作。',
     '必须输出 JSON 对象，不要输出 Markdown，不要输出代码块。',
     'JSON 结构：{"reply": string, "headline": string, "suggestedPrompts": string[], "toolCalls": Array<{"type": "focus_container"|"open_logs"|"open_reagents"|"save_note", "targetId"?: string, "note"?: string}>, "statusLabel"?: string}',

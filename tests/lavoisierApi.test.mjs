@@ -258,6 +258,11 @@ test('Lavoisier prompt carries mission proof state for tutor-style guidance', as
           completed: false,
           doneCount: 3,
           stepCount: 6,
+          evidenceScore: 60,
+          integrity: 88,
+          hintUses: 1,
+          lastPenalty: '证据误判：Ag⁺',
+          coachLine: '现象已出现，判断“离子”。',
           nextAction: '回答证据：离子',
           proof: {
             solvedCount: 0,
@@ -290,7 +295,10 @@ test('Lavoisier prompt carries mission proof state for tutor-style guidance', as
     })
 
     const systemPrompt = capturedRequest.messages[0].content
-    assert.match(systemPrompt, /mission\.productReady=true/)
+    assert.match(systemPrompt, /"productReady":true/)
+    assert.match(systemPrompt, /"hintUses":1/)
+    assert.match(systemPrompt, /"lastPenalty":"证据误判：Ag⁺"/)
+    assert.match(systemPrompt, /"coachLine":"现象已出现，判断“离子”。"/)
     assert.match(systemPrompt, /蓝绿色絮状沉淀锁定哪个阳离子/)
     assert.match(systemPrompt, /线索：蓝绿色/)
     assert.deepEqual(capturedRequest.chat_template_kwargs, { enable_thinking: false })

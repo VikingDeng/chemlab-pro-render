@@ -54,6 +54,9 @@ export const RealisticBeaker: React.FC<GlassProps> = ({
   // Darker shade for edge depth, keeping transparency
   const depthColor = `rgba(${Math.max(0, r - 30)}, ${Math.max(0, g - 30)}, ${Math.max(0, b - 30)}, ${a + 0.1})`;
   const isPrecipitate = reactionType?.includes('precipitate');
+  const isGasLike = Boolean(reactionType?.includes('gas') || reactionType === 'redox_kmno4');
+  const isComplex = Boolean(reactionType?.includes('complex'));
+  const isLayered = organicVolume > 0 && volume > 0;
   const reactionParticles: ReactionParticle[] = particles;
 
   return (
@@ -154,6 +157,16 @@ export const RealisticBeaker: React.FC<GlassProps> = ({
                 />
               )}
 
+              {/* Animated phase boundary: makes extraction / layering readable from a distance */}
+              {isLayered && (
+                <motion.div
+                  className="absolute left-0 right-0 z-[6] h-[2px] bg-white/70 shadow-[0_0_12px_rgba(255,255,255,0.5)]"
+                  style={organicIsTop ? { top: `${organicPercent}%` } : { bottom: `${organicPercent}%` }}
+                  animate={{ opacity: [0.45, 0.95, 0.45], scaleX: [0.82, 1, 0.82] }}
+                  transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
+                />
+              )}
+
               {/* Liquid Surface Meniscus (Surface Tension / Meniscus Edge) */}
               <div 
                 className="absolute top-[-6px] left-[-3px] right-[-3px] h-[12px] rounded-[100%]" 
@@ -190,6 +203,32 @@ export const RealisticBeaker: React.FC<GlassProps> = ({
                      backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")'
                    }}
                  />
+              )}
+
+              {/* Complexation / color-change bloom: subtle, fast, non-popup feedback */}
+              {isComplex && isReacting && (
+                <motion.div
+                  className="absolute inset-0 z-[4] rounded-[30%] mix-blend-screen pointer-events-none"
+                  style={{
+                    background: `radial-gradient(circle at 50% 55%, ${particleColor} 0%, transparent 62%)`,
+                  }}
+                  animate={{ opacity: [0, 0.55, 0.16], scale: [0.72, 1.08, 1] }}
+                  transition={{ duration: 1.1, ease: "easeOut" }}
+                />
+              )}
+
+              {/* Gas nucleation bed: bubbles visibly start inside the liquid, not as random sparkles */}
+              {isGasLike && isReacting && (
+                <motion.div
+                  className="absolute bottom-0 left-[8%] right-[8%] z-[4] h-[42%] rounded-t-full pointer-events-none"
+                  style={{
+                    backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.78) 0 1px, transparent 1.8px)',
+                    backgroundSize: '12px 10px',
+                    maskImage: 'linear-gradient(180deg, transparent, black 35%, black)',
+                  }}
+                  animate={{ opacity: [0.12, 0.42, 0.12], y: [8, -2, 8] }}
+                  transition={{ repeat: Infinity, duration: 1.25, ease: "easeInOut" }}
+                />
               )}
 
               {/* Settled precipitate layer (Microscopic Lattice / Crystals) */}

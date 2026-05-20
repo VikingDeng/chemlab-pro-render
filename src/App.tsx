@@ -131,6 +131,7 @@ type MissionCompletionCard = {
   integrity: number;
   evidenceScore: number;
   mistakes: number;
+  recap: MissionRecap;
 };
 
 type MissionCue = {
@@ -168,6 +169,13 @@ type MissionProofAnswer = {
   selectedId: string;
   correct: boolean;
   attempts: number;
+};
+
+type MissionRecap = {
+  coachLine: string;
+  routeLine: string;
+  weakPoint: string;
+  badges: string[];
 };
 
 type MissionRunStats = {
@@ -234,6 +242,8 @@ const MISSION_PROOF_PENALTY = 18;
 const MISSION_PREDICTION_PENALTY = 22;
 const MISSION_WRONG_ORDER_PENALTY = 12;
 const MISSION_SIDE_REAGENT_PENALTY = 8;
+const PHENOMENON_TAG_VISIBLE_MS = 12000;
+const PHENOMENON_TAG_STALE_MS = 18000;
 const PUBLIC_LAVOISIER_API_URL = 'https://chemlab-pro.onrender.com/api/lavoisier';
 const PREP_CU_TARGET = '鉴定未知样品 A，制备蓝绿色 Cu(OH)₂ 沉淀';
 const PREP_AG_TARGET = '鉴定未知样品 B，制备白色 AgCl 沉淀';
@@ -795,6 +805,56 @@ function getMissionGrade(integrity: number) {
   return { grade: '未评级', stars: 0 };
 }
 
+function getMissionFinalGrade(integrity: number, stats: MissionRunStats) {
+  const base = getMissionGrade(integrity);
+  const mistakes = stats.wrongProofs + stats.wrongReagents;
+  if (base.grade === 'S' && (mistakes > 0 || stats.hintUses > 0)) {
+    return { grade: 'A', stars: 2 };
+  }
+  if (base.grade === 'A' && mistakes >= 2) {
+    return { grade: 'B', stars: 1 };
+  }
+  return base;
+}
+
+function buildMissionRecap(
+  challengeId: string,
+  stats: MissionRunStats,
+  proof: MissionProof | undefined,
+  answers: Record<string, MissionProofAnswer>,
+  evidenceScore: number,
+): MissionRecap {
+  const preset = MISSION_SEQUENCE.find(entry => MISSION_BRIEFS[entry].challengeId === challengeId);
+  const mission = preset ? MISSION_BRIEFS[preset] : null;
+  const mistakes = stats.wrongProofs + stats.wrongReagents;
+  const controlSolved = Boolean(proof?.checkpoints.some(checkpoint => checkpoint.stage === 'control' && answers[checkpoint.id]?.correct));
+  const badges = [
+    mistakes === 0 ? '零失误' : `失误 ${mistakes}`,
+    stats.hintUses === 0 ? '无提示' : `提示 ${stats.hintUses}`,
+    controlSolved ? '完成对照' : '证据链完成',
+  ];
+  const weakPoint = stats.lastPenalty
+    ? stats.lastPenalty
+    : stats.wrongProofs > 0
+    ? '证据判断还可更稳'
+    : stats.wrongReagents > 0
+    ? '试剂顺序还可更准'
+    : '路线干净';
+  const routeLine = mission ? mission.route.join(' → ') : '主线完成';
+  const coachLine = evidenceScore >= 100 && mistakes === 0
+    ? '预测、现象、解释、对照全部闭环。'
+    : controlSolved
+    ? '现象成立；复盘扣分点，下次争取 S。'
+    : '现象成立；补强对照判断会更像真实实验。';
+
+  return {
+    coachLine,
+    routeLine,
+    weakPoint,
+    badges,
+  };
+}
+
 function missionReagentMatchesAction(reagentName: string, actionLabel: string | null) {
   if (!actionLabel) return true;
   const reagent = normalizeMissionToken(reagentName);
@@ -1312,6 +1372,31 @@ function buildReactionSpotlight(reagentName: string, result: ReactionResult): Re
   };
 }
 
+function getPhenomenonTag(item: PlacedItem, timeSinceReaction: number, showPersistent = false) {
+  const state = item.state || '';
+  const hasRecentReaction = Boolean(item.lastReactionTime && timeSinceReaction < PHENOMENON_TAG_VISIBLE_MS);
+  if (!hasRecentReaction && !showPersistent) return null;
+
+  const layered = (item.chemState.organicVolume || 0) > 0 && (item.chemState.volume || 0) > 0;
+
+  if (layered) {
+    return { label: '双相分层', accent: '#a855f7', tone: 'layer' };
+  }
+  if (state.includes('gas_co2') || state === 'redox_kmno4') {
+    return { label: '持续冒泡', accent: '#f59e0b', tone: 'gas' };
+  }
+  if (state.includes('precipitate')) {
+    return { label: hasRecentReaction ? '絮状沉降' : '沉淀已成', accent: state.includes('ag') ? '#f8fafc' : '#22d3ee', tone: 'precipitate' };
+  }
+  if (state.includes('complex')) {
+    return { label: '显色络合', accent: state.includes('fe') ? '#fb7185' : '#2563eb', tone: 'complex' };
+  }
+  if (state.includes('redox')) {
+    return { label: '氧化还原', accent: '#a855f7', tone: 'redox' };
+  }
+  return null;
+}
+
 function DiscoveryAtlasModal({ cards, onClose }: { cards: DiscoveryCardView[]; onClose: () => void }) {
   const unlockedCount = cards.filter(card => card.unlocked).length;
 
@@ -1599,8 +1684,9 @@ function App() {
   const [isThermoChartOpen, setIsThermoChartOpen] = useState(false);
   const [renderNow, setRenderNow] = useState<number>(0);
   const hasTimedVisualEffects = placedItems.some(item => {
-    if (!item.state || !item.lastReactionTime) return false;
-    return item.state.includes('precipitate') || item.state === 'neutralize' || item.state === 'redox_silver_mirror' || item.state === 'complex_cu_nh3';
+    if (!item.lastReactionTime) return false;
+    if (renderNow && renderNow - item.lastReactionTime > PHENOMENON_TAG_STALE_MS) return false;
+    return Boolean(item.state || (item.chemState.organicVolume || 0) > 0);
   });
 
   const syncReadouts = useCallback((chemState?: ChemState | null) => {
@@ -2761,7 +2847,7 @@ function App() {
   const activeMissionStats = activeChallenge
     ? (missionRunStats[activeChallenge.id] || createMissionRunStats())
     : createMissionRunStats();
-  const activeMissionGrade = getMissionGrade(activeMissionStats.integrity);
+  const activeMissionGrade = getMissionFinalGrade(activeMissionStats.integrity, activeMissionStats);
   const activeMissionCanComplete = activeMissionStats.integrity >= MISSION_MIN_INTEGRITY;
   const activeMissionFailed = Boolean(activeChallenge && !activeChallenge.completed && activeMissionStats.integrity < MISSION_MIN_INTEGRITY);
   const showMissionProofPanel = Boolean(
@@ -2846,6 +2932,16 @@ function App() {
     if (challengeNextAction) return `做 ${compactMissionLabel(challengeNextAction)}`;
     return '观察';
   }, [activeChallenge, activeMissionCanComplete, activeMissionFailed, activeMissionProof, activePredictionCheckpoint, activeProofCurrent, activeProofSolved, challengeNextAction, challengeProductReady, challengeQuickReagent, shouldShowPredictionGate]);
+  const challengeCoachLine = useMemo(() => {
+    if (!activeChallenge) return '';
+    if (activeMissionFailed) return '样本失效：重开本关，先按主线验证。';
+    if (activeChallenge.completed) return '本关闭环，进入下一关或复盘现象。';
+    if (shouldShowPredictionGate && activeProofCurrent) return '先预测，再动手验证。';
+    if (challengeProductReady && activeProofCurrent) return `现象已出现，判断“${activeProofCurrent.label}”。`;
+    if (challengeQuickReagent) return `下一步加入 ${compactMissionLabel(challengeQuickReagent)}。`;
+    if (challengeNextAction) return `先完成 ${compactMissionLabel(challengeNextAction)}。`;
+    return '观察颜色、沉淀、气泡或分层。';
+  }, [activeChallenge, activeMissionFailed, activeProofCurrent, challengeNextAction, challengeProductReady, challengeQuickReagent, shouldShowPredictionGate]);
   const challengeActionOptions = useMemo(() => {
     if (!challengeInsight || !primaryAgentContainerId || activeChallenge?.completed) return [];
     if (activeMissionFailed) return [];
@@ -3111,6 +3207,9 @@ function App() {
         grade: activeMissionGrade.grade,
         mistakes: activeMissionStats.wrongProofs + activeMissionStats.wrongReagents,
         operations: activeMissionStats.operations,
+        hintUses: activeMissionStats.hintUses,
+        lastPenalty: activeMissionStats.lastPenalty || null,
+        coachLine: challengeCoachLine,
         evidenceScore: activeMissionEvidenceScore,
         nextAction: challengeProductReady && activeMissionProof && !activeProofSolved
           ? (activeProofCurrent ? `回答证据：${activeProofCurrent.label}` : '完成证据链')
@@ -3273,7 +3372,7 @@ function App() {
         agentAbortControllerRef.current = null;
       }
     }
-  }, [activeChallenge, activeMissionBrief, activeMissionEvidenceScore, activeMissionGrade.grade, activeMissionProof, activeMissionStats.integrity, activeMissionStats.operations, activeMissionStats.wrongProofs, activeMissionStats.wrongReagents, activeProofCurrent, activeProofCurrentAnswer, activeProofCurrentFeedback, activeProofSolved, activeProofSolvedCount, agentLastEvent, agentMessages, agentState.goal, agentState.intent, agentState.risks, appendAgentMessage, appendUserMessage, challengeDisplayDoneCount, challengeDisplayStepCount, challengeProductReady, challengeStageLabel, gameMode, placedItems, primaryAgentContainerId, runAgentToolCalls, lavoisierApiUrl, setAgentDraft, setAgentError, setAgentExpanded, setAgentIsLoading, setAgentRemoteHeadline, setAgentRemoteSummary, setAgentStatusLabel, setAgentSuggestedPrompts, shouldShowPredictionGate]);
+  }, [activeChallenge, activeMissionBrief, activeMissionEvidenceScore, activeMissionGrade.grade, activeMissionProof, activeMissionStats.hintUses, activeMissionStats.integrity, activeMissionStats.lastPenalty, activeMissionStats.operations, activeMissionStats.wrongProofs, activeMissionStats.wrongReagents, activeProofCurrent, activeProofCurrentAnswer, activeProofCurrentFeedback, activeProofSolved, activeProofSolvedCount, agentLastEvent, agentMessages, agentState.goal, agentState.intent, agentState.risks, appendAgentMessage, appendUserMessage, challengeCoachLine, challengeDisplayDoneCount, challengeDisplayStepCount, challengeProductReady, challengeStageLabel, gameMode, placedItems, primaryAgentContainerId, runAgentToolCalls, lavoisierApiUrl, setAgentDraft, setAgentError, setAgentExpanded, setAgentIsLoading, setAgentRemoteHeadline, setAgentRemoteSummary, setAgentStatusLabel, setAgentSuggestedPrompts, shouldShowPredictionGate]);
 
   const submitAgentQuery = useCallback((query: string) => {
     void requestLavoisierApi(query, { includeUserMessage: true });
@@ -3488,7 +3587,8 @@ function App() {
     pendingChallengeCompletionRef.current = activeChallenge.id;
     playSound('reaction');
     const meta = getMissionSuccessMeta(activeChallenge.id);
-    const grade = getMissionGrade(runStats.integrity);
+    const grade = getMissionFinalGrade(runStats.integrity, runStats);
+    const recap = buildMissionRecap(activeChallenge.id, runStats, proof, answers, activeMissionEvidenceScore);
     setMissionCompletionCard({
       id: createRuntimeId('mission-complete'),
       challengeId: activeChallenge.id,
@@ -3501,6 +3601,7 @@ function App() {
       integrity: runStats.integrity,
       evidenceScore: activeMissionEvidenceScore,
       mistakes: runStats.wrongProofs + runStats.wrongReagents,
+      recap,
     });
     setCompletedMissionIds(previousIds => {
       if (previousIds.has(activeChallenge.id)) return previousIds;
@@ -4108,6 +4209,9 @@ function App() {
 		                      <div className="mt-1 max-w-[190px] truncate rounded-full border border-[#22d3ee]/20 bg-[#22d3ee]/10 px-2.5 py-1 text-[11px] font-medium text-[#a5f3fc]">
 		                        {challengeStageLabel}
 		                      </div>
+		                      {challengeCoachLine && (
+		                        <div className="mt-1 max-w-[210px] truncate text-[10.5px] text-[#94a3b8]">{challengeCoachLine}</div>
+		                      )}
 	                    </div>
                   </div>
                 </motion.div>
@@ -4225,7 +4329,7 @@ function App() {
                       )}
                     </AnimatePresence>
                   </motion.div>
-                ) : (
+                ) : missionCompletionCard && activeChallenge.completed ? null : (
                   <motion.div
                     data-panel="challenge-action-dock"
                     initial={{ opacity: 0, y: 16 }}
@@ -4291,7 +4395,7 @@ function App() {
                                 {challengePrimaryAction ? `加入 ${compactMissionLabel(challengePrimaryAction.name)}` : '观察现象'}
                               </span>
                             </div>
-                            <div className="mt-1 truncate text-[11px] text-[#8fb5c4]">{challengeInsight.nextHint}</div>
+                            <div className="mt-1 truncate text-[11px] text-[#8fb5c4]">{challengeCoachLine || challengeInsight.nextHint}</div>
                           </button>
 
                           <div className="flex min-w-0 flex-wrap items-center justify-center gap-1.5 sm:justify-end">
@@ -4420,7 +4524,7 @@ function App() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 18, scale: 0.96 }}
                   transition={{ type: 'spring', stiffness: 360, damping: 30 }}
-                  className="absolute bottom-[112px] right-5 z-[130] w-[min(320px,calc(100%-36px))] rounded-[24px] border border-white/14 bg-[rgba(8,13,24,0.9)] p-3 shadow-[0_20px_54px_rgba(2,6,23,0.50)] backdrop-blur-2xl"
+                  className="absolute bottom-[112px] right-5 z-[130] max-h-[min(560px,calc(100%-152px))] w-[min(360px,calc(100%-36px))] overflow-y-auto rounded-[24px] border border-white/14 bg-[rgba(8,13,24,0.9)] p-3 shadow-[0_20px_54px_rgba(2,6,23,0.50)] backdrop-blur-2xl"
                 >
                   <button
                     type="button"
@@ -4457,6 +4561,16 @@ function App() {
 	                  </div>
 	                  <div className="mt-3 rounded-[18px] border border-white/8 bg-white/[0.025] px-3 py-2">
 	                    <MissionEvidenceBar value={missionCompletionCard.evidenceScore} integrity={missionCompletionCard.integrity} />
+	                  </div>
+	                  <div className="mt-3 rounded-[18px] border border-white/8 bg-white/[0.025] px-3 py-2">
+	                    <div className="flex flex-wrap gap-1.5">
+	                      {missionCompletionCard.recap.badges.map(badge => (
+	                        <span key={badge} className="rounded-full border border-white/8 bg-black/20 px-2 py-0.5 text-[10px] text-[#cbd5e1]">{badge}</span>
+	                      ))}
+	                    </div>
+	                    <div className="mt-2 truncate text-[11px] text-[#e2e8f0]">路线：{missionCompletionCard.recap.routeLine}</div>
+	                    <div className="mt-1 truncate text-[11px] text-[#94a3b8]">{missionCompletionCard.recap.coachLine}</div>
+	                    <div className="mt-1 truncate text-[10px] text-[#64748b]">复盘：{missionCompletionCard.recap.weakPoint}</div>
 	                  </div>
 	                  <div className="mt-3 grid grid-cols-3 gap-1.5">
                     <button
@@ -4632,10 +4746,11 @@ function App() {
 	                          );
 	                        })}
                       </div>
-                      <div className="mt-4 grid grid-cols-3 gap-2 text-[11px] text-[#64748b]">
+                      <div className="mt-4 grid grid-cols-4 gap-2 text-[11px] text-[#64748b]">
 	                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">预测</div>
 	                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">验证</div>
 	                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">证据</div>
+	                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">对照</div>
                       </div>
                     </div>
                   </div>
@@ -5254,6 +5369,29 @@ function App() {
                 <div className="relative z-10 pointer-events-auto">
                   {renderPlacedIcon(item)}
                 </div>
+
+                {(() => {
+                  if (!LIQUID_CONTAINER_TYPES.has(item.type)) return null;
+                  const tagTime = item.lastReactionTime && renderNow ? renderNow - item.lastReactionTime : Number.POSITIVE_INFINITY;
+                  const keepTagVisible = focusedItemId === item.id || hoveredItemId === item.id;
+                  const phenomenonTag = getPhenomenonTag(item, tagTime, keepTagVisible);
+                  if (!phenomenonTag) return null;
+
+                  return (
+                    <motion.div
+                      key={`${item.id}-${phenomenonTag.label}`}
+                      initial={{ opacity: 0, y: 4, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                      transition={{ duration: 0.18, ease: 'easeOut' }}
+                      className={`phenomenon-tag pointer-events-none absolute left-1/2 z-[22] -translate-x-1/2 rounded-full border border-white/10 bg-[rgba(7,11,23,0.72)] px-2.5 py-1 text-[10.5px] font-semibold text-white shadow-[0_10px_26px_rgba(2,6,23,0.32)] backdrop-blur-xl ${item.type === 'testtube' ? '-top-[88px]' : '-top-[40px]'}`}
+                      style={{ boxShadow: `0 0 20px ${phenomenonTag.accent}55` }}
+                    >
+                      <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle shadow-[0_0_10px_currentColor]" style={{ backgroundColor: phenomenonTag.accent, color: phenomenonTag.accent }} />
+                      {phenomenonTag.label}
+                    </motion.div>
+                  );
+                })()}
                 
                 {/* Holographic Trace Tooltip */}
                 {(item.type === 'beaker' || item.type === 'flask' || item.type === 'testtube') && hoveredItemId === item.id && (
