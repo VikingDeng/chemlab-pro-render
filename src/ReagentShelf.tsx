@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
 
 export interface ReagentProps {
   category: ReagentCategory;
@@ -35,6 +34,15 @@ type WorkspaceDragStateDetail = {
   kind: 'reagent';
   name: string;
   point?: DragPoint;
+};
+
+type ActiveReagentPointer = {
+  pointerId: number;
+  item: ReagentProps;
+  start: DragPoint;
+  last: DragPoint;
+  dragging: boolean;
+  element: HTMLDivElement;
 };
 
 const REAGENT_IMAGE_BY_NAME: Record<string, string> = {
@@ -157,9 +165,11 @@ export function ReagentShelf({
 }: ReagentShelfProps) {
   const [activeCategory, setActiveCategory] = useState<'全部' | ReagentCategory>('全部');
   const [dragGhost, setDragGhost] = useState<ReagentProps | null>(null);
+  const [draggingReagentName, setDraggingReagentName] = useState<string | null>(null);
   const effectiveActiveCategory = !showUnknownSamples && activeCategory === '未知样品' ? '全部' : activeCategory;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const dragClickGuardRef = useRef(false);
+  const activePointerRef = useRef<ActiveReagentPointer | null>(null);
   const dragGhostRef = useRef<HTMLDivElement>(null);
   const dragGhostPointRef = useRef<DragPoint | null>(null);
   const dragGhostFrameRef = useRef<number | null>(null);
@@ -223,6 +233,7 @@ export function ReagentShelf({
       if (workspaceDragStateFrameRef.current !== null) {
         cancelAnimationFrame(workspaceDragStateFrameRef.current);
       }
+      document.body.classList.remove('reagent-drag-active');
     };
   }, []);
 
@@ -273,6 +284,9 @@ export function ReagentShelf({
       dragGhostFrameRef.current = null;
     }
     dragGhostPointRef.current = null;
+    activePointerRef.current = null;
+    document.body.classList.remove('reagent-drag-active');
+    setDraggingReagentName(null);
     setDragGhost(null);
   }, []);
 
@@ -293,6 +307,8 @@ export function ReagentShelf({
 
     const beginDragGhost = (point: DragPoint) => {
       setDragGhost(item);
+      setDraggingReagentName(item.name);
+      document.body.classList.add('reagent-drag-active');
       positionDragGhost(point);
     };
 
@@ -306,41 +322,97 @@ export function ReagentShelf({
       }));
     };
 
+    const beginPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      window.getSelection()?.removeAllRanges();
+      const point = { x: event.clientX, y: event.clientY };
+      document.body.classList.add('reagent-drag-active');
+      activePointerRef.current = {
+        pointerId: event.pointerId,
+        item,
+        start: point,
+        last: point,
+        dragging: false,
+        element: event.currentTarget,
+      };
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    };
+
+    const movePointer = (event: React.PointerEvent<HTMLDivElement>) => {
+      const active = activePointerRef.current;
+      if (!active || active.pointerId !== event.pointerId) return;
+      const point = { x: event.clientX, y: event.clientY };
+      active.last = point;
+      const distance = Math.hypot(point.x - active.start.x, point.y - active.start.y);
+
+      if (!active.dragging && distance >= 4) {
+        active.dragging = true;
+        dragClickGuardRef.current = true;
+        beginDragGhost(point);
+      }
+
+      if (!active.dragging) return;
+      event.preventDefault();
+      updateWorkspaceDragState(true, point);
+      positionDragGhost(point);
+    };
+
+    const finishPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+      const active = activePointerRef.current;
+      if (!active || active.pointerId !== event.pointerId) return;
+      const point = { x: event.clientX, y: event.clientY };
+      active.last = point;
+      active.element.releasePointerCapture?.(event.pointerId);
+
+      if (active.dragging) {
+        updateWorkspaceDragState(false);
+        clearDragGhost();
+        window.setTimeout(() => {
+          dragClickGuardRef.current = false;
+        }, 0);
+        window.dispatchEvent(new CustomEvent('reagentDrop', {
+          detail: {
+            event: { clientX: point.x, clientY: point.y },
+            info: { point },
+            type: 'reagent',
+            name: item.name,
+            isDrop: true,
+          },
+        }));
+        return;
+      }
+
+      activePointerRef.current = null;
+      document.body.classList.remove('reagent-drag-active');
+      emitQuickAdd();
+    };
+
+    const cancelPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+      const active = activePointerRef.current;
+      if (!active || active.pointerId !== event.pointerId) return;
+      updateWorkspaceDragState(false);
+      clearDragGhost();
+      window.setTimeout(() => {
+        dragClickGuardRef.current = false;
+      }, 0);
+    };
+
+    const isDragging = draggingReagentName === item.name;
+
     return (
-      <motion.div
-        drag
-        dragSnapToOrigin
-        dragElastic={0.08}
-        dragMomentum={false}
-        onClick={emitQuickAdd}
-        onDragStart={(_e, info) => {
-          dragClickGuardRef.current = true;
-          updateWorkspaceDragState(true, info.point);
-          beginDragGhost(info.point);
-        }}
-        onDrag={(_e, info) => {
-          updateWorkspaceDragState(true, info.point);
-          positionDragGhost(info.point);
-        }}
-        onDragEnd={(e, i) => {
-          updateWorkspaceDragState(false);
-          clearDragGhost();
-          window.setTimeout(() => {
-            dragClickGuardRef.current = false;
-          }, 0);
-          const customEvent = new CustomEvent('reagentDrop', {
-            detail: { event: e, info: i, type: 'reagent', name: item.name, isDrop: true }
-          });
-          window.dispatchEvent(customEvent);
-        }}
-        whileDrag={{ scale: 0.98, zIndex: 100, opacity: 0.28, cursor: 'grabbing' }}
+      <div
         key={key}
-        className={`isolate min-h-[68px] flex items-center justify-between pl-2.5 pr-3 py-2 rounded-xl border transition-all duration-200 cursor-grab group relative overflow-visible ${quickAddEnabled ? 'active:scale-[0.99]' : ''} ${isHighlighted
+        onPointerDown={beginPointer}
+        onPointerMove={movePointer}
+        onPointerUp={finishPointer}
+        onPointerCancel={cancelPointer}
+        className={`reagent-card isolate min-h-[68px] flex items-center justify-between pl-2.5 pr-3 py-2 rounded-xl border transition-all duration-200 cursor-grab group relative overflow-visible ${isDragging ? 'reagent-card-dragging opacity-35' : ''} ${quickAddEnabled ? 'active:scale-[0.99]' : ''} ${isHighlighted
           ? 'border-[#22d3ee]/40 bg-[rgba(34,211,238,0.10)] shadow-[0_0_18px_rgba(34,211,238,0.12)]'
           : isSuggested
           ? 'border-[#c084fc]/28 bg-[rgba(168,85,247,0.08)] shadow-[0_0_14px_rgba(168,85,247,0.08)]'
           : 'border-white/6 bg-[rgba(255,255,255,0.02)] hover:border-[#22d3ee]/18 hover:bg-[rgba(34,211,238,0.05)] hover:shadow-[0_0_16px_rgba(34,211,238,0.08)]'} ${isMuted ? 'opacity-50 saturate-[0.75]' : ''}`}
-        style={{ touchAction: 'none' }}
+        style={{ touchAction: 'none', userSelect: 'none' }}
       >
         <div
           className={`absolute inset-0 z-0 transition-opacity duration-200 pointer-events-none rounded-xl ${isHighlighted || isSuggested ? 'opacity-[0.16]' : 'opacity-0 group-hover:opacity-10'}`}
@@ -384,7 +456,7 @@ export function ReagentShelf({
         >
           {item.badgeFormula}
         </div>
-      </motion.div>
+      </div>
     );
   };
 
@@ -393,16 +465,18 @@ export function ReagentShelf({
       {dragGhost && (
         <div
           ref={dragGhostRef}
-          className="pointer-events-none fixed left-0 top-0 z-[9999] flex min-h-[62px] w-[250px] items-center justify-between rounded-2xl border border-[#22d3ee]/34 bg-[rgba(8,13,24,0.92)] px-3 py-2.5 shadow-[0_20px_54px_rgba(2,6,23,0.56),0_0_24px_rgba(34,211,238,0.16)] backdrop-blur-xl will-change-transform"
+          className="reagent-drag-ghost pointer-events-none fixed left-0 top-0 z-[9999] flex min-h-[58px] w-[232px] items-center justify-between rounded-2xl border border-[#22d3ee]/34 bg-[rgba(8,13,24,0.92)] px-3 py-2 shadow-[0_18px_44px_rgba(2,6,23,0.48),0_0_18px_rgba(34,211,238,0.12)] will-change-transform"
           style={{ transform: 'translate3d(-9999px, -9999px, 0) translate(-50%, -50%)' }}
         >
           <div className="flex min-w-0 items-center gap-3">
-            <img
-              src={getReagentImageSrc(dragGhost.name)}
-              alt=""
-              draggable={false}
-              className="h-12 w-12 shrink-0 rounded-2xl border border-white/10 object-cover contrast-[1.04] saturate-[1.08] shadow-[0_10px_22px_rgba(2,6,23,0.35)]"
-            />
+            <span
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-white/12 text-[12px] font-bold text-white shadow-[0_10px_22px_rgba(2,6,23,0.28)]"
+              style={{
+                background: `radial-gradient(circle at 35% 28%, rgba(255,255,255,0.72), ${dragGhost.dot} 42%, rgba(7,16,31,0.98) 100%)`,
+              }}
+            >
+              {dragGhost.category === '未知样品' ? dragGhost.name.replace('未知样品 ', '') : '滴'}
+            </span>
             <span className="truncate text-[14px] font-semibold text-white">{dragGhost.name}</span>
           </div>
           <span

@@ -296,6 +296,33 @@ body::before {
   filter: contrast(1.04) saturate(0.95);
 }
 
+[data-panel="reagent-shelf"] .reagent-card {
+  contain: layout paint;
+  transform: translateZ(0);
+}
+
+.reagent-drag-active [data-panel="reagent-shelf"] .reagent-card,
+.reagent-drag-active [data-panel="reagent-shelf"] img {
+  transition: none !important;
+  filter: none !important;
+}
+
+.reagent-drag-active,
+.reagent-drag-active * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.reagent-card-dragging {
+  box-shadow: none !important;
+}
+
+.reagent-drag-ghost {
+  contain: layout paint style;
+  transform: translate3d(-9999px, -9999px, 0);
+  backface-visibility: hidden;
+}
+
 [data-panel="reagent-shelf"] [class*="rounded-xl"]:hover {
   border-color: rgba(103,232,249,0.22);
 }
