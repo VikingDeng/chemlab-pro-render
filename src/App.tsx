@@ -126,6 +126,10 @@ type MissionCompletionCard = {
   product: string;
   formula: string;
   accent: string;
+  grade: string;
+  stars: number;
+  integrity: number;
+  mistakes: number;
 };
 
 type MissionCue = {
@@ -154,6 +158,21 @@ type MissionProofCheckpoint = {
 
 type MissionProof = {
   checkpoints: MissionProofCheckpoint[];
+};
+
+type MissionProofAnswer = {
+  selectedId: string;
+  correct: boolean;
+  attempts: number;
+};
+
+type MissionRunStats = {
+  operations: number;
+  wrongReagents: number;
+  wrongProofs: number;
+  hintUses: number;
+  integrity: number;
+  lastPenalty?: string;
 };
 
 type ChallengeActionOption = {
@@ -198,6 +217,7 @@ const AGENT_ORB_WIDTH = 84;
 const AGENT_ORB_HEIGHT = 84;
 const AGENT_FLOATING_MARGIN = 14;
 const AGENT_REQUEST_TIMEOUT_MS = 18000;
+const MISSION_MIN_INTEGRITY = 60;
 const PUBLIC_LAVOISIER_API_URL = 'https://chemlab-pro.onrender.com/api/lavoisier';
 const PREP_CU_TARGET = '鉴定未知样品 A，制备蓝绿色 Cu(OH)₂ 沉淀';
 const PREP_AG_TARGET = '鉴定未知样品 B，制备白色 AgCl 沉淀';
@@ -606,6 +626,89 @@ function compactMissionLabel(value: string) {
     .replace(/[（(].*?[）)]/g, '')
     .replace('指示剂', '')
     .trim();
+}
+
+function normalizeMissionToken(value: string) {
+  return compactMissionLabel(value)
+    .replace(/\s+/g, '')
+    .replace(/⁻/g, '-')
+    .replace(/₂/g, '2')
+    .replace(/₃/g, '3')
+    .replace(/₄/g, '4')
+    .toLowerCase();
+}
+
+function createMissionRunStats(): MissionRunStats {
+  return {
+    operations: 0,
+    wrongReagents: 0,
+    wrongProofs: 0,
+    hintUses: 0,
+    integrity: 100,
+  };
+}
+
+function clampMissionIntegrity(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function getMissionGrade(integrity: number) {
+  if (integrity >= 92) return { grade: 'S', stars: 3 };
+  if (integrity >= 78) return { grade: 'A', stars: 2 };
+  if (integrity >= MISSION_MIN_INTEGRITY) return { grade: 'B', stars: 1 };
+  return { grade: '未评级', stars: 0 };
+}
+
+function missionReagentMatchesAction(reagentName: string, actionLabel: string | null) {
+  if (!actionLabel) return true;
+  const reagent = normalizeMissionToken(reagentName);
+  const action = normalizeMissionToken(actionLabel);
+  if (!action) return true;
+  if (reagent.includes(action) || action.includes(reagent)) return true;
+  if (action.includes('加碱')) return reagent.includes('氢氧化钠') || reagent.includes('氨水') || reagent.includes('naoh');
+  if (action.includes('有机相')) return reagent.includes('四氯化碳') || reagent.includes('正己烷') || reagent.includes('ccl4') || reagent.includes('hexane');
+  if (action.includes('加酸')) return reagent.includes('盐酸') || reagent.includes('硫酸') || reagent.includes('硝酸');
+  if (action.includes('草酸')) return reagent.includes('草酸') || reagent.includes('h2c2o4');
+  return false;
+}
+
+function getMissionReagentEvent(
+  activeChallenge: { id: string; title: string; target: string; completed: boolean; targetId?: string } | null,
+  items: PlacedItem[],
+  reagentName: string,
+) {
+  if (!activeChallenge || activeChallenge.completed) return { penalty: 0 };
+  const insight = computeChallengeInsight(activeChallenge, items);
+  if (!insight) return { penalty: 0 };
+
+  const productReady = computeChallengeCompleted(activeChallenge, items);
+  const nextAction = insight.checklist.find(item => !item.done)?.label || null;
+  const isPrimary = insight.primaryReagents.includes(reagentName);
+  const isSecondary = insight.secondaryReagents.includes(reagentName);
+  const matchesCurrentStep = missionReagentMatchesAction(reagentName, nextAction);
+
+  if (!isPrimary && !isSecondary) {
+    return {
+      penalty: 18,
+      message: `非本关试剂：${compactMissionLabel(reagentName)}`,
+    };
+  }
+
+  if (isPrimary && !productReady && !matchesCurrentStep) {
+    return {
+      penalty: 10,
+      message: `顺序偏离：当前应先${compactMissionLabel(nextAction || '观察')}`,
+    };
+  }
+
+  if (isSecondary && !productReady) {
+    return {
+      penalty: 6,
+      message: `支线消耗：${compactMissionLabel(reagentName)}`,
+    };
+  }
+
+  return { penalty: 0 };
 }
 
 function buildMissionProofFeedback(checkpoint: MissionProofCheckpoint, selectedId?: string) {
@@ -1313,7 +1416,8 @@ function App() {
   const [reagentFocusSignal, setReagentFocusSignal] = useState(0);
   const [unlockedDiscoveryIds, setUnlockedDiscoveryIds] = useState<Set<string>>(() => readStoredDiscoveryIds());
   const [completedMissionIds, setCompletedMissionIds] = useState<Set<string>>(() => readStoredMissionCompletionIds());
-  const [missionProofAnswers, setMissionProofAnswers] = useState<Record<string, Record<string, { selectedId: string; correct: boolean }>>>({});
+  const [missionProofAnswers, setMissionProofAnswers] = useState<Record<string, Record<string, MissionProofAnswer>>>({});
+  const [missionRunStats, setMissionRunStats] = useState<Record<string, MissionRunStats>>({});
   
   // Custom Toast State
   const [toast, setToast] = useState<{id: string, message: string} | null>(null);
@@ -1339,6 +1443,33 @@ function App() {
       missionCueTimeoutRef.current = null;
     }, duration);
   }, []);
+
+  const updateMissionRunStats = useCallback((challengeId: string, updater: (stats: MissionRunStats) => MissionRunStats) => {
+    setMissionRunStats(prev => {
+      const current = prev[challengeId] || createMissionRunStats();
+      return {
+        ...prev,
+        [challengeId]: updater(current),
+      };
+    });
+  }, []);
+
+  const recordMissionEvent = useCallback((
+    challengeId: string,
+    kind: 'operation' | 'reagent' | 'proof' | 'hint',
+    penalty = 0,
+    message?: string,
+  ) => {
+    updateMissionRunStats(challengeId, current => ({
+      ...current,
+      operations: current.operations + (kind === 'operation' || kind === 'reagent' ? 1 : 0),
+      wrongReagents: current.wrongReagents + (kind === 'reagent' && penalty > 0 ? 1 : 0),
+      wrongProofs: current.wrongProofs + (kind === 'proof' && penalty > 0 ? 1 : 0),
+      hintUses: current.hintUses + (kind === 'hint' ? 1 : 0),
+      integrity: clampMissionIntegrity(current.integrity - penalty),
+      lastPenalty: penalty > 0 ? message : current.lastPenalty,
+    }));
+  }, [updateMissionRunStats]);
 
   // Play Mode State
   const [gameMode, setGameMode] = useState<'sandbox' | 'challenge'>('challenge');
@@ -1442,6 +1573,20 @@ function App() {
       if (currentVolume + volumeML > capacity) {
         showToast(`🚫 ${target.name} 容量不足，无法加入 ${volumeML}mL`);
         return currentItems;
+      }
+
+      if (gameMode === 'challenge' && activeChallenge && !activeChallenge.completed) {
+        const missionEvent = getMissionReagentEvent(activeChallenge, currentItems, reagentName);
+
+        recordMissionEvent(activeChallenge.id, missionEvent.penalty > 0 ? 'reagent' : 'operation', missionEvent.penalty, missionEvent.message);
+        if (missionEvent.penalty > 0 && missionEvent.message) {
+          showMissionCue({
+            title: '可信度下降',
+            detail: `${missionEvent.message} · -${missionEvent.penalty}`,
+            accent: '#f59e0b',
+            tone: 'side',
+          }, 2600);
+        }
       }
 
       saveSnapshot(currentItems, brokenGlass);
@@ -1740,6 +1885,11 @@ function App() {
       delete next[mission.challengeId];
       return next;
     });
+    setMissionRunStats(prev => ({
+      ...prev,
+      [mission.challengeId]: createMissionRunStats(),
+    }));
+    pendingChallengeCompletionRef.current = null;
     setActiveChallenge({
       id: mission.challengeId,
       title: mission.title,
@@ -2315,6 +2465,11 @@ function App() {
     ? buildMissionProofFeedback(activeProofCurrent, activeProofCurrentAnswer.selectedId)
     : null;
   const activeProofSolved = Boolean(activeMissionProof && activeProofSolvedCount === activeMissionProof.checkpoints.length);
+  const activeMissionStats = activeChallenge
+    ? (missionRunStats[activeChallenge.id] || createMissionRunStats())
+    : createMissionRunStats();
+  const activeMissionGrade = getMissionGrade(activeMissionStats.integrity);
+  const activeMissionCanComplete = activeMissionStats.integrity >= MISSION_MIN_INTEGRITY;
   const discoveryCards = useMemo(() => buildDiscoveryCards(placedItems, unlockedDiscoveryIds), [placedItems, unlockedDiscoveryIds]);
   const unlockedDiscoveryCount = useMemo(() => discoveryCards.filter(card => card.unlocked).length, [discoveryCards]);
   const completedMissionCount = useMemo(
@@ -2356,13 +2511,14 @@ function App() {
   const challengeStageLabel = useMemo(() => {
     if (!activeChallenge) return '选一关';
     if (activeChallenge.completed) return '下一关';
+    if (challengeProductReady && activeProofSolved && !activeMissionCanComplete) return '样本失效';
     if (challengeProductReady && activeMissionProof && !activeProofSolved) {
       return activeProofCurrent ? `证据：${activeProofCurrent.label}` : '答证据链';
     }
     if (challengeQuickReagent) return `加${compactMissionLabel(challengeQuickReagent)}`;
     if (challengeNextAction) return `做 ${compactMissionLabel(challengeNextAction)}`;
     return '观察';
-  }, [activeChallenge, activeMissionProof, activeProofCurrent, activeProofSolved, challengeNextAction, challengeProductReady, challengeQuickReagent]);
+  }, [activeChallenge, activeMissionCanComplete, activeMissionProof, activeProofCurrent, activeProofSolved, challengeNextAction, challengeProductReady, challengeQuickReagent]);
   const challengeActionOptions = useMemo(() => {
     if (!challengeInsight || !primaryAgentContainerId || activeChallenge?.completed) return [];
     const options: ChallengeActionOption[] = [];
@@ -2593,6 +2749,10 @@ function App() {
         productReady: challengeProductReady,
         doneCount: challengeDisplayDoneCount,
         stepCount: challengeDisplayStepCount,
+        integrity: activeMissionStats.integrity,
+        grade: activeMissionGrade.grade,
+        mistakes: activeMissionStats.wrongProofs + activeMissionStats.wrongReagents,
+        operations: activeMissionStats.operations,
         nextAction: challengeProductReady && activeMissionProof && !activeProofSolved
           ? (activeProofCurrent ? `回答证据：${activeProofCurrent.label}` : '完成证据链')
           : challengeStageLabel,
@@ -2605,13 +2765,14 @@ function App() {
             question: activeProofCurrent.question,
             hint: activeProofCurrent.hint || null,
             selectedFeedback: activeProofCurrentFeedback,
-            options: activeProofCurrent.options.map(option => ({
-              id: option.id,
-              label: option.label,
-              detail: option.detail,
-              selected: activeProofCurrentAnswer?.selectedId === option.id,
-            })),
-          } : null,
+	            options: activeProofCurrent.options.map(option => ({
+	              id: option.id,
+	              label: option.label,
+	              detail: option.detail,
+	              selected: activeProofCurrentAnswer?.selectedId === option.id,
+	            })),
+	            attempts: activeProofCurrentAnswer?.attempts || 0,
+	          } : null,
         } : null,
       } : null;
 
@@ -2750,7 +2911,7 @@ function App() {
         agentAbortControllerRef.current = null;
       }
     }
-  }, [activeChallenge, activeMissionBrief, activeMissionProof, activeProofCurrent, activeProofCurrentAnswer, activeProofCurrentFeedback, activeProofSolved, activeProofSolvedCount, agentLastEvent, agentMessages, agentState.goal, agentState.intent, agentState.risks, appendAgentMessage, appendUserMessage, challengeDisplayDoneCount, challengeDisplayStepCount, challengeProductReady, challengeStageLabel, gameMode, placedItems, primaryAgentContainerId, runAgentToolCalls, lavoisierApiUrl, setAgentDraft, setAgentError, setAgentExpanded, setAgentIsLoading, setAgentRemoteHeadline, setAgentRemoteSummary, setAgentStatusLabel, setAgentSuggestedPrompts]);
+  }, [activeChallenge, activeMissionBrief, activeMissionGrade.grade, activeMissionProof, activeMissionStats.integrity, activeMissionStats.operations, activeMissionStats.wrongProofs, activeMissionStats.wrongReagents, activeProofCurrent, activeProofCurrentAnswer, activeProofCurrentFeedback, activeProofSolved, activeProofSolvedCount, agentLastEvent, agentMessages, agentState.goal, agentState.intent, agentState.risks, appendAgentMessage, appendUserMessage, challengeDisplayDoneCount, challengeDisplayStepCount, challengeProductReady, challengeStageLabel, gameMode, placedItems, primaryAgentContainerId, runAgentToolCalls, lavoisierApiUrl, setAgentDraft, setAgentError, setAgentExpanded, setAgentIsLoading, setAgentRemoteHeadline, setAgentRemoteSummary, setAgentStatusLabel, setAgentSuggestedPrompts]);
 
   const submitAgentQuery = useCallback((query: string) => {
     void requestLavoisierApi(query, { includeUserMessage: true });
@@ -2957,12 +3118,15 @@ function App() {
     const proof = MISSION_PROOFS[activeChallenge.id];
     const answers = missionProofAnswers[activeChallenge.id] || {};
     const proofSolved = proof ? proof.checkpoints.every(checkpoint => answers[checkpoint.id]?.correct) : true;
-    const success = computeChallengeCompleted(activeChallenge, placedItems) && proofSolved;
+    const runStats = missionRunStats[activeChallenge.id] || createMissionRunStats();
+    const canComplete = runStats.integrity >= MISSION_MIN_INTEGRITY;
+    const success = computeChallengeCompleted(activeChallenge, placedItems) && proofSolved && canComplete;
     if (!success || pendingChallengeCompletionRef.current === activeChallenge.id) return;
 
     pendingChallengeCompletionRef.current = activeChallenge.id;
     playSound('reaction');
     const meta = getMissionSuccessMeta(activeChallenge.id);
+    const grade = getMissionGrade(runStats.integrity);
     setMissionCompletionCard({
       id: createRuntimeId('mission-complete'),
       challengeId: activeChallenge.id,
@@ -2970,6 +3134,10 @@ function App() {
       product: meta.product,
       formula: meta.formula,
       accent: meta.accent,
+      grade: grade.grade,
+      stars: grade.stars,
+      integrity: runStats.integrity,
+      mistakes: runStats.wrongProofs + runStats.wrongReagents,
     });
     setCompletedMissionIds(previousIds => {
       if (previousIds.has(activeChallenge.id)) return previousIds;
@@ -2981,7 +3149,7 @@ function App() {
     setTimeout(() => {
       setActiveChallenge(c => c?.id === activeChallenge.id ? { ...c, completed: true } : c);
     }, 0);
-  }, [activeChallenge, gameMode, missionProofAnswers, placedItems, playSound]);
+  }, [activeChallenge, gameMode, missionProofAnswers, missionRunStats, placedItems, playSound]);
 
   usePhysicsEngine(
     placedItems, 
@@ -3006,6 +3174,35 @@ function App() {
       if (currentTotalVolume + dropVolume > absoluteMax) {
         showToast(`🚫 该容器已装入 ${currentTotalVolume.toFixed(1)}mL，无法再加入 ${dropVolume}mL (最大容量 ${absoluteMax}mL)`);
         return currentItems;
+      }
+
+      if (gameMode === 'challenge' && activeChallenge && challengeInsight && !activeChallenge.completed) {
+        const isPrimary = challengeInsight.primaryReagents.includes(activeDrop.reagentName);
+        const isSecondary = challengeInsight.secondaryReagents.includes(activeDrop.reagentName);
+        const matchesCurrentStep = missionReagentMatchesAction(activeDrop.reagentName, challengeNextAction);
+        let penalty = 0;
+        let message: string | undefined;
+
+        if (!isPrimary && !isSecondary) {
+          penalty = 18;
+          message = `非本关试剂：${compactMissionLabel(activeDrop.reagentName)}`;
+        } else if (isPrimary && !challengeProductReady && !matchesCurrentStep) {
+          penalty = 10;
+          message = `顺序偏离：当前应先${compactMissionLabel(challengeNextAction || '观察')}`;
+        } else if (isSecondary && !challengeProductReady) {
+          penalty = 6;
+          message = `支线消耗：${compactMissionLabel(activeDrop.reagentName)}`;
+        }
+
+        recordMissionEvent(activeChallenge.id, penalty > 0 ? 'reagent' : 'operation', penalty, message);
+        if (penalty > 0 && message) {
+          showMissionCue({
+            title: '可信度下降',
+            detail: `${message} · -${penalty}`,
+            accent: '#f59e0b',
+            tone: 'side',
+          }, 2600);
+        }
       }
 
       // Thermal shock logic
@@ -3515,13 +3712,16 @@ function App() {
                         })}
                       </div>
                     </div>
-                    <div className="shrink-0 text-right">
-                      <div className="font-mono text-[13px] font-semibold text-[#67e8f9]">
-                        {challengeDisplayDoneCount}/{Math.max(1, challengeDisplayStepCount)}
-                      </div>
-                      <div className="mt-1 max-w-[170px] truncate rounded-full border border-[#22d3ee]/20 bg-[#22d3ee]/10 px-2.5 py-1 text-[11px] font-medium text-[#a5f3fc]">
-                        {challengeStageLabel}
-                      </div>
+	                    <div className="shrink-0 text-right">
+	                      <div className="font-mono text-[13px] font-semibold text-[#67e8f9]">
+	                        {challengeDisplayDoneCount}/{Math.max(1, challengeDisplayStepCount)}
+	                      </div>
+	                      <div className={`mt-0.5 font-mono text-[11px] font-semibold ${activeMissionCanComplete ? 'text-[#bbf7d0]' : 'text-[#fda4af]'}`}>
+	                        可信度 {activeMissionStats.integrity}%
+	                      </div>
+	                      <div className="mt-1 max-w-[170px] truncate rounded-full border border-[#22d3ee]/20 bg-[#22d3ee]/10 px-2.5 py-1 text-[11px] font-medium text-[#a5f3fc]">
+	                        {challengeStageLabel}
+	                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -3534,15 +3734,19 @@ function App() {
                     transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                     className="absolute bottom-5 left-1/2 z-[68] w-[min(520px,calc(100%-32px))] -translate-x-1/2 rounded-[28px] border border-[#22d3ee]/18 bg-[rgba(7,11,23,0.88)] p-3 shadow-[0_18px_58px_rgba(2,6,23,0.48)] backdrop-blur-2xl sm:left-[58%] sm:w-[min(500px,calc(100%-180px))]"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#67e8f9]">
-                          证据 {activeProofSolvedCount + 1}/{activeMissionProof.checkpoints.length}
-                        </div>
-                        <div className="mt-1 truncate text-[13px] font-semibold text-white">{activeProofCurrent.question}</div>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {activeMissionProof.checkpoints.map((checkpoint, checkpointIndex) => {
+	                    <div className="flex flex-wrap items-center justify-between gap-2">
+	                      <div className="min-w-0">
+	                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#67e8f9]">
+	                          证据 {activeProofSolvedCount + 1}/{activeMissionProof.checkpoints.length}
+	                        </div>
+	                        <div className="mt-1 truncate text-[13px] font-semibold text-white">{activeProofCurrent.question}</div>
+	                      </div>
+	                      <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-2.5 py-1 text-right">
+	                        <div className="font-mono text-[12px] font-semibold text-[#f8fafc]">{activeMissionStats.integrity}%</div>
+	                        <div className="text-[9px] uppercase tracking-[0.14em] text-[#64748b]">{activeMissionGrade.grade}</div>
+	                      </div>
+	                      <div className="flex flex-wrap gap-1">
+	                        {activeMissionProof.checkpoints.map((checkpoint, checkpointIndex) => {
                           const checkpointDone = Boolean(activeProofAnswers[checkpoint.id]?.correct);
                           const checkpointCurrent = checkpoint.id === activeProofCurrent.id;
                           return (
@@ -3555,11 +3759,14 @@ function App() {
                           );
                         })}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => submitAgentQuery('这道证据题应该怎么判断？请结合当前现象给一个提示。')}
-                        className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-2.5 py-1 text-[10px] font-semibold text-[#a5f3fc] hover:bg-[#22d3ee]/16 transition-colors"
-                      >
+	                      <button
+	                        type="button"
+	                        onClick={() => {
+	                          recordMissionEvent(activeChallenge.id, 'hint', 3, '使用拉瓦锡提示');
+	                          submitAgentQuery('这道证据题应该怎么判断？请结合当前现象给一个提示。');
+	                        }}
+	                        className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-2.5 py-1 text-[10px] font-semibold text-[#a5f3fc] hover:bg-[#22d3ee]/16 transition-colors"
+	                      >
                         问拉瓦锡
                       </button>
                     </div>
@@ -3571,25 +3778,36 @@ function App() {
                         return (
                           <button
                             key={option.id}
-                            type="button"
-                            onClick={() => {
-                              const isCorrect = option.id === activeProofCurrent.answerId;
-                              setMissionProofAnswers(prev => ({
-                                ...prev,
-                                [activeChallenge.id]: {
-                                  ...(prev[activeChallenge.id] || {}),
-                                  [activeProofCurrent.id]: { selectedId: option.id, correct: isCorrect },
-                                },
-                              }));
-                              if (isCorrect) {
-                                showMissionCue({
-                                  title: `证据 · ${activeProofCurrent.label}`,
+	                            type="button"
+	                            onClick={() => {
+	                              const isCorrect = option.id === activeProofCurrent.answerId;
+	                              const isRepeatWrong = activeProofCurrentAnswer?.selectedId === option.id && activeProofCurrentAnswer.correct === false;
+	                              if (isRepeatWrong) return;
+	                              const attempts = (activeProofCurrentAnswer?.attempts || 0) + 1;
+	                              setMissionProofAnswers(prev => ({
+	                                ...prev,
+	                                [activeChallenge.id]: {
+	                                  ...(prev[activeChallenge.id] || {}),
+	                                  [activeProofCurrent.id]: { selectedId: option.id, correct: isCorrect, attempts },
+	                                },
+	                              }));
+	                              if (isCorrect) {
+	                                showMissionCue({
+	                                  title: `证据 · ${activeProofCurrent.label}`,
                                   detail: activeProofCurrent.success,
                                   accent: getMissionSuccessMeta(activeChallenge.id).accent,
-                                  tone: 'proof',
-                                });
-                              }
-                            }}
+	                                  tone: 'proof',
+	                                });
+	                              } else {
+	                                recordMissionEvent(activeChallenge.id, 'proof', 15, `证据误判：${option.label}`);
+	                                showMissionCue({
+	                                  title: '证据扣分',
+	                                  detail: `不是 ${option.label} · -15`,
+	                                  accent: '#f43f5e',
+	                                  tone: 'side',
+	                                }, 2600);
+	                              }
+	                            }}
                             className={`rounded-2xl border px-3 py-2 text-left transition-all hover:-translate-y-0.5 ${isWrong ? 'border-[#f43f5e]/35 bg-[#f43f5e]/10' : isSelected ? 'border-[#10b981]/35 bg-[#10b981]/10' : 'border-white/8 bg-white/[0.035] hover:border-[#22d3ee]/30 hover:bg-[#22d3ee]/8'}`}
                           >
                             <div className="text-[12px] font-semibold text-[#f8fafc]">{option.label}</div>
@@ -3628,8 +3846,35 @@ function App() {
                     transition={{ duration: 0.2, ease: 'easeOut' }}
                     className="absolute bottom-5 left-1/2 z-[58] w-[min(520px,calc(100%-32px))] -translate-x-1/2 rounded-[26px] border border-white/10 bg-[rgba(7,11,23,0.76)] px-3 py-2.5 shadow-[0_16px_46px_rgba(2,6,23,0.38)] backdrop-blur-2xl sm:left-[58%] sm:w-[min(500px,calc(100%-180px))]"
                   >
-                    {!activeChallenge.completed ? (
-                      <>
+	                    {!activeChallenge.completed && challengeProductReady && activeProofSolved && !activeMissionCanComplete ? (
+	                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+	                        <div className="min-w-0">
+	                          <div className="text-[12px] font-semibold text-[#fda4af]">样本可信度不足</div>
+	                          <div className="mt-1 text-[11px] leading-snug text-[#94a3b8]">
+	                            当前 {activeMissionStats.integrity}% ，低于通关线 {MISSION_MIN_INTEGRITY}%。错误试剂或证据误判会让本次结果失效。
+	                          </div>
+	                        </div>
+	                        <div className="flex flex-wrap justify-end gap-1.5">
+	                          <button
+	                            type="button"
+	                            onClick={() => {
+	                              if (activeMissionPreset) launchQuickStart(activeMissionPreset);
+	                            }}
+	                            className="rounded-full border border-[#f43f5e]/30 bg-[#f43f5e]/10 px-3 py-2 text-[11px] font-semibold text-[#fda4af] transition-all hover:-translate-y-0.5 hover:bg-[#f43f5e]/16"
+	                          >
+	                            重开本关
+	                          </button>
+	                          <button
+	                            type="button"
+	                            onClick={() => submitAgentQuery('我这关样本可信度不够，请帮我复盘哪里扣分，以及下一次最短正确路线。')}
+	                            className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-3 py-2 text-[11px] font-semibold text-[#a5f3fc] transition-all hover:-translate-y-0.5 hover:bg-[#22d3ee]/16"
+	                          >
+	                            复盘
+	                          </button>
+	                        </div>
+	                      </div>
+	                    ) : !activeChallenge.completed ? (
+	                      <>
                         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                           <button
                             type="button"
@@ -3688,11 +3933,14 @@ function App() {
                             >
                               观察
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => submitAgentQuery('结合当前关卡，下一步该怎么做？')}
-                              className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-3 py-2 text-[11px] font-semibold text-[#a5f3fc] transition-all hover:-translate-y-0.5 hover:bg-[#22d3ee]/16"
-                            >
+	                            <button
+	                              type="button"
+	                              onClick={() => {
+	                                recordMissionEvent(activeChallenge.id, 'hint', 3, '使用拉瓦锡提示');
+	                                submitAgentQuery('结合当前关卡，下一步该怎么做？');
+	                              }}
+	                              className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-3 py-2 text-[11px] font-semibold text-[#a5f3fc] transition-all hover:-translate-y-0.5 hover:bg-[#22d3ee]/16"
+	                            >
                               问 AI
                             </button>
                           </div>
@@ -3792,10 +4040,16 @@ function App() {
                   >
                     <X size={14} />
                   </button>
-                  <div className="pr-8">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#67e8f9]">关卡完成</div>
-                    <div className="mt-1 text-[17px] font-semibold text-white">{missionCompletionCard.title}</div>
-                  </div>
+	                  <div className="flex items-start justify-between gap-3 pr-8">
+	                    <div className="min-w-0">
+	                      <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#67e8f9]">关卡完成</div>
+	                      <div className="mt-1 text-[17px] font-semibold text-white">{missionCompletionCard.title}</div>
+	                    </div>
+	                    <div className="shrink-0 rounded-2xl border border-[#f59e0b]/26 bg-[#f59e0b]/10 px-2.5 py-1 text-right">
+	                      <div className="font-mono text-[15px] font-bold text-[#fde68a]">{missionCompletionCard.grade}</div>
+	                      <div className="text-[10px] text-[#fbbf24]">{'★'.repeat(missionCompletionCard.stars)}{'☆'.repeat(3 - missionCompletionCard.stars)}</div>
+	                    </div>
+	                  </div>
                   <div className="mt-3 flex items-center gap-3 rounded-[20px] border border-white/8 bg-white/[0.035] px-3 py-2.5">
                     <div
                       className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.06] font-mono text-[12px] font-bold text-white"
@@ -3803,10 +4057,12 @@ function App() {
                     >
                       {missionCompletionCard.formula}
                     </div>
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-semibold text-[#f8fafc]">{missionCompletionCard.product}</div>
-                      <div className="mt-1 text-[12px] text-[#94a3b8]">已解锁图鉴，可继续下一关。</div>
-                    </div>
+	                    <div className="min-w-0">
+	                      <div className="text-[13px] font-semibold text-[#f8fafc]">{missionCompletionCard.product}</div>
+	                      <div className="mt-1 text-[12px] text-[#94a3b8]">
+	                        可信度 {missionCompletionCard.integrity}% · 失误 {missionCompletionCard.mistakes} · 已解锁图鉴。
+	                      </div>
+	                    </div>
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-1.5">
                     <button
