@@ -243,6 +243,8 @@ function sanitizeMissionContext(mission) {
     productReady: Boolean(mission.productReady),
     doneCount: Number.isFinite(mission.doneCount) ? Number(mission.doneCount) : null,
     stepCount: Number.isFinite(mission.stepCount) ? Number(mission.stepCount) : null,
+    evidenceScore: Number.isFinite(mission.evidenceScore) ? Number(mission.evidenceScore) : null,
+    integrity: Number.isFinite(mission.integrity) ? Number(mission.integrity) : null,
     nextAction: sanitizeString(mission.nextAction, undefined, 60),
     proof: proof
       ? {
@@ -251,6 +253,7 @@ function sanitizeMissionContext(mission) {
           solved: Boolean(proof.solved),
           current: current
             ? {
+                stage: sanitizeString(current.stage, undefined, 20),
                 label: sanitizeString(current.label, undefined, 40),
                 question: sanitizeString(current.question, undefined, 100),
                 hint: sanitizeString(current.hint, undefined, 80),
@@ -527,6 +530,7 @@ function buildLlmInstruction(contextDigest) {
     '你是“拉瓦锡”，一个面向化学实验平台的智能化学家助手。',
     '你需要结合实验上下文、最近对话和可用 skill，给出简洁、可执行、具备化学解释的建议。',
     '如果 mission 存在，优先围绕 mission.title、mission.target、mission.nextAction 和 mission.proof.current 回答；这是当前演示的真实任务状态。',
+    '如果 mission.proof.current.stage="predict"，不要直接替用户选最终答案；用当前题目和选项提示如何预测，并提醒先预测再验证。',
     '当 mission.productReady=true 且 mission.proof.current 存在时，先确认“现象已出现”，再用当前题目、选项、hint 帮用户判断证据；不要重复长路线。',
     '当 mission.completed=true 时，建议用户解释现象或进入下一关；不要继续要求加同一主线试剂。',
     '严格按上下文说话：只有在 focusedContainer.species、containers.species、lastEvent、challenge.target、mission.target/route/proof 或最近用户消息中明确出现的物质/离子/沉淀，才可以点名；不要根据 intent、模式或常识臆测 Fe²⁺、Cu²⁺、Ag⁺ 等具体体系。',

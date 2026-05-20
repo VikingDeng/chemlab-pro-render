@@ -129,6 +129,7 @@ type MissionCompletionCard = {
   grade: string;
   stars: number;
   integrity: number;
+  evidenceScore: number;
   mistakes: number;
 };
 
@@ -140,6 +141,8 @@ type MissionCue = {
   tone: 'main' | 'side' | 'proof';
 };
 
+type MissionProofStage = 'predict' | 'evidence' | 'explain' | 'control';
+
 type MissionProofOption = {
   id: string;
   label: string;
@@ -148,6 +151,7 @@ type MissionProofOption = {
 
 type MissionProofCheckpoint = {
   id: string;
+  stage?: MissionProofStage;
   label: string;
   question: string;
   answerId: string;
@@ -173,6 +177,13 @@ type MissionRunStats = {
   hintUses: number;
   integrity: number;
   lastPenalty?: string;
+};
+
+type MissionPredictionGateSnapshot = {
+  active: boolean;
+  nextAction: string | null;
+  question: string;
+  accent: string;
 };
 
 type ChallengeActionOption = {
@@ -355,7 +366,22 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
   c1: {
     checkpoints: [
       {
+        id: 'predict',
+        stage: 'predict',
+        label: '预测',
+        question: '样品 A 加 NaOH 前，先预测会出现什么？',
+        answerId: 'blue-floc',
+        success: '预测成立，开始验证。',
+        hint: '线索：A 的主线是铜盐遇碱。',
+        options: [
+          { id: 'blue-floc', label: '蓝绿色絮状', detail: 'Cu(OH)₂ 沉淀' },
+          { id: 'white-clot', label: '白色凝乳', detail: '更像 AgCl' },
+          { id: 'bubbles', label: '连续气泡', detail: '更像碳酸盐遇酸' },
+        ],
+      },
+      {
         id: 'ion',
+        stage: 'evidence',
         label: '离子',
         question: '蓝绿色絮状沉淀锁定哪个阳离子？',
         answerId: 'cu2',
@@ -369,6 +395,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
       },
       {
         id: 'reagent-role',
+        stage: 'explain',
         label: '作用',
         question: 'NaOH 在这一步提供了什么？',
         answerId: 'oh',
@@ -382,6 +409,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
       },
       {
         id: 'control',
+        stage: 'control',
         label: '对照',
         question: '若先加入过量氨水，更可能看到什么？',
         answerId: 'deep-blue',
@@ -398,7 +426,22 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
   c2: {
     checkpoints: [
       {
+        id: 'predict',
+        stage: 'predict',
+        label: '预测',
+        question: '样品 B 加盐酸前，最该预测哪种现象？',
+        answerId: 'white-precipitate',
+        success: '预测成立，开始验证。',
+        hint: '线索：B 的关键变量是 Cl⁻。',
+        options: [
+          { id: 'white-precipitate', label: '白色沉淀', detail: 'Ag⁺ + Cl⁻' },
+          { id: 'red-complex', label: '血红显色', detail: 'Fe³⁺ + SCN⁻' },
+          { id: 'purple-layer', label: '紫色分层', detail: '碘萃取' },
+        ],
+      },
+      {
         id: 'product',
+        stage: 'evidence',
         label: '产物',
         question: '白色凝乳状沉淀最可能是什么？',
         answerId: 'agcl',
@@ -412,6 +455,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
       },
       {
         id: 'missing-ion',
+        stage: 'explain',
         label: '变量',
         question: '若用硝酸代替盐酸，少了哪种关键离子？',
         answerId: 'chloride',
@@ -425,6 +469,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
       },
       {
         id: 'principle',
+        stage: 'control',
         label: '本质',
         question: '这类现象属于哪种判断？',
         answerId: 'insoluble-salt',
@@ -441,7 +486,22 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
   c3: {
     checkpoints: [
       {
+        id: 'predict',
+        stage: 'predict',
+        label: '预测',
+        question: '样品 C 加 KSCN 前，预测颜色会怎样？',
+        answerId: 'blood-red',
+        success: '预测成立，开始验证。',
+        hint: '线索：SCN⁻ 是 Fe³⁺ 的显色试剂。',
+        options: [
+          { id: 'blood-red', label: '血红加深', detail: 'Fe(SCN)₃ 络合' },
+          { id: 'blue-floc', label: '蓝色沉淀', detail: '铜盐遇碱' },
+          { id: 'clear-gas', label: '无色气泡', detail: '碳酸盐遇酸' },
+        ],
+      },
+      {
         id: 'phenomenon',
+        stage: 'evidence',
         label: '现象',
         question: '血红色来自哪类变化？',
         answerId: 'complex',
@@ -455,6 +515,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
       },
       {
         id: 'iron-state',
+        stage: 'explain',
         label: '价态',
         question: '本关主要检出的铁离子价态是？',
         answerId: 'fe3',
@@ -468,6 +529,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
       },
       {
         id: 'interference',
+        stage: 'control',
         label: '干扰',
         question: '若先加 NaOH，最可能干扰成什么？',
         answerId: 'feoh3',
@@ -484,7 +546,22 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
   c4: {
     checkpoints: [
       {
+        id: 'predict',
+        stage: 'predict',
+        label: '预测',
+        question: '样品 D 加盐酸前，先预测主要现象？',
+        answerId: 'bubbles',
+        success: '预测成立，开始验证。',
+        hint: '线索：D 的主线是碳酸盐遇酸。',
+        options: [
+          { id: 'bubbles', label: '连续气泡', detail: '生成 CO₂' },
+          { id: 'white-solid', label: '白色沉淀', detail: '银盐路线' },
+          { id: 'deep-blue', label: '深蓝溶液', detail: '铜氨络合' },
+        ],
+      },
+      {
         id: 'sample',
+        stage: 'evidence',
         label: '样品',
         question: '连续气泡最能说明样品 D 含什么？',
         answerId: 'carbonate',
@@ -498,6 +575,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
       },
       {
         id: 'acid-role',
+        stage: 'explain',
         label: '试剂',
         question: '盐酸在这里的关键作用是？',
         answerId: 'h-plus',
@@ -511,6 +589,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
       },
       {
         id: 'gas-id',
+        stage: 'control',
         label: '气体',
         question: '这一步生成的无色气体应判断为？',
         answerId: 'co2',
@@ -527,7 +606,22 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
   c5: {
     checkpoints: [
       {
+        id: 'predict',
+        stage: 'predict',
+        label: '预测',
+        question: '样品 E 加 CCl₄ 前，预测紫色会去哪？',
+        answerId: 'organic-layer',
+        success: '预测成立，开始验证。',
+        hint: '线索：碘更偏向非极性有机相。',
+        options: [
+          { id: 'organic-layer', label: '进入有机层', detail: '分层后有机相显紫' },
+          { id: 'solid-bottom', label: '杯底沉淀', detail: '不是碘萃取' },
+          { id: 'gas-top', label: '变成气泡', detail: '不是气体生成' },
+        ],
+      },
+      {
         id: 'process',
+        stage: 'evidence',
         label: '过程',
         question: '紫色集中在有机层，说明发生了什么？',
         answerId: 'partition',
@@ -541,6 +635,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
       },
       {
         id: 'layer',
+        stage: 'explain',
         label: '层位',
         question: '使用 CCl₄ 时，紫色层通常在哪一侧？',
         answerId: 'bottom',
@@ -554,6 +649,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
       },
       {
         id: 'property',
+        stage: 'control',
         label: '性质',
         question: '这个现象主要利用碘的哪种性质？',
         answerId: 'nonpolar',
@@ -570,7 +666,22 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
   c6: {
     checkpoints: [
       {
+        id: 'predict',
+        stage: 'predict',
+        label: '预测',
+        question: '样品 F 加草酸和硫酸后，最该观察什么？',
+        answerId: 'fade',
+        success: '预测成立，开始验证。',
+        hint: '线索：酸性草酸能还原 MnO₄⁻。',
+        options: [
+          { id: 'fade', label: '紫色褪去', detail: 'MnO₄⁻ 被还原' },
+          { id: 'white-clot', label: '白色凝乳', detail: '银盐沉淀' },
+          { id: 'purple-layer', label: '紫色分层', detail: '碘萃取' },
+        ],
+      },
+      {
         id: 'condition',
+        stage: 'evidence',
         label: '条件',
         question: '高锰酸钾褪色需要哪个条件？',
         answerId: 'acid-redox',
@@ -584,6 +695,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
       },
       {
         id: 'oxidant',
+        stage: 'explain',
         label: '角色',
         question: '紫色的 MnO₄⁻ 在反应中扮演什么角色？',
         answerId: 'oxidant',
@@ -597,6 +709,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
       },
       {
         id: 'acid-choice',
+        stage: 'control',
         label: '选酸',
         question: '本关更适合用硫酸而不是盐酸，原因是？',
         answerId: 'avoid-cl2',
@@ -721,6 +834,61 @@ function buildMissionProofFeedback(checkpoint: MissionProofCheckpoint, selectedI
   }
 
   return `不是 ${selected.label}：${selected.detail}。${clue}`;
+}
+
+function isMissionPredictionCheckpoint(checkpoint: MissionProofCheckpoint) {
+  return checkpoint.stage === 'predict';
+}
+
+function getMissionEvidenceScore(
+  productReady: boolean,
+  proof: MissionProof | undefined,
+  answers: Record<string, MissionProofAnswer>,
+) {
+  if (!proof) return productReady ? 100 : 0;
+
+  const predictionCheckpoints = proof.checkpoints.filter(isMissionPredictionCheckpoint);
+  const learningCheckpoints = proof.checkpoints.filter(checkpoint => !isMissionPredictionCheckpoint(checkpoint));
+  const predictionSolved = predictionCheckpoints.some(checkpoint => answers[checkpoint.id]?.correct);
+  const learningSolvedCount = learningCheckpoints.filter(checkpoint => answers[checkpoint.id]?.correct).length;
+  const learningScore = learningCheckpoints.length > 0
+    ? Math.round((learningSolvedCount / learningCheckpoints.length) * 55)
+    : 0;
+
+  return clampMissionIntegrity(
+    (predictionSolved ? 20 : 0)
+    + (productReady ? 25 : 0)
+    + learningScore,
+  );
+}
+
+function getMissionProofStageLabel(stage: MissionProofStage | undefined) {
+  switch (stage) {
+    case 'predict':
+      return '预测';
+    case 'evidence':
+      return '证据';
+    case 'explain':
+      return '解释';
+    case 'control':
+      return '对照';
+    default:
+      return '证据';
+  }
+}
+
+function getMissionProofStageAccent(stage: MissionProofStage | undefined) {
+  switch (stage) {
+    case 'predict':
+      return '#f59e0b';
+    case 'control':
+      return '#a855f7';
+    case 'explain':
+      return '#10b981';
+    case 'evidence':
+    default:
+      return '#22d3ee';
+  }
 }
 
 function readStoredDiscoveryIds() {
@@ -1026,6 +1194,53 @@ function getMissionAccentClasses(accent: MissionBrief['accent']) {
         button: 'border-[#22d3ee]/35 bg-[#22d3ee]/12 text-[#a5f3fc] hover:bg-[#22d3ee]/20',
       };
   }
+}
+
+function MissionEvidenceBar({
+  value,
+  integrity,
+  compact = false,
+}: {
+  value: number;
+  integrity: number;
+  compact?: boolean;
+}) {
+  const safeValue = clampMissionIntegrity(value);
+  const safeIntegrity = clampMissionIntegrity(integrity);
+  const isCritical = safeIntegrity < MISSION_MIN_INTEGRITY;
+  const fillClass = isCritical
+    ? 'from-[#f43f5e] via-[#fb7185] to-[#f59e0b]'
+    : safeValue >= 80
+    ? 'from-[#10b981] via-[#22d3ee] to-[#67e8f9]'
+    : 'from-[#f59e0b] via-[#22d3ee] to-[#38bdf8]';
+
+  return (
+    <div className={compact ? 'min-w-[140px]' : 'w-full'}>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#64748b]">证据强度</span>
+        <span className={`font-mono text-[12px] font-bold ${isCritical ? 'text-[#fda4af]' : 'text-[#a5f3fc]'}`}>{safeValue}%</span>
+      </div>
+      <div className="relative h-3 overflow-hidden rounded-full border border-white/10 bg-black/30 shadow-[inset_0_0_14px_rgba(2,6,23,0.65)]">
+        <motion.div
+          className={`absolute inset-y-0 left-0 rounded-full bg-gradient-to-r ${fillClass}`}
+          initial={false}
+          animate={{ width: `${safeValue}%` }}
+          transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+          style={{ boxShadow: isCritical ? '0 0 18px rgba(244,63,94,0.45)' : '0 0 18px rgba(34,211,238,0.32)' }}
+        />
+        <div className="absolute inset-0 grid grid-cols-10">
+          {Array.from({ length: 10 }).map((_, index) => (
+            <span key={index} className="border-l border-black/28 first:border-l-0" />
+          ))}
+        </div>
+      </div>
+      {!compact && (
+        <div className={`mt-1 text-[10px] ${isCritical ? 'text-[#fda4af]' : 'text-[#64748b]'}`}>
+          样本可信度 {safeIntegrity}%{isCritical ? ` · 低于通关线 ${MISSION_MIN_INTEGRITY}%` : ''}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function getLiveDiscoveryIds(items: PlacedItem[]) {
@@ -1519,7 +1734,14 @@ function App() {
   const agentMessagesEndRef = useRef<HTMLDivElement | null>(null);
   const inlineContainerFeedbackTimeoutRef = useRef<number | null>(null);
   const missionCueTimeoutRef = useRef<number | null>(null);
+  const missionPredictionGateRef = useRef<MissionPredictionGateSnapshot>({
+    active: false,
+    nextAction: null,
+    question: '',
+    accent: '#f59e0b',
+  });
   const agentDragStateRef = useRef<AgentDragState>({ pointerId: null, startX: 0, startY: 0, originX: 0, originY: 0, dragging: false });
+  const addReagentToContainerRef = useRef(addReagentToContainer);
   const handleDragEndRef = useRef(handleDragEnd);
   const emitReactionOutcomeRef = useRef(emitReactionOutcome);
 
@@ -1572,6 +1794,12 @@ function App() {
       const currentVolume = getTotalLiquidVolume(target.chemState);
       if (currentVolume + volumeML > capacity) {
         showToast(`🚫 ${target.name} 容量不足，无法加入 ${volumeML}mL`);
+        return currentItems;
+      }
+
+      if (gameMode === 'challenge' && shouldBlockMissionReagentForPrediction(reagentName)) {
+        promptMissionPredictionGate();
+        showToast('先完成预测，再验证现象');
         return currentItems;
       }
 
@@ -2215,6 +2443,7 @@ function App() {
   }
 
   useEffect(() => {
+    addReagentToContainerRef.current = addReagentToContainer;
     handleDragEndRef.current = handleDragEnd;
     emitReactionOutcomeRef.current = emitReactionOutcome;
   });
@@ -2300,7 +2529,7 @@ function App() {
       }
 
       const volume = customEvent.detail?.volume ?? (target.type === 'testtube' ? 5 : customEvent.detail?.tone === 'try' ? 10 : 20);
-      addReagentToContainer(target.id, reagentName, volume);
+      addReagentToContainerRef.current(target.id, reagentName, volume);
     };
     window.addEventListener('quickAddReagent', handleQuickAddReagent);
 
@@ -2434,7 +2663,6 @@ function App() {
       window.removeEventListener('quickAddReagent', handleQuickAddReagent);
       window.removeEventListener('buretteDrip', handleBuretteDrip);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- quick-add uses setPlacedItems functional updates and refs for live containers.
   }, [showInlineContainerHint, showToast, syncReadouts, updateDragGuide]);
 
   const agentState = useMemo(() => inferAgentState({
@@ -2456,20 +2684,47 @@ function App() {
   const primaryAgentContainerId = primaryAgentContainer?.id || null;
   const challengeInsight = useMemo(() => computeChallengeInsight(activeChallenge, placedItems), [activeChallenge, placedItems]);
   const challengeProductReady = useMemo(() => computeChallengeCompleted(activeChallenge, placedItems), [activeChallenge, placedItems]);
+  const challengeDoneCount = challengeInsight?.checklist.filter(item => item.done).length ?? 0;
   const activeMissionProof = activeChallenge ? MISSION_PROOFS[activeChallenge.id] : undefined;
   const activeProofAnswers = activeChallenge ? (missionProofAnswers[activeChallenge.id] || {}) : {};
   const activeProofSolvedCount = activeMissionProof?.checkpoints.filter(checkpoint => activeProofAnswers[checkpoint.id]?.correct).length ?? 0;
-  const activeProofCurrent = activeMissionProof?.checkpoints.find(checkpoint => !activeProofAnswers[checkpoint.id]?.correct);
+  const activePredictionCheckpoint = activeMissionProof?.checkpoints.find(checkpoint => isMissionPredictionCheckpoint(checkpoint));
+  const activePredictionSolved = Boolean(activePredictionCheckpoint && activeProofAnswers[activePredictionCheckpoint.id]?.correct);
+  const shouldShowPredictionGate = Boolean(
+    activeChallenge
+    && !activeChallenge.completed
+    && activePredictionCheckpoint
+    && !activePredictionSolved
+    && !challengeProductReady
+    && challengeDoneCount > 0,
+  );
+  const activePostProofCurrent = activeMissionProof?.checkpoints.find(checkpoint => !isMissionPredictionCheckpoint(checkpoint) && !activeProofAnswers[checkpoint.id]?.correct);
+  const activeProofCurrent = shouldShowPredictionGate
+    ? activePredictionCheckpoint
+    : challengeProductReady
+    ? (activePredictionSolved ? activePostProofCurrent : activePredictionCheckpoint)
+    : undefined;
   const activeProofCurrentAnswer = activeProofCurrent ? activeProofAnswers[activeProofCurrent.id] : undefined;
   const activeProofCurrentFeedback = activeProofCurrent && activeProofCurrentAnswer?.correct === false
     ? buildMissionProofFeedback(activeProofCurrent, activeProofCurrentAnswer.selectedId)
     : null;
   const activeProofSolved = Boolean(activeMissionProof && activeProofSolvedCount === activeMissionProof.checkpoints.length);
+  const activeProofStageLabel = getMissionProofStageLabel(activeProofCurrent?.stage);
+  const activeProofStageAccent = getMissionProofStageAccent(activeProofCurrent?.stage);
+  const showMissionProofPanel = Boolean(
+    activeChallenge
+    && !activeChallenge.completed
+    && activeMissionProof
+    && activeProofCurrent
+    && !activeProofSolved
+    && (shouldShowPredictionGate || challengeProductReady),
+  );
   const activeMissionStats = activeChallenge
     ? (missionRunStats[activeChallenge.id] || createMissionRunStats())
     : createMissionRunStats();
   const activeMissionGrade = getMissionGrade(activeMissionStats.integrity);
   const activeMissionCanComplete = activeMissionStats.integrity >= MISSION_MIN_INTEGRITY;
+  const activeMissionEvidenceScore = getMissionEvidenceScore(challengeProductReady, activeMissionProof, activeProofAnswers);
   const discoveryCards = useMemo(() => buildDiscoveryCards(placedItems, unlockedDiscoveryIds), [placedItems, unlockedDiscoveryIds]);
   const unlockedDiscoveryCount = useMemo(() => discoveryCards.filter(card => card.unlocked).length, [discoveryCards]);
   const completedMissionCount = useMemo(
@@ -2488,7 +2743,6 @@ function App() {
   );
   const activeLevelIndex = activeMissionPreset ? MISSION_SEQUENCE.indexOf(activeMissionPreset) : currentLevelIndex;
   const activeMissionBrief = activeMissionPreset ? MISSION_BRIEFS[activeMissionPreset] : null;
-  const challengeDoneCount = challengeInsight?.checklist.filter(item => item.done).length ?? 0;
   const challengeStepCount = challengeInsight?.checklist.length ?? 0;
   const challengeProofStepCount = activeMissionProof?.checkpoints.length ?? 0;
   const challengeDisplayDoneCount = challengeDoneCount + activeProofSolvedCount;
@@ -2508,19 +2762,31 @@ function App() {
       || (challengeNextAction === '有机相' ? actionPool.find(name => name.includes('四氯化碳')) : undefined)
       || null;
   }, [challengeInsight, challengeNextAction]);
+  useEffect(() => {
+    missionPredictionGateRef.current = {
+      active: shouldShowPredictionGate,
+      nextAction: challengeNextAction,
+      question: activeProofCurrent?.question || '',
+      accent: activeProofStageAccent,
+    };
+  }, [activeProofCurrent?.question, activeProofStageAccent, challengeNextAction, shouldShowPredictionGate]);
   const challengeStageLabel = useMemo(() => {
     if (!activeChallenge) return '选一关';
     if (activeChallenge.completed) return '下一关';
     if (challengeProductReady && activeProofSolved && !activeMissionCanComplete) return '样本失效';
+    if (shouldShowPredictionGate && activePredictionCheckpoint) {
+      return `预测：${activePredictionCheckpoint.label}`;
+    }
     if (challengeProductReady && activeMissionProof && !activeProofSolved) {
-      return activeProofCurrent ? `证据：${activeProofCurrent.label}` : '答证据链';
+      return activeProofCurrent ? `${getMissionProofStageLabel(activeProofCurrent.stage)}：${activeProofCurrent.label}` : '答证据链';
     }
     if (challengeQuickReagent) return `加${compactMissionLabel(challengeQuickReagent)}`;
     if (challengeNextAction) return `做 ${compactMissionLabel(challengeNextAction)}`;
     return '观察';
-  }, [activeChallenge, activeMissionCanComplete, activeMissionProof, activeProofCurrent, activeProofSolved, challengeNextAction, challengeProductReady, challengeQuickReagent]);
+  }, [activeChallenge, activeMissionCanComplete, activeMissionProof, activePredictionCheckpoint, activeProofCurrent, activeProofSolved, challengeNextAction, challengeProductReady, challengeQuickReagent, shouldShowPredictionGate]);
   const challengeActionOptions = useMemo(() => {
     if (!challengeInsight || !primaryAgentContainerId || activeChallenge?.completed) return [];
+    if (shouldShowPredictionGate) return [];
     const options: ChallengeActionOption[] = [];
     const pushOption = (name: string, label: string, tone: 'next' | 'main' | 'try', volume = 20) => {
       if (!name || options.some(option => option.name === name)) return;
@@ -2535,7 +2801,7 @@ function App() {
       .forEach(name => pushOption(name, '主线', 'main'));
     challengeInsight.secondaryReagents.slice(0, 2).forEach(name => pushOption(name, '支线', 'try', 10));
     return options.slice(0, 4);
-  }, [activeChallenge?.completed, challengeInsight, challengeQuickReagent, primaryAgentContainerId]);
+  }, [activeChallenge?.completed, challengeInsight, challengeQuickReagent, primaryAgentContainerId, shouldShowPredictionGate]);
   const challengePrimaryAction = useMemo(
     () => challengeActionOptions.find(option => option.tone === 'next')
       || challengeActionOptions.find(option => option.tone === 'main')
@@ -2548,6 +2814,24 @@ function App() {
       .slice(0, 3),
     [challengeActionOptions, challengePrimaryAction]
   );
+
+  function shouldBlockMissionReagentForPrediction(reagentName: string) {
+    const gate = missionPredictionGateRef.current;
+    if (!gate.active || !gate.nextAction) return false;
+    if (reagentName.includes('未知样品')) return false;
+    return missionReagentMatchesAction(reagentName, gate.nextAction);
+  }
+
+  function promptMissionPredictionGate() {
+    const gate = missionPredictionGateRef.current;
+    if (!gate.active || !gate.question) return;
+    showMissionCue({
+      title: '先预测',
+      detail: gate.question,
+      accent: gate.accent,
+      tone: 'proof',
+    }, 3200);
+  }
 
   function flashMissionCue(reagentName: string, tone: ChallengeActionOption['tone']) {
     if (gameMode !== 'challenge' || !activeChallenge) return;
@@ -2580,7 +2864,6 @@ function App() {
     flashMissionCue(option.name, option.tone);
   }
 
-  /* eslint-disable react-hooks/preserve-manual-memoization -- React Compiler flags the stable toast callback here; dependencies remain explicit for hook correctness. */
   const handleAgentQuickAction = useCallback((actionId: 'focus' | 'logs' | 'reagents' | 'note') => {
     if (actionId === 'focus') {
       const target = primaryAgentContainerId
@@ -2617,7 +2900,6 @@ function App() {
     window.dispatchEvent(new CustomEvent('agentNote', { detail: { message: note } }));
     showToast('📝 已把当前建议写入观察日志');
   }, [agentRemoteSummary, isTablet, primaryAgentContainerId, showToast, syncReadouts]);
-  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   const runAgentToolCalls = useCallback((toolCalls?: AgentToolCall[]) => {
     if (!toolCalls?.length) return;
@@ -2654,6 +2936,8 @@ function App() {
   const agentSkillPrompts = useMemo(() => {
     const missionPrompts = activeChallenge?.completed
       ? ['解释刚才现象', '下一关怎么做']
+      : shouldShowPredictionGate
+      ? ['帮我做预测', '为什么先预测']
       : challengeProductReady && activeMissionProof && !activeProofSolved
       ? ['我该选哪个证据', '解释这个现象']
       : [];
@@ -2664,7 +2948,7 @@ function App() {
       ...(dragGuide?.kind === 'reagent' && dragGuide.targetId && dragGuide.name ? [`${dragGuide.name}加到当前容器会怎样`] : []),
     ];
     return dedupePromptStrings([...localPrompts, ...agentSuggestedPrompts]).slice(0, 3);
-  }, [activeChallenge?.completed, activeMissionProof, activeProofSolved, agentSuggestedPrompts, challengeInsight, challengeProductReady, dragGuide, primaryAgentContainer]);
+  }, [activeChallenge?.completed, activeMissionProof, activeProofSolved, agentSuggestedPrompts, challengeInsight, challengeProductReady, dragGuide, primaryAgentContainer, shouldShowPredictionGate]);
   const agentDockSide = useMemo(() => {
     return agentPosition.x + AGENT_ORB_WIDTH / 2 >= agentViewport.width / 2 ? 'right' : 'left';
   }, [agentPosition.x, agentViewport.width]);
@@ -2753,15 +3037,19 @@ function App() {
         grade: activeMissionGrade.grade,
         mistakes: activeMissionStats.wrongProofs + activeMissionStats.wrongReagents,
         operations: activeMissionStats.operations,
+        evidenceScore: activeMissionEvidenceScore,
         nextAction: challengeProductReady && activeMissionProof && !activeProofSolved
           ? (activeProofCurrent ? `回答证据：${activeProofCurrent.label}` : '完成证据链')
+          : shouldShowPredictionGate && activeProofCurrent
+          ? `先预测：${activeProofCurrent.label}`
           : challengeStageLabel,
         proof: activeMissionProof ? {
           solvedCount: activeProofSolvedCount,
           stepCount: activeMissionProof.checkpoints.length,
           solved: activeProofSolved,
-          current: activeProofCurrent ? {
-            label: activeProofCurrent.label,
+            current: activeProofCurrent ? {
+              stage: activeProofCurrent.stage || 'evidence',
+              label: activeProofCurrent.label,
             question: activeProofCurrent.question,
             hint: activeProofCurrent.hint || null,
             selectedFeedback: activeProofCurrentFeedback,
@@ -2911,7 +3199,7 @@ function App() {
         agentAbortControllerRef.current = null;
       }
     }
-  }, [activeChallenge, activeMissionBrief, activeMissionGrade.grade, activeMissionProof, activeMissionStats.integrity, activeMissionStats.operations, activeMissionStats.wrongProofs, activeMissionStats.wrongReagents, activeProofCurrent, activeProofCurrentAnswer, activeProofCurrentFeedback, activeProofSolved, activeProofSolvedCount, agentLastEvent, agentMessages, agentState.goal, agentState.intent, agentState.risks, appendAgentMessage, appendUserMessage, challengeDisplayDoneCount, challengeDisplayStepCount, challengeProductReady, challengeStageLabel, gameMode, placedItems, primaryAgentContainerId, runAgentToolCalls, lavoisierApiUrl, setAgentDraft, setAgentError, setAgentExpanded, setAgentIsLoading, setAgentRemoteHeadline, setAgentRemoteSummary, setAgentStatusLabel, setAgentSuggestedPrompts]);
+  }, [activeChallenge, activeMissionBrief, activeMissionEvidenceScore, activeMissionGrade.grade, activeMissionProof, activeMissionStats.integrity, activeMissionStats.operations, activeMissionStats.wrongProofs, activeMissionStats.wrongReagents, activeProofCurrent, activeProofCurrentAnswer, activeProofCurrentFeedback, activeProofSolved, activeProofSolvedCount, agentLastEvent, agentMessages, agentState.goal, agentState.intent, agentState.risks, appendAgentMessage, appendUserMessage, challengeDisplayDoneCount, challengeDisplayStepCount, challengeProductReady, challengeStageLabel, gameMode, placedItems, primaryAgentContainerId, runAgentToolCalls, lavoisierApiUrl, setAgentDraft, setAgentError, setAgentExpanded, setAgentIsLoading, setAgentRemoteHeadline, setAgentRemoteSummary, setAgentStatusLabel, setAgentSuggestedPrompts, shouldShowPredictionGate]);
 
   const submitAgentQuery = useCallback((query: string) => {
     void requestLavoisierApi(query, { includeUserMessage: true });
@@ -3137,6 +3425,7 @@ function App() {
       grade: grade.grade,
       stars: grade.stars,
       integrity: runStats.integrity,
+      evidenceScore: activeMissionEvidenceScore,
       mistakes: runStats.wrongProofs + runStats.wrongReagents,
     });
     setCompletedMissionIds(previousIds => {
@@ -3149,7 +3438,7 @@ function App() {
     setTimeout(() => {
       setActiveChallenge(c => c?.id === activeChallenge.id ? { ...c, completed: true } : c);
     }, 0);
-  }, [activeChallenge, gameMode, missionProofAnswers, missionRunStats, placedItems, playSound]);
+  }, [activeChallenge, activeMissionEvidenceScore, gameMode, missionProofAnswers, missionRunStats, placedItems, playSound]);
 
   usePhysicsEngine(
     placedItems, 
@@ -3173,6 +3462,12 @@ function App() {
       const currentTotalVolume = getTotalLiquidVolume(collisionItem.chemState);
       if (currentTotalVolume + dropVolume > absoluteMax) {
         showToast(`🚫 该容器已装入 ${currentTotalVolume.toFixed(1)}mL，无法再加入 ${dropVolume}mL (最大容量 ${absoluteMax}mL)`);
+        return currentItems;
+      }
+
+      if (gameMode === 'challenge' && shouldBlockMissionReagentForPrediction(activeDrop.reagentName)) {
+        promptMissionPredictionGate();
+        showToast('先完成预测，再验证现象');
         return currentItems;
       }
 
@@ -3712,21 +4007,24 @@ function App() {
                         })}
                       </div>
                     </div>
-	                    <div className="shrink-0 text-right">
-	                      <div className="font-mono text-[13px] font-semibold text-[#67e8f9]">
-	                        {challengeDisplayDoneCount}/{Math.max(1, challengeDisplayStepCount)}
-	                      </div>
-	                      <div className={`mt-0.5 font-mono text-[11px] font-semibold ${activeMissionCanComplete ? 'text-[#bbf7d0]' : 'text-[#fda4af]'}`}>
-	                        可信度 {activeMissionStats.integrity}%
-	                      </div>
-	                      <div className="mt-1 max-w-[170px] truncate rounded-full border border-[#22d3ee]/20 bg-[#22d3ee]/10 px-2.5 py-1 text-[11px] font-medium text-[#a5f3fc]">
-	                        {challengeStageLabel}
-	                      </div>
-                    </div>
+		                    <div className="shrink-0 text-right">
+		                      <div className="mb-1 flex items-center justify-end gap-2">
+		                        <span className="font-mono text-[13px] font-semibold text-[#67e8f9]">
+		                          {challengeDisplayDoneCount}/{Math.max(1, challengeDisplayStepCount)}
+		                        </span>
+		                        <span className={`font-mono text-[10px] font-semibold ${activeMissionCanComplete ? 'text-[#bbf7d0]' : 'text-[#fda4af]'}`}>
+		                          HP {activeMissionStats.integrity}%
+		                        </span>
+		                      </div>
+		                      <MissionEvidenceBar value={activeMissionEvidenceScore} integrity={activeMissionStats.integrity} compact />
+		                      <div className="mt-1 max-w-[190px] truncate rounded-full border border-[#22d3ee]/20 bg-[#22d3ee]/10 px-2.5 py-1 text-[11px] font-medium text-[#a5f3fc]">
+		                        {challengeStageLabel}
+		                      </div>
+	                    </div>
                   </div>
                 </motion.div>
 
-                {!activeChallenge.completed && challengeProductReady && activeMissionProof && activeProofCurrent && !activeProofSolved ? (
+                {showMissionProofPanel && activeMissionProof && activeProofCurrent ? (
                   <motion.div
                     data-panel="challenge-proof-panel"
                     initial={{ opacity: 0, y: 18, scale: 0.98 }}
@@ -3734,17 +4032,17 @@ function App() {
                     transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                     className="absolute bottom-5 left-1/2 z-[68] w-[min(520px,calc(100%-32px))] -translate-x-1/2 rounded-[28px] border border-[#22d3ee]/18 bg-[rgba(7,11,23,0.88)] p-3 shadow-[0_18px_58px_rgba(2,6,23,0.48)] backdrop-blur-2xl sm:left-[58%] sm:w-[min(500px,calc(100%-180px))]"
                   >
-	                    <div className="flex flex-wrap items-center justify-between gap-2">
-	                      <div className="min-w-0">
-	                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#67e8f9]">
-	                          证据 {activeProofSolvedCount + 1}/{activeMissionProof.checkpoints.length}
-	                        </div>
-	                        <div className="mt-1 truncate text-[13px] font-semibold text-white">{activeProofCurrent.question}</div>
-	                      </div>
-	                      <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-2.5 py-1 text-right">
-	                        <div className="font-mono text-[12px] font-semibold text-[#f8fafc]">{activeMissionStats.integrity}%</div>
-	                        <div className="text-[9px] uppercase tracking-[0.14em] text-[#64748b]">{activeMissionGrade.grade}</div>
-	                      </div>
+		                    <div className="flex flex-wrap items-center justify-between gap-2">
+		                      <div className="min-w-0 flex-1">
+		                        <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: activeProofStageAccent }}>
+		                          <span>{activeProofStageLabel}</span>
+		                          <span className="text-[#64748b]">{activeProofSolvedCount + 1}/{activeMissionProof.checkpoints.length}</span>
+		                        </div>
+		                        <div className="mt-1 truncate text-[13px] font-semibold text-white">{activeProofCurrent.question}</div>
+		                      </div>
+		                      <div className="w-[158px] shrink-0">
+		                        <MissionEvidenceBar value={activeMissionEvidenceScore} integrity={activeMissionStats.integrity} compact />
+		                      </div>
 	                      <div className="flex flex-wrap gap-1">
 	                        {activeMissionProof.checkpoints.map((checkpoint, checkpointIndex) => {
                           const checkpointDone = Boolean(activeProofAnswers[checkpoint.id]?.correct);
@@ -3793,7 +4091,7 @@ function App() {
 	                              }));
 	                              if (isCorrect) {
 	                                showMissionCue({
-	                                  title: `证据 · ${activeProofCurrent.label}`,
+	                                  title: `${getMissionProofStageLabel(activeProofCurrent.stage)} · ${activeProofCurrent.label}`,
                                   detail: activeProofCurrent.success,
                                   accent: getMissionSuccessMeta(activeChallenge.id).accent,
 	                                  tone: 'proof',
@@ -4057,14 +4355,17 @@ function App() {
                     >
                       {missionCompletionCard.formula}
                     </div>
-	                    <div className="min-w-0">
-	                      <div className="text-[13px] font-semibold text-[#f8fafc]">{missionCompletionCard.product}</div>
-	                      <div className="mt-1 text-[12px] text-[#94a3b8]">
-	                        可信度 {missionCompletionCard.integrity}% · 失误 {missionCompletionCard.mistakes} · 已解锁图鉴。
-	                      </div>
-	                    </div>
-                  </div>
-                  <div className="mt-3 grid grid-cols-3 gap-1.5">
+		                    <div className="min-w-0">
+		                      <div className="text-[13px] font-semibold text-[#f8fafc]">{missionCompletionCard.product}</div>
+		                      <div className="mt-1 text-[12px] text-[#94a3b8]">
+		                        可信度 {missionCompletionCard.integrity}% · 失误 {missionCompletionCard.mistakes}
+		                      </div>
+		                    </div>
+	                  </div>
+	                  <div className="mt-3 rounded-[18px] border border-white/8 bg-white/[0.025] px-3 py-2">
+	                    <MissionEvidenceBar value={missionCompletionCard.evidenceScore} integrity={missionCompletionCard.integrity} />
+	                  </div>
+	                  <div className="mt-3 grid grid-cols-3 gap-1.5">
                     <button
                       type="button"
                       onClick={() => setAtlasOpen(true)}
@@ -4196,7 +4497,7 @@ function App() {
                       <div className="absolute -left-16 -top-16 h-44 w-44 rounded-full bg-[#22d3ee]/12 blur-3xl" />
                       <div className="relative">
                         <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#64748b]">闯关进度</div>
-                        <div className="mt-2 text-[24px] font-semibold tracking-[-0.03em] text-white">化学闯关</div>
+	                        <div className="mt-2 text-[24px] font-semibold tracking-[-0.03em] text-white">实验侦探</div>
                         <div className="mt-3 flex items-end gap-3">
                           <div className="font-mono text-[34px] font-bold leading-none text-[#67e8f9]">{completedMissionCount}/{MISSION_SEQUENCE.length}</div>
                           <div className="pb-1 text-[12px] text-[#94a3b8]">已完成</div>
@@ -4234,9 +4535,9 @@ function App() {
                         })}
                       </div>
                       <div className="mt-4 grid grid-cols-3 gap-2 text-[11px] text-[#64748b]">
-                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">沉淀</div>
-                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">显色</div>
-                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">分层/褪色</div>
+	                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">预测</div>
+	                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">验证</div>
+	                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">证据</div>
                       </div>
                     </div>
                   </div>
