@@ -112,10 +112,10 @@ export function EquipmentCard({
   const ghost = dragGhost ? (
     <div
       ref={dragGhostRef}
-      className="pointer-events-none fixed left-0 top-0 z-[9999] flex min-h-[52px] w-[190px] items-center gap-3 rounded-2xl border border-white/16 bg-[rgba(8,13,24,0.92)] px-4 py-3 text-white shadow-[0_20px_54px_rgba(2,6,23,0.56),0_0_22px_rgba(34,211,238,0.12)] backdrop-blur-xl will-change-transform"
+      className="pointer-events-none fixed left-0 top-0 z-[9999] flex min-h-[52px] w-[190px] items-center gap-3 rounded-2xl border border-white/16 bg-[rgba(8,13,24,0.92)] px-4 py-3 text-white shadow-[0_20px_54px_rgba(2,6,23,0.56),0_0_22px_rgba(214,197,157,0.12)] backdrop-blur-xl will-change-transform"
       style={{ transform: `translate3d(${dragGhost.x}px, ${dragGhost.y}px, 0) translate(-50%, -50%)` }}
     >
-      <span className="text-[#67e8f9]">{icon}</span>
+      <span className="text-[#f8e7bd]">{icon}</span>
       <span className="min-w-0">
         <span className="block truncate text-[14px] font-semibold">{name}</span>
         <span className="block truncate text-[11px] text-[#94a3b8]">{subtitle}</span>
@@ -146,7 +146,7 @@ export function EquipmentCard({
             onDragEnd?.(event, info);
           }}
           whileDrag={{ scale: 0.98, zIndex: 100, opacity: 0.3, cursor: 'grabbing' }}
-          className="w-10 h-10 flex items-center justify-center rounded-lg mb-2 transition-all hover:bg-[rgba(34,211,238,0.1)] hover:text-[#22d3ee] text-[#64748b] cursor-grab z-50 relative"
+          className="w-10 h-10 flex items-center justify-center rounded-lg mb-2 transition-all hover:bg-[rgba(214,197,157,0.1)] hover:text-[#d6c59d] text-[#64748b] cursor-grab z-50 relative"
           title={name}
           style={{ touchAction: 'none' }}
         >
@@ -186,8 +186,8 @@ export function EquipmentCard({
             state === 'disabled'
               ? 'opacity-35 cursor-not-allowed'
               : state === 'dragging'
-              ? 'opacity-60 scale-95 shadow-[0_0_20px_rgba(34,211,238,0.2)]'
-              : 'active:scale-[0.98] active:bg-[rgba(34,211,238,0.08)]'
+              ? 'opacity-60 scale-95 shadow-[0_0_20px_rgba(214,197,157,0.2)]'
+              : 'active:scale-[0.98] active:bg-[rgba(214,197,157,0.08)]'
           }
         `}
         style={{ touchAction: 'none' }}
@@ -197,7 +197,7 @@ export function EquipmentCard({
             ${
               state === 'disabled'
                 ? 'text-[#64748b]'
-                : 'text-[#64748b] group-hover:text-[#22d3ee]'
+                : 'text-[#64748b] group-hover:text-[#d6c59d]'
             }
           `}
         >
@@ -214,7 +214,7 @@ export function EquipmentCard({
         </div>
 
         {state === 'disabled' ? (
-          <div className="shrink-0 text-[10px] uppercase font-bold text-[#22d3ee] bg-[rgba(34,211,238,0.1)] px-1.5 py-0.5 rounded ml-2 pointer-events-none">
+          <div className="shrink-0 text-[10px] uppercase font-bold text-[#d6c59d] bg-[rgba(214,197,157,0.1)] px-1.5 py-0.5 rounded ml-2 pointer-events-none">
             使用中
           </div>
         ) : (

@@ -14,7 +14,7 @@ export function DashboardReadouts({ focusedLabel = '未选择容器', boilingPoi
   const [temp, setTemp] = useState(22.4);
   const [ph, setPh] = useState(7.0);
   const [trend, setTrend] = useState('→'); // '↗', '↘', '→'
-  const [tempColor, setTempColor] = useState('#22d3ee');
+  const [tempColor, setTempColor] = useState('#d6c59d');
 
   useEffect(() => {
     // Listen for exact temp/ph from the physical reaction engine
@@ -32,7 +32,7 @@ export function DashboardReadouts({ focusedLabel = '未选择容器', boilingPoi
           
           if (exactTemp > 60) setTempColor('#f43f5e'); // Red hot
           else if (exactTemp > 30) setTempColor('#f59e0b'); // Amber warm
-          else setTempColor('#22d3ee'); // Cool blue
+          else setTempColor('#d6c59d'); // neutral
           
           return Number(exactTemp.toFixed(1));
         });
@@ -51,7 +51,7 @@ export function DashboardReadouts({ focusedLabel = '未选择容器', boilingPoi
             
             if (exactTemp > 60) setTempColor('#f43f5e');
             else if (exactTemp > 30) setTempColor('#f59e0b');
-            else setTempColor('#22d3ee');
+            else setTempColor('#d6c59d');
             
             return Number(exactTemp.toFixed(1));
           });

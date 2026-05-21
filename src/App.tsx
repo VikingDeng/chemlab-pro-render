@@ -392,7 +392,7 @@ const MISSION_IMAGE_BY_PRESET: Record<MissionPreset, string> = {
 const DISCOVERY_STORAGE_KEY = 'chemlab:discovery-unlocks:v1';
 const MISSION_COMPLETION_STORAGE_KEY = 'chemlab:mission-completions:v1';
 const MISSION_SUCCESS_META: Record<string, { product: string; formula: string; accent: string }> = {
-  c1: { product: '蓝绿色絮状沉淀', formula: 'Cu(OH)₂', accent: '#22d3ee' },
+  c1: { product: '蓝绿色絮状沉淀', formula: 'Cu(OH)₂', accent: '#d6c59d' },
   c2: { product: '白色沉淀', formula: 'AgCl', accent: '#f8fafc' },
   c3: { product: '血红色络合物', formula: 'Fe(SCN)₃', accent: '#fb7185' },
   c4: { product: '无色气泡', formula: 'CO₂', accent: '#f59e0b' },
@@ -793,7 +793,7 @@ function isMissionUnlocked(index: number, completedIds: Set<string>) {
 }
 
 function getMissionSuccessMeta(challengeId: string) {
-  return MISSION_SUCCESS_META[challengeId] || { product: '目标现象', formula: '✓', accent: '#22d3ee' };
+  return MISSION_SUCCESS_META[challengeId] || { product: '目标现象', formula: '✓', accent: '#d6c59d' };
 }
 
 function compactMissionLabel(value: string) {
@@ -1028,7 +1028,7 @@ function getMissionProofStageAccent(stage: MissionProofStage | undefined) {
       return '#10b981';
     case 'evidence':
     default:
-      return '#22d3ee';
+      return '#d6c59d';
   }
 }
 
@@ -1096,7 +1096,7 @@ const DISCOVERY_LIBRARY: DiscoveryDefinition[] = [
     title: '蓝绿色絮状沉淀',
     formula: 'Cu(OH)₂',
     hint: '铜盐遇碱',
-    accent: '#22d3ee',
+    accent: '#d6c59d',
     isUnlocked: (state) => hasMole(state, 'Cu(OH)2', 1e-6),
   },
   {
@@ -1228,11 +1228,11 @@ function getAgentIntentMeta(intent: AgentIntent) {
     case 'titration':
       return {
         label: '滴定',
-        badge: 'border-[#22d3ee]/25 bg-[#22d3ee]/10 text-[#67e8f9]',
-        bubbleBorder: 'border-[#22d3ee]/24',
-        suggestion: 'text-[#67e8f9]',
-        orbGradient: 'from-[#22d3ee] via-[#38bdf8] to-[#0f172a]',
-        orbGlow: '0 0 42px rgba(34,211,238,0.35)',
+        badge: 'border-[#d6c59d]/25 bg-[#d6c59d]/10 text-[#f8e7bd]',
+        bubbleBorder: 'border-[#d6c59d]/24',
+        suggestion: 'text-[#f8e7bd]',
+        orbGradient: 'from-[#d6c59d] via-[#cdb47f] to-[#0f172a]',
+        orbGlow: '0 0 42px rgba(214,197,157,0.35)',
       };
     case 'precipitation':
       return {
@@ -1264,11 +1264,11 @@ function getAgentIntentMeta(intent: AgentIntent) {
     case 'distillation':
       return {
         label: '蒸馏',
-        badge: 'border-[#38bdf8]/25 bg-[#38bdf8]/10 text-[#bae6fd]',
-        bubbleBorder: 'border-[#38bdf8]/24',
+        badge: 'border-[#cdb47f]/25 bg-[#cdb47f]/10 text-[#bae6fd]',
+        bubbleBorder: 'border-[#cdb47f]/24',
         suggestion: 'text-[#bae6fd]',
-        orbGradient: 'from-[#38bdf8] via-[#818cf8] to-[#0f172a]',
-        orbGlow: '0 0 42px rgba(56,189,248,0.34)',
+        orbGradient: 'from-[#cdb47f] via-[#818cf8] to-[#0f172a]',
+        orbGlow: '0 0 42px rgba(205,180,127,0.34)',
       };
     case 'exploration':
     default:
@@ -1277,7 +1277,7 @@ function getAgentIntentMeta(intent: AgentIntent) {
         badge: 'border-white/12 bg-white/6 text-[#cbd5e1]',
         bubbleBorder: 'border-white/10',
         suggestion: 'text-[#e2e8f0]',
-        orbGradient: 'from-[#6366f1] via-[#22d3ee] to-[#0f172a]',
+        orbGradient: 'from-[#6366f1] via-[#d6c59d] to-[#0f172a]',
         orbGlow: '0 0 42px rgba(99,102,241,0.28)',
       };
   }
@@ -1319,16 +1319,16 @@ function MissionEvidenceBar({
   const fillClass = isCritical
     ? 'from-[#f43f5e] via-[#fb7185] to-[#f59e0b]'
     : safeValue >= 80
-    ? 'from-[#10b981] via-[#22d3ee] to-[#67e8f9]'
-    : 'from-[#f59e0b] via-[#22d3ee] to-[#38bdf8]';
-  const hpFillClass = isCritical ? 'from-[#f43f5e] to-[#f59e0b]' : 'from-[#10b981] to-[#22d3ee]';
+    ? 'from-[#10b981] via-[#d6c59d] to-[#f8e7bd]'
+    : 'from-[#f59e0b] via-[#d6c59d] to-[#cdb47f]';
+  const hpFillClass = isCritical ? 'from-[#f43f5e] to-[#f59e0b]' : 'from-[#10b981] to-[#d6c59d]';
   const pollutionText = safePollution > 0 ? (compact ? ` · 污${safePollution}` : ` · 污染 ${safePollution}`) : '';
 
   return (
     <div className={compact ? 'min-w-[140px]' : 'w-full'}>
       <div className="mb-1 flex items-center justify-between gap-2">
         <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#64748b]">{compact ? '证据' : '证据强度'}</span>
-        <span className={`font-mono text-[12px] font-bold ${isCritical ? 'text-[#fda4af]' : 'text-[#a5f3fc]'}`}>{safeValue}% · HP {safeIntegrity}{pollutionText}</span>
+        <span className={`font-mono text-[12px] font-bold ${isCritical ? 'text-[#fda4af]' : 'text-[#f1e6cd]'}`}>{safeValue}% · HP {safeIntegrity}{pollutionText}</span>
       </div>
       <div className="relative h-3 overflow-hidden rounded-full border border-white/10 bg-black/30 shadow-[inset_0_0_14px_rgba(2,6,23,0.65)]">
         <motion.div
@@ -1336,7 +1336,7 @@ function MissionEvidenceBar({
           initial={false}
           animate={{ width: `${safeValue}%` }}
           transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-          style={{ boxShadow: isCritical ? '0 0 18px rgba(244,63,94,0.45)' : '0 0 18px rgba(34,211,238,0.32)' }}
+          style={{ boxShadow: isCritical ? '0 0 18px rgba(244,63,94,0.45)' : '0 0 18px rgba(214,197,157,0.32)' }}
         />
         <div className="absolute inset-0 grid grid-cols-10">
           {Array.from({ length: 10 }).map((_, index) => (
@@ -1386,7 +1386,7 @@ function buildReactionSpotlight(reagentName: string, result: ReactionResult): Re
     : result.reactionType.includes('redox')
     ? '#a855f7'
     : result.reactionType.includes('precipitate')
-    ? '#22d3ee'
+    ? '#d6c59d'
     : '#10b981';
   const detail = result.equation || `继续观察颜色、沉淀、气泡或分层变化`;
   return {
@@ -1411,7 +1411,7 @@ function getPhenomenonTag(item: PlacedItem, timeSinceReaction: number, showPersi
     return { label: '持续冒泡', accent: '#f59e0b', tone: 'gas' };
   }
   if (state.includes('precipitate')) {
-    return { label: hasRecentReaction ? '絮状沉降' : '沉淀已成', accent: state.includes('ag') ? '#f8fafc' : '#22d3ee', tone: 'precipitate' };
+    return { label: hasRecentReaction ? '絮状沉降' : '沉淀已成', accent: state.includes('ag') ? '#f8fafc' : '#d6c59d', tone: 'precipitate' };
   }
   if (state.includes('complex')) {
     return { label: '显色络合', accent: state.includes('fe') ? '#fb7185' : '#2563eb', tone: 'complex' };
@@ -4076,13 +4076,13 @@ function App() {
                 setGameMode('sandbox');
                 setActiveChallenge(null);
               }}
-              className={`px-3 py-1 rounded-md text-[13px] transition-all ${gameMode === 'sandbox' ? 'bg-[#22d3ee]/20 text-[#22d3ee] shadow-[0_0_10px_rgba(34,211,238,0.2)]' : 'hover:text-white text-[#94a3b8]'}`}
+              className={`px-3 py-1 rounded-md text-[13px] transition-all ${gameMode === 'sandbox' ? 'bg-[#d6c59d]/20 text-[#d6c59d] shadow-[0_0_10px_rgba(214,197,157,0.2)]' : 'hover:text-white text-[#94a3b8]'}`}
             >
               自由实验
             </button>
             <button 
               onClick={openChallengeMode}
-              className={`px-3 py-1 rounded-md text-[13px] transition-all ${gameMode === 'challenge' ? 'bg-[#f43f5e]/20 text-[#f43f5e] shadow-[0_0_10px_rgba(244,63,94,0.2)]' : 'hover:text-white text-[#94a3b8]'}`}
+              className={`px-3 py-1 rounded-md text-[13px] transition-all ${gameMode === 'challenge' ? 'bg-[#d6c59d]/20 text-[#f8e7bd] shadow-[0_0_10px_rgba(214,197,157,0.2)]' : 'hover:text-white text-[#94a3b8]'}`}
             >
               任务挑战
             </button>
@@ -4090,18 +4090,18 @@ function App() {
           <button
             type="button"
             onClick={() => launchQuickStart('prepCu')}
-            className="hidden h-8 items-center rounded-full border border-[#22d3ee]/30 bg-[#22d3ee]/12 px-3 text-[13px] font-semibold text-[#a5f3fc] transition-colors hover:bg-[#22d3ee]/20 sm:flex"
+            className="hidden h-8 items-center rounded-full border border-[#d6c59d]/30 bg-[#d6c59d]/12 px-3 text-[13px] font-semibold text-[#f1e6cd] transition-colors hover:bg-[#d6c59d]/20 sm:flex"
           >
             演示关卡
           </button>
           <button
             type="button"
             onClick={() => setAtlasOpen(true)}
-            className="flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 text-[13px] text-[#cbd5e1] transition-colors hover:border-[#22d3ee]/30 hover:bg-[#22d3ee]/10 hover:text-[#67e8f9]"
+            className="flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 text-[13px] text-[#cbd5e1] transition-colors hover:border-[#d6c59d]/30 hover:bg-[#d6c59d]/10 hover:text-[#f8e7bd]"
           >
             <BookOpen size={14} />
             <span>图鉴</span>
-            <span className="font-mono text-[11px] text-[#67e8f9]">{unlockedDiscoveryCount}/{discoveryCards.length}</span>
+            <span className="font-mono text-[11px] text-[#f8e7bd]">{unlockedDiscoveryCount}/{discoveryCards.length}</span>
           </button>
           </div>
           <div className="flex items-center gap-4 text-[13px] text-[#cbd5e1]">
@@ -4170,9 +4170,9 @@ function App() {
             {dragGuide && (
               <div className="absolute inset-0 z-[25] pointer-events-none flex items-center justify-center">
                 <div
-                  className={`absolute inset-3 rounded-[18px] border-2 transition-all duration-150 ${dragGuide.inWorkspace ? 'border-[#22d3ee]/70 shadow-[inset_0_0_40px_rgba(34,211,238,0.12),0_0_25px_rgba(34,211,238,0.12)]' : 'border-white/8'}`}
+                  className={`absolute inset-3 rounded-[18px] border-2 transition-all duration-150 ${dragGuide.inWorkspace ? 'border-[#d6c59d]/70 shadow-[inset_0_0_40px_rgba(214,197,157,0.12),0_0_25px_rgba(214,197,157,0.12)]' : 'border-white/8'}`}
                 />
-                <div className={`px-4 py-2 rounded-full border backdrop-blur-md text-[13px] font-medium transition-all duration-150 ${dragGuide.inWorkspace ? 'border-[#22d3ee]/40 bg-[#0a0e1a]/75 text-[#22d3ee]' : 'border-white/10 bg-[#0a0e1a]/70 text-[#94a3b8]'}`}>
+                <div className={`px-4 py-2 rounded-full border backdrop-blur-md text-[13px] font-medium transition-all duration-150 ${dragGuide.inWorkspace ? 'border-[#d6c59d]/40 bg-[#0a0e1a]/75 text-[#d6c59d]' : 'border-white/10 bg-[#0a0e1a]/70 text-[#94a3b8]'}`}>
                   {dragGuide.message ?? (dragGuide.kind === 'equipment'
                     ? (dragGuide.inWorkspace ? `释放以放置器材：${dragGuide.name}` : `将器材拖入中央实验台：${dragGuide.name}`)
                     : dragGuide.targetId
@@ -4187,7 +4187,7 @@ function App() {
               {isTablet && !sidebarOpen && (
                 <button
                   onClick={() => setSidebarOpen(true)}
-                  className="glass-panel px-3 py-1.5 flex items-center gap-1.5 text-[12px] text-[#94a3b8] hover:text-[#22d3ee] transition-all hover:shadow-[0_0_10px_rgba(34,211,238,0.2)] pointer-events-auto"
+                  className="glass-panel px-3 py-1.5 flex items-center gap-1.5 text-[12px] text-[#94a3b8] hover:text-[#d6c59d] transition-all hover:shadow-[0_0_10px_rgba(214,197,157,0.2)] pointer-events-auto"
                 >
                   <Menu size={14} />
                   <span>器材库</span>
@@ -4196,7 +4196,7 @@ function App() {
 
               <button 
                 onClick={undo}
-                className="glass-panel px-3 py-1.5 flex items-center gap-1.5 text-[12px] text-[#94a3b8] hover:text-[#22d3ee] transition-all hover:shadow-[0_0_10px_rgba(34,211,238,0.2)] disabled:opacity-30 disabled:hover:shadow-none pointer-events-auto"
+                className="glass-panel px-3 py-1.5 flex items-center gap-1.5 text-[12px] text-[#94a3b8] hover:text-[#d6c59d] transition-all hover:shadow-[0_0_10px_rgba(214,197,157,0.2)] disabled:opacity-30 disabled:hover:shadow-none pointer-events-auto"
                 disabled={history.length === 0}
               >
                 <RotateCcw size={14} />
@@ -4233,7 +4233,7 @@ function App() {
                   transition={{ duration: 0.22, ease: 'easeOut' }}
                   className="absolute left-1/2 top-[204px] z-[55] w-[min(760px,calc(100%-32px))] -translate-x-1/2 overflow-hidden rounded-[26px] border border-white/10 bg-[rgba(7,11,23,0.78)] px-3 py-2.5 shadow-[0_14px_44px_rgba(2,6,23,0.34)] backdrop-blur-2xl sm:top-[118px]"
                 >
-                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#22d3ee]/50 to-transparent" />
+                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d6c59d]/50 to-transparent" />
                   <div className="flex items-center gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-2">
@@ -4255,9 +4255,9 @@ function App() {
                             <div
                               key={`${label}-${index}`}
                               title={label}
-                              className={`group flex min-w-0 flex-1 items-center gap-1.5 rounded-full border px-1.5 py-1 transition-colors ${stepDone ? 'border-[#10b981]/24 bg-[#10b981]/10 text-[#bbf7d0]' : stepCurrent ? 'border-[#22d3ee]/28 bg-[#22d3ee]/10 text-[#a5f3fc]' : 'border-white/8 bg-white/[0.025] text-[#64748b]'}`}
+                              className={`group flex min-w-0 flex-1 items-center gap-1.5 rounded-full border px-1.5 py-1 transition-colors ${stepDone ? 'border-[#10b981]/24 bg-[#10b981]/10 text-[#bbf7d0]' : stepCurrent ? 'border-[#d6c59d]/28 bg-[#d6c59d]/10 text-[#f1e6cd]' : 'border-white/8 bg-white/[0.025] text-[#64748b]'}`}
                             >
-                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${stepDone ? 'bg-[#10b981]' : stepCurrent ? 'bg-[#22d3ee]' : 'bg-[#475569]'}`} />
+                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${stepDone ? 'bg-[#10b981]' : stepCurrent ? 'bg-[#d6c59d]' : 'bg-[#475569]'}`} />
                               <span className="hidden truncate text-[10px] font-semibold md:block">{label}</span>
                             </div>
                           );
@@ -4266,7 +4266,7 @@ function App() {
                     </div>
 		                    <div className="shrink-0 text-right">
 		                      <div className="mb-1 flex items-center justify-end gap-2">
-		                        <span className="font-mono text-[13px] font-semibold text-[#67e8f9]">
+		                        <span className="font-mono text-[13px] font-semibold text-[#f8e7bd]">
 		                          {challengeDisplayDoneCount}/{Math.max(1, challengeDisplayStepCount)}
 		                        </span>
 		                        <span className={`font-mono text-[10px] font-semibold ${activeMissionCanComplete ? 'text-[#bbf7d0]' : 'text-[#fda4af]'}`}>
@@ -4274,7 +4274,7 @@ function App() {
 		                        </span>
 		                      </div>
 		                      <MissionEvidenceBar value={activeMissionEvidenceScore} integrity={activeMissionStats.integrity} pollution={activeMissionStats.pollution} compact />
-		                      <div className="mt-1 max-w-[190px] truncate rounded-full border border-[#22d3ee]/20 bg-[#22d3ee]/10 px-2.5 py-1 text-[11px] font-medium text-[#a5f3fc]">
+		                      <div className="mt-1 max-w-[190px] truncate rounded-full border border-[#d6c59d]/20 bg-[#d6c59d]/10 px-2.5 py-1 text-[11px] font-medium text-[#f1e6cd]">
 		                        {challengeStageLabel}
 		                      </div>
 		                      {challengeCoachLine && (
@@ -4290,7 +4290,7 @@ function App() {
                     initial={{ opacity: 0, y: 18, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-                    className="absolute bottom-5 left-1/2 z-[68] w-[min(520px,calc(100%-32px))] -translate-x-1/2 rounded-[28px] border border-[#22d3ee]/18 bg-[rgba(7,11,23,0.88)] p-3 shadow-[0_18px_58px_rgba(2,6,23,0.48)] backdrop-blur-2xl sm:left-[58%] sm:w-[min(500px,calc(100%-180px))]"
+                    className="absolute bottom-5 left-1/2 z-[68] w-[min(520px,calc(100%-32px))] -translate-x-1/2 rounded-[28px] border border-[#d6c59d]/18 bg-[rgba(7,11,23,0.88)] p-3 shadow-[0_18px_58px_rgba(2,6,23,0.48)] backdrop-blur-2xl sm:left-[58%] sm:w-[min(500px,calc(100%-180px))]"
                   >
 		                    <div className="flex flex-wrap items-center justify-between gap-2">
 		                      <div className="min-w-0 flex-1">
@@ -4310,7 +4310,7 @@ function App() {
                           return (
                             <span
                               key={checkpoint.id}
-                              className={`rounded-full border px-2 py-0.5 text-[10px] ${checkpointDone ? 'border-[#10b981]/25 bg-[#10b981]/10 text-[#bbf7d0]' : checkpointCurrent ? 'border-[#22d3ee]/28 bg-[#22d3ee]/10 text-[#a5f3fc]' : 'border-white/8 bg-white/[0.025] text-[#64748b]'}`}
+                              className={`rounded-full border px-2 py-0.5 text-[10px] ${checkpointDone ? 'border-[#10b981]/25 bg-[#10b981]/10 text-[#bbf7d0]' : checkpointCurrent ? 'border-[#d6c59d]/28 bg-[#d6c59d]/10 text-[#f1e6cd]' : 'border-white/8 bg-white/[0.025] text-[#64748b]'}`}
                             >
                               {checkpointDone ? '✓' : checkpointIndex + 1} {checkpoint.label}
                             </span>
@@ -4323,7 +4323,7 @@ function App() {
 	                          recordMissionEvent(activeChallenge.id, 'hint', MISSION_HINT_PENALTY, '使用拉瓦锡提示');
 	                          submitAgentQuery('只给一个线索，不要直接说答案。');
 	                        }}
-	                        className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-2.5 py-1 text-[10px] font-semibold text-[#a5f3fc] hover:bg-[#22d3ee]/16 transition-colors"
+	                        className="rounded-full border border-[#d6c59d]/24 bg-[#d6c59d]/10 px-2.5 py-1 text-[10px] font-semibold text-[#f1e6cd] hover:bg-[#d6c59d]/16 transition-colors"
 	                      >
                         问拉瓦锡
                       </button>
@@ -4368,7 +4368,7 @@ function App() {
 	                                }, 2600);
 	                              }
 	                            }}
-                            className={`rounded-2xl border px-3 py-2 text-left transition-all hover:-translate-y-0.5 ${isWrong ? 'border-[#f43f5e]/35 bg-[#f43f5e]/10' : isSelected ? 'border-[#10b981]/35 bg-[#10b981]/10' : 'border-white/8 bg-white/[0.035] hover:border-[#22d3ee]/30 hover:bg-[#22d3ee]/8'}`}
+                            className={`rounded-2xl border px-3 py-2 text-left transition-all hover:-translate-y-0.5 ${isWrong ? 'border-[#f43f5e]/35 bg-[#f43f5e]/10' : isSelected ? 'border-[#10b981]/35 bg-[#10b981]/10' : 'border-white/8 bg-white/[0.035] hover:border-[#d6c59d]/30 hover:bg-[#d6c59d]/8'}`}
                           >
                             <div className="text-[12px] font-semibold text-[#f8fafc]">{option.label}</div>
                             <div className="mt-0.5 truncate text-[10px] text-[#94a3b8]">{option.detail}</div>
@@ -4395,7 +4395,7 @@ function App() {
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: 4, scale: 0.98 }}
                           transition={{ duration: 0.18, ease: 'easeOut' }}
-                          className={`mt-2 flex items-center gap-2 rounded-[18px] border px-3 py-2 text-[11px] ${missionCue.tone === 'side' ? 'border-[#f59e0b]/22 bg-[#f59e0b]/8 text-[#fde68a]' : missionCue.tone === 'proof' ? 'border-[#10b981]/24 bg-[#10b981]/10 text-[#bbf7d0]' : 'border-[#22d3ee]/22 bg-[#22d3ee]/8 text-[#a5f3fc]'}`}
+                          className={`mt-2 flex items-center gap-2 rounded-[18px] border px-3 py-2 text-[11px] ${missionCue.tone === 'side' ? 'border-[#f59e0b]/22 bg-[#f59e0b]/8 text-[#fde68a]' : missionCue.tone === 'proof' ? 'border-[#10b981]/24 bg-[#10b981]/10 text-[#bbf7d0]' : 'border-[#d6c59d]/22 bg-[#d6c59d]/8 text-[#f1e6cd]'}`}
                         >
                           <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: missionCue.accent, boxShadow: `0 0 14px ${missionCue.accent}` }} />
                           <span className="shrink-0 font-semibold">{missionCue.title}</span>
@@ -4436,7 +4436,7 @@ function App() {
 	                          <button
 	                            type="button"
 	                            onClick={() => submitAgentQuery('我这关样本失效，请用两句话复盘扣分/污染来源，以及下一次最短正确路线。')}
-	                            className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-3 py-2 text-[11px] font-semibold text-[#a5f3fc] transition-all hover:-translate-y-0.5 hover:bg-[#22d3ee]/16"
+	                            className="rounded-full border border-[#d6c59d]/24 bg-[#d6c59d]/10 px-3 py-2 text-[11px] font-semibold text-[#f1e6cd] transition-all hover:-translate-y-0.5 hover:bg-[#d6c59d]/16"
 	                          >
 	                            复盘
 	                          </button>
@@ -4462,10 +4462,10 @@ function App() {
                               }
                               showToast('已观察当前状态');
                             }}
-                            className="group min-h-[48px] min-w-0 rounded-[20px] border border-[#22d3ee]/30 bg-[#22d3ee]/12 px-3.5 py-2 text-left shadow-[0_0_24px_rgba(34,211,238,0.10)] transition-all hover:-translate-y-0.5 hover:bg-[#22d3ee]/18"
+                            className="group min-h-[48px] min-w-0 rounded-[20px] border border-[#d6c59d]/30 bg-[#d6c59d]/12 px-3.5 py-2 text-left shadow-[0_0_24px_rgba(214,197,157,0.10)] transition-all hover:-translate-y-0.5 hover:bg-[#d6c59d]/18"
                           >
                             <div className="flex min-w-0 items-center gap-2">
-                              <span className="h-2 w-2 shrink-0 rounded-full bg-[#22d3ee] shadow-[0_0_16px_rgba(34,211,238,0.85)]" />
+                              <span className="h-2 w-2 shrink-0 rounded-full bg-[#d6c59d] shadow-[0_0_16px_rgba(214,197,157,0.85)]" />
                               <span className="truncate text-[13px] font-semibold text-[#f8fafc]">
                                 {challengePrimaryAction ? `加入 ${compactMissionLabel(challengePrimaryAction.name)}` : '观察现象'}
                               </span>
@@ -4508,7 +4508,7 @@ function App() {
 	                                recordMissionEvent(activeChallenge.id, 'hint', MISSION_HINT_PENALTY, '使用拉瓦锡提示');
 	                                submitAgentQuery('结合当前关卡，下一步该怎么做？');
 	                              }}
-	                              className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-3 py-2 text-[11px] font-semibold text-[#a5f3fc] transition-all hover:-translate-y-0.5 hover:bg-[#22d3ee]/16"
+	                              className="rounded-full border border-[#d6c59d]/24 bg-[#d6c59d]/10 px-3 py-2 text-[11px] font-semibold text-[#f1e6cd] transition-all hover:-translate-y-0.5 hover:bg-[#d6c59d]/16"
 	                            >
                               问 AI
                             </button>
@@ -4522,7 +4522,7 @@ function App() {
                               animate={{ opacity: 1, y: 0, scale: 1 }}
                               exit={{ opacity: 0, y: 4, scale: 0.98 }}
                               transition={{ duration: 0.18, ease: 'easeOut' }}
-                              className={`mt-2 flex items-center gap-2 rounded-[18px] border px-3 py-2 text-[11px] ${missionCue.tone === 'side' ? 'border-[#f59e0b]/22 bg-[#f59e0b]/8 text-[#fde68a]' : missionCue.tone === 'proof' ? 'border-[#10b981]/24 bg-[#10b981]/10 text-[#bbf7d0]' : 'border-[#22d3ee]/22 bg-[#22d3ee]/8 text-[#a5f3fc]'}`}
+                              className={`mt-2 flex items-center gap-2 rounded-[18px] border px-3 py-2 text-[11px] ${missionCue.tone === 'side' ? 'border-[#f59e0b]/22 bg-[#f59e0b]/8 text-[#fde68a]' : missionCue.tone === 'proof' ? 'border-[#10b981]/24 bg-[#10b981]/10 text-[#bbf7d0]' : 'border-[#d6c59d]/22 bg-[#d6c59d]/8 text-[#f1e6cd]'}`}
                             >
                               <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: missionCue.accent, boxShadow: `0 0 14px ${missionCue.accent}` }} />
                               <span className="shrink-0 font-semibold">{missionCue.title}</span>
@@ -4543,7 +4543,7 @@ function App() {
                         <button
                           type="button"
                           onClick={() => setAtlasOpen(true)}
-                          className="rounded-full border border-[#22d3ee]/35 bg-[#22d3ee]/12 px-3 py-1.5 text-[11px] font-semibold text-[#a5f3fc] hover:bg-[#22d3ee]/20 transition-colors"
+                          className="rounded-full border border-[#d6c59d]/35 bg-[#d6c59d]/12 px-3 py-1.5 text-[11px] font-semibold text-[#f1e6cd] hover:bg-[#d6c59d]/20 transition-colors"
                         >
                           查看图鉴
                         </button>
@@ -4611,7 +4611,7 @@ function App() {
                   </button>
 	                  <div className="flex items-start justify-between gap-3 pr-8">
 	                    <div className="min-w-0">
-	                      <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#67e8f9]">关卡完成</div>
+	                      <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#f8e7bd]">关卡完成</div>
 	                      <div className="mt-1 text-[17px] font-semibold text-white">{missionCompletionCard.title}</div>
 	                    </div>
 	                    <div className="shrink-0 rounded-2xl border border-[#f59e0b]/26 bg-[#f59e0b]/10 px-2.5 py-1 text-right">
@@ -4651,7 +4651,7 @@ function App() {
                     <button
                       type="button"
                       onClick={() => setAtlasOpen(true)}
-                      className="rounded-2xl border border-[#22d3ee]/30 bg-[#22d3ee]/10 px-2 py-2 text-[11px] font-semibold text-[#a5f3fc] hover:bg-[#22d3ee]/16 transition-colors"
+                      className="rounded-2xl border border-[#d6c59d]/30 bg-[#d6c59d]/10 px-2 py-2 text-[11px] font-semibold text-[#f1e6cd] hover:bg-[#d6c59d]/16 transition-colors"
                     >
                       查看图鉴
                     </button>
@@ -4731,15 +4731,15 @@ function App() {
                     initial={{ scale: 0.9, y: 20 }}
                     animate={{ scale: 1, y: 0 }}
                     exit={{ scale: 0.9, y: 20 }}
-                    className="glass-panel p-6 w-[320px] flex flex-col items-center shadow-2xl border border-[rgba(34,211,238,0.3)] bg-[#0a0e1a]/80"
+                    className="glass-panel p-6 w-[320px] flex flex-col items-center shadow-2xl border border-[rgba(214,197,157,0.3)] bg-[#0a0e1a]/80"
                   >
-                    <Droplets size={32} className="text-[#22d3ee] mb-4" />
+                    <Droplets size={32} className="text-[#d6c59d] mb-4" />
                     <h3 className="text-[#e2e8f0] text-[18px] font-medium mb-1">加入 {activeDrop.reagentName}</h3>
                     <p className="text-[#94a3b8] text-[13px] mb-6">请调节倒入的毫升数 (mL)</p>
                     
                     <div className="w-full flex items-center justify-between mb-2">
                       <span className="text-[#475569] text-[12px] font-mono">1mL</span>
-                      <span className="text-[#22d3ee] text-[24px] font-mono font-bold drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">{dropVolume}mL</span>
+                      <span className="text-[#d6c59d] text-[24px] font-mono font-bold drop-shadow-[0_0_10px_rgba(214,197,157,0.5)]">{dropVolume}mL</span>
                       <span className="text-[#475569] text-[12px] font-mono">{activeDrop.maxAdd}mL</span>
                     </div>
                     
@@ -4749,7 +4749,7 @@ function App() {
                       max={activeDrop.maxAdd}
                       value={dropVolume}
                       onChange={(e) => setDropVolume(Number(e.target.value))}
-                      className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-[#22d3ee] mb-8"
+                      className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-[#d6c59d] mb-8"
                     />
                     
                     <div className="flex w-full gap-3">
@@ -4761,7 +4761,7 @@ function App() {
                       </button>
                       <button 
                         onClick={handleConfirmDrop}
-                        className="flex-1 py-2.5 rounded-lg bg-[#22d3ee] text-[#0a0e1a] font-medium hover:bg-[#22d3ee]/90 hover:shadow-[0_0_15px_rgba(34,211,238,0.4)] transition-all"
+                        className="flex-1 py-2.5 rounded-lg bg-[#d6c59d] text-[#0a0e1a] font-medium hover:bg-[#d6c59d]/90 hover:shadow-[0_0_15px_rgba(214,197,157,0.4)] transition-all"
                       >
                         倒入
                       </button>
@@ -5367,7 +5367,7 @@ function App() {
                 animate={{ scale: 1, opacity: 1 }} 
                 transition={{ type: "spring", stiffness: 800, damping: 50 }}
                 data-placed-item-id={item.id}
-                className={`absolute flex flex-col items-center justify-center cursor-grab active:cursor-grabbing interactive-item ${item.type === 'testtube' && item.rackId ? 'z-[15]' : ''} ${item.type === 'testtubes' ? 'z-[10]' : ''} ${highlightedTargetId === item.id ? 'drop-shadow-[0_0_18px_rgba(34,211,238,0.6)]' : ''}`}
+                className={`absolute flex flex-col items-center justify-center cursor-grab active:cursor-grabbing interactive-item ${item.type === 'testtube' && item.rackId ? 'z-[15]' : ''} ${item.type === 'testtubes' ? 'z-[10]' : ''} ${highlightedTargetId === item.id ? 'drop-shadow-[0_0_18px_rgba(214,197,157,0.6)]' : ''}`}
                 style={{ 
                   left: item.x,
                   top: item.y,
@@ -5376,7 +5376,7 @@ function App() {
                 }}
               >
                 {highlightedTargetId === item.id && (
-                  <div className="absolute -inset-3 rounded-[24px] border-2 border-[#22d3ee]/70 shadow-[0_0_24px_rgba(34,211,238,0.25)] pointer-events-none" />
+                  <div className="absolute -inset-3 rounded-[24px] border-2 border-[#d6c59d]/70 shadow-[0_0_24px_rgba(214,197,157,0.25)] pointer-events-none" />
                 )}
 
                 {/* Overlay an invisible drag handle that leaves child components clickable if needed */}
@@ -5431,17 +5431,17 @@ function App() {
                     ? 'border-emerald-400/35 bg-[rgba(16,185,129,0.14)] text-emerald-100'
                     : activeHint.tone === 'warning'
                     ? 'border-amber-400/35 bg-[rgba(245,158,11,0.14)] text-amber-100'
-                    : 'border-[#22d3ee]/35 bg-[rgba(34,211,238,0.14)] text-slate-100';
+                    : 'border-[#d6c59d]/35 bg-[rgba(214,197,157,0.14)] text-slate-100';
                   const titleClass = activeHint.tone === 'success'
                     ? 'text-emerald-300'
                     : activeHint.tone === 'warning'
                     ? 'text-amber-300'
-                    : 'text-[#67e8f9]';
+                    : 'text-[#f8e7bd]';
                   const dotColor = activeHint.tone === 'success'
                     ? '#34d399'
                     : activeHint.tone === 'warning'
                     ? '#f59e0b'
-                    : '#22d3ee';
+                    : '#d6c59d';
 
                   if (inlineHint) {
                     return (
@@ -5483,23 +5483,23 @@ function App() {
                     initial={{ opacity: 0, y: 8, scale: 0.96 }}
                     animate={{ opacity: 1, y: [0, -4, 0], scale: 1 }}
                     transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-                    className={`absolute left-1/2 -translate-x-1/2 pointer-events-none w-[168px] rounded-full border border-[#22d3ee]/30 bg-[rgba(7,11,23,0.82)] px-3 py-2 text-center text-[11px] font-semibold text-[#a5f3fc] shadow-[0_14px_34px_rgba(2,6,23,0.38),0_0_24px_rgba(34,211,238,0.12)] backdrop-blur-xl ${item.type === 'testtube' ? '-top-[74px]' : '-top-[54px]'}`}
+                    className={`absolute left-1/2 -translate-x-1/2 pointer-events-none w-[168px] rounded-full border border-[#d6c59d]/30 bg-[rgba(7,11,23,0.82)] px-3 py-2 text-center text-[11px] font-semibold text-[#f1e6cd] shadow-[0_14px_34px_rgba(2,6,23,0.38),0_0_24px_rgba(214,197,157,0.12)] backdrop-blur-xl ${item.type === 'testtube' ? '-top-[74px]' : '-top-[54px]'}`}
                   >
                     {(challengeNextAction.includes('沉淀') || challengeNextAction.includes('气泡') || challengeNextAction.includes('色') || challengeNextAction.includes('层')) ? '观察' : '拖入'} → {challengeNextAction}
                   </motion.div>
                 )}
 
                 {/* Focus indicator / label */}
-                <div className={`mt-2 flex flex-col items-center z-10 transition-all duration-300 ${focusedItemId === item.id ? 'scale-110 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : ''}`}>
+                <div className={`mt-2 flex flex-col items-center z-10 transition-all duration-300 ${focusedItemId === item.id ? 'scale-110 drop-shadow-[0_0_8px_rgba(214,197,157,0.8)]' : ''}`}>
                   {item.type !== 'testtube' && (
-                    <span className={`text-[12px] bg-[rgba(10,14,26,0.8)] px-2 py-0.5 rounded border ${focusedItemId === item.id ? 'border-[#22d3ee] text-[#22d3ee]' : 'border-[rgba(255,255,255,0.05)] text-[#94a3b8]'}`}>
+                    <span className={`text-[12px] bg-[rgba(10,14,26,0.8)] px-2 py-0.5 rounded border ${focusedItemId === item.id ? 'border-[#d6c59d] text-[#d6c59d]' : 'border-[rgba(255,255,255,0.05)] text-[#94a3b8]'}`}>
                       {item.name}
                     </span>
                   )}
                   {focusedItemId === item.id && (
                     <motion.div 
                       layoutId="focus-indicator"
-                      className="w-1.5 h-1.5 mt-1 rounded-full bg-[#22d3ee] shadow-[0_0_5px_#22d3ee]"
+                      className="w-1.5 h-1.5 mt-1 rounded-full bg-[#d6c59d] shadow-[0_0_5px_#d6c59d]"
                     />
                   )}
                 </div>
@@ -5534,14 +5534,14 @@ function App() {
                   <button
                     type="button"
                     onClick={() => setActiveRightPanelTab('reagents')}
-                    className={`flex-1 h-9 rounded-[12px] text-[13px] transition-colors ${activeRightPanelTab === 'reagents' ? 'bg-[#22d3ee]/15 text-[#22d3ee] border border-[#22d3ee]/25' : 'text-[#94a3b8] hover:text-white'}`}
+                    className={`flex-1 h-9 rounded-[12px] text-[13px] transition-colors ${activeRightPanelTab === 'reagents' ? 'bg-[#d6c59d]/15 text-[#d6c59d] border border-[#d6c59d]/25' : 'text-[#94a3b8] hover:text-white'}`}
                   >
                     试剂架
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveRightPanelTab('logs')}
-                    className={`flex-1 h-9 rounded-[12px] text-[13px] transition-colors ${activeRightPanelTab === 'logs' ? 'bg-[#22d3ee]/15 text-[#22d3ee] border border-[#22d3ee]/25' : 'text-[#94a3b8] hover:text-white'}`}
+                    className={`flex-1 h-9 rounded-[12px] text-[13px] transition-colors ${activeRightPanelTab === 'logs' ? 'bg-[#d6c59d]/15 text-[#d6c59d] border border-[#d6c59d]/25' : 'text-[#94a3b8] hover:text-white'}`}
                   >
                     观察日志
                   </button>
@@ -5560,7 +5560,7 @@ function App() {
                   quickAddEnabled={gameMode === 'challenge' && Boolean(activeChallenge)}
                 />
               </div>
-              <div className={`${isTablet && activeRightPanelTab !== 'logs' ? 'hidden' : 'flex'} min-h-0 flex-col overflow-hidden rounded-[18px] transition-all duration-300 ${isTablet ? 'flex-1' : ''} ${rightPanelPulse === 'logs' ? 'ring-2 ring-[#22d3ee]/45 shadow-[0_0_28px_rgba(34,211,238,0.18)]' : ''}`}>
+              <div className={`${isTablet && activeRightPanelTab !== 'logs' ? 'hidden' : 'flex'} min-h-0 flex-col overflow-hidden rounded-[18px] transition-all duration-300 ${isTablet ? 'flex-1' : ''} ${rightPanelPulse === 'logs' ? 'ring-2 ring-[#d6c59d]/45 shadow-[0_0_28px_rgba(214,197,157,0.18)]' : ''}`}>
                 <ObservationLog className="h-full" />
               </div>
             </div>
@@ -5587,7 +5587,7 @@ function App() {
                   <div className="lavoisier-panel rounded-[30px] border border-white/10 bg-[rgba(7,11,23,0.96)] backdrop-blur-2xl px-4 py-4 shadow-[0_26px_80px_rgba(2,6,23,0.52)]">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex items-center gap-3 text-[#e2e8f0]">
-                        <div className="relative h-12 w-12 shrink-0 rounded-full border border-white/12 bg-[rgba(15,23,42,0.82)] p-1 shadow-[inset_0_1px_12px_rgba(255,255,255,0.12),0_0_24px_rgba(34,211,238,0.12)]">
+                        <div className="relative h-12 w-12 shrink-0 rounded-full border border-white/12 bg-[rgba(15,23,42,0.82)] p-1 shadow-[inset_0_1px_12px_rgba(255,255,255,0.12),0_0_24px_rgba(214,197,157,0.12)]">
                           <img src="/lavoisier-avatar.svg" alt="拉瓦锡助手头像" draggable={false} className="h-full w-full rounded-full object-cover" />
                           <span className={`absolute -right-0.5 -bottom-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#07101f] ${agentIsLoading ? 'bg-[#f59e0b]' : agentError ? 'bg-[#f97316]' : 'bg-[#10b981]'}`} />
                         </div>
@@ -5613,8 +5613,8 @@ function App() {
                     </div>
 
                     <div className="mt-3 grid grid-cols-2 gap-2">
-                      <button type="button" onClick={() => submitAgentQuery('结合当前实验目标，下一步该怎么做？')} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#22d3ee]/30 hover:bg-[#22d3ee]/10 transition-colors">下一步</button>
-                      <button type="button" onClick={() => submitAgentQuery('请解释当前实验现象和背后的化学原因。')} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#22d3ee]/30 hover:bg-[#22d3ee]/10 transition-colors">解释现象</button>
+                      <button type="button" onClick={() => submitAgentQuery('结合当前实验目标，下一步该怎么做？')} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#d6c59d]/30 hover:bg-[#d6c59d]/10 transition-colors">下一步</button>
+                      <button type="button" onClick={() => submitAgentQuery('请解释当前实验现象和背后的化学原因。')} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#d6c59d]/30 hover:bg-[#d6c59d]/10 transition-colors">解释现象</button>
                       <button type="button" onClick={() => submitAgentQuery('我现在这一步做对了吗？')} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#f59e0b]/30 hover:bg-[#f59e0b]/10 transition-colors">我做对了吗</button>
                       <button type="button" onClick={(event) => { event.stopPropagation(); handleAgentQuickAction('reagents'); }} className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2 text-left text-[11px] text-[#dbeafe] hover:border-[#10b981]/30 hover:bg-[#10b981]/10 transition-colors">打开试剂</button>
                     </div>
@@ -5636,14 +5636,14 @@ function App() {
                           {agentMessages.map(message => (
                             <div
                               key={message.id}
-                              className={`whitespace-pre-line rounded-[16px] px-3 py-2 text-[12px] leading-relaxed ${message.role === 'agent' ? 'bg-[rgba(34,211,238,0.08)] border border-[#22d3ee]/14 text-[#dbeafe]' : 'bg-white/5 border border-white/8 text-[#e2e8f0]'}`}
+                              className={`whitespace-pre-line rounded-[16px] px-3 py-2 text-[12px] leading-relaxed ${message.role === 'agent' ? 'bg-[rgba(214,197,157,0.08)] border border-[#d6c59d]/14 text-[#dbeafe]' : 'bg-white/5 border border-white/8 text-[#e2e8f0]'}`}
                             >
                               {message.text}
                             </div>
                           ))}
                           {agentIsLoading && (
-                            <div className="flex items-center gap-2 rounded-[16px] px-3 py-2 text-[12px] leading-relaxed bg-[rgba(34,211,238,0.08)] border border-[#22d3ee]/14 text-[#dbeafe]">
-                              <span className="h-2 w-2 rounded-full bg-[#22d3ee] animate-pulse" />
+                            <div className="flex items-center gap-2 rounded-[16px] px-3 py-2 text-[12px] leading-relaxed bg-[rgba(214,197,157,0.08)] border border-[#d6c59d]/14 text-[#dbeafe]">
+                              <span className="h-2 w-2 rounded-full bg-[#d6c59d] animate-pulse" />
                               拉瓦锡正在整理实验建议…
                             </div>
                           )}
@@ -5684,13 +5684,13 @@ function App() {
                             }}
                             placeholder="问拉瓦锡：下一步、现象、风险…"
                             rows={2}
-                            className="flex-1 resize-none rounded-[16px] border border-white/8 bg-white/5 px-3 py-2 text-[12px] text-[#e2e8f0] placeholder:text-[#64748b] outline-none focus:border-[#22d3ee]/35"
+                            className="flex-1 resize-none rounded-[16px] border border-white/8 bg-white/5 px-3 py-2 text-[12px] text-[#e2e8f0] placeholder:text-[#64748b] outline-none focus:border-[#d6c59d]/35"
                           />
                           <button
                             type="button"
                             onClick={() => submitAgentQuery(agentDraft)}
                             disabled={agentIsLoading || !agentDraft.trim()}
-                            className="h-[42px] px-4 rounded-[14px] border border-[#22d3ee]/25 bg-[#22d3ee]/12 text-[12px] text-[#67e8f9] hover:bg-[#22d3ee]/18 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="h-[42px] px-4 rounded-[14px] border border-[#d6c59d]/25 bg-[#d6c59d]/12 text-[12px] text-[#f8e7bd] hover:bg-[#d6c59d]/18 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             title="Enter 发送，Esc 收起"
                           >
                             {agentIsLoading ? '思考' : '发送'}

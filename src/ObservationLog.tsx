@@ -63,7 +63,7 @@ export function ObservationLog({ className = '' }: ObservationLogProps) {
       case 'action':
         return { text: 'text-[#94a3b8]', icon: 'text-[#94a3b8]', bg: 'bg-transparent' };
       case 'measurement':
-        return { text: 'text-[#22d3ee] font-mono', icon: 'text-[#22d3ee]', bg: 'bg-transparent' };
+        return { text: 'text-[#d6c59d] font-mono', icon: 'text-[#d6c59d]', bg: 'bg-transparent' };
       case 'reaction':
         return { text: 'text-[#f59e0b]', icon: 'text-[#f59e0b]', bg: 'bg-[rgba(245,158,11,0.05)] border border-[rgba(245,158,11,0.2)]' };
       case 'observation':
@@ -171,7 +171,7 @@ export function ObservationLog({ className = '' }: ObservationLogProps) {
               scrollToBottom();
               setHasUnreadLogs(false);
             }}
-            className="shrink-0 px-2.5 py-1 rounded-full text-[11px] text-[#22d3ee] border border-[#22d3ee]/25 bg-[#22d3ee]/10 hover:bg-[#22d3ee]/15 transition-colors"
+            className="shrink-0 px-2.5 py-1 rounded-full text-[11px] text-[#d6c59d] border border-[#d6c59d]/25 bg-[#d6c59d]/10 hover:bg-[#d6c59d]/15 transition-colors"
           >
             新日志 ↓
           </button>
@@ -205,11 +205,11 @@ export function ObservationLog({ className = '' }: ObservationLogProps) {
               <div className={`text-[13px] leading-relaxed flex-1 break-words ${style.text}`}>
                 {log.type === 'action' && log.event.includes('CuSO₄') ? (
                   <span>
-                    {log.event.split('CuSO₄')[0]}<span style={{ fontFamily: "'JetBrains Mono', monospace", color: '#22d3ee' }}>CuSO₄</span>{log.event.split('CuSO₄')[1]}
+                    {log.event.split('CuSO₄')[0]}<span style={{ fontFamily: "'JetBrains Mono', monospace", color: '#d6c59d' }}>CuSO₄</span>{log.event.split('CuSO₄')[1]}
                   </span>
                 ) : log.type === 'action' && log.event.includes('NaOH') ? (
                   <span>
-                    {log.event.split('NaOH')[0]}<span style={{ fontFamily: "'JetBrains Mono', monospace", color: '#22d3ee' }}>NaOH</span>{log.event.split('NaOH')[1]}
+                    {log.event.split('NaOH')[0]}<span style={{ fontFamily: "'JetBrains Mono', monospace", color: '#d6c59d' }}>NaOH</span>{log.event.split('NaOH')[1]}
                   </span>
                 ) : log.type === 'action' && log.event.includes('HCl') ? (
                   <span>
@@ -244,11 +244,11 @@ export function ObservationLog({ className = '' }: ObservationLogProps) {
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           placeholder="手动记录观察笔记..."
-          className="w-full h-[36px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-lg pl-3 pr-9 text-[13px] text-[#e2e8f0] placeholder-[#475569] focus:outline-none focus:border-[rgba(34,211,238,0.4)] focus:bg-[rgba(34,211,238,0.02)] transition-all"
+          className="w-full h-[36px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-lg pl-3 pr-9 text-[13px] text-[#e2e8f0] placeholder-[#475569] focus:outline-none focus:border-[rgba(214,197,157,0.4)] focus:bg-[rgba(214,197,157,0.02)] transition-all"
         />
         <button 
           type="submit"
-          className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-[#475569] hover:text-[#22d3ee] transition-colors rounded-md"
+          className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-[#475569] hover:text-[#d6c59d] transition-colors rounded-md"
         >
           <ArrowUp size={16} />
         </button>

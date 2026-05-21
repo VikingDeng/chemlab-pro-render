@@ -86,7 +86,7 @@ const REAGENT_GROUPS: ReagentGroup[] = [
     label: '未知样品',
     description: '闯关用样品，只通过现象判断成分。',
     items: [
-      { category: '未知样品', dot: '#38bdf8', name: '未知样品 A', badgeFormula: <>A · ?</> },
+      { category: '未知样品', dot: '#cdb47f', name: '未知样品 A', badgeFormula: <>A · ?</> },
       { category: '未知样品', dot: '#f8fafc', name: '未知样品 B', badgeFormula: <>B · ?</> },
       { category: '未知样品', dot: '#f59e0b', name: '未知样品 C', badgeFormula: <>C · ?</> },
       { category: '未知样品', dot: '#e2e8f0', name: '未知样品 D', badgeFormula: <>D · ?</> },
@@ -111,7 +111,7 @@ const REAGENT_GROUPS: ReagentGroup[] = [
     label: '金属盐',
     description: '覆盖沉淀、络合与离子鉴定常用盐类。',
     items: [
-      { category: '金属盐', dot: '#22d3ee', name: '硫酸铜', badgeFormula: <>CuSO₄ · 0.5M</> },
+      { category: '金属盐', dot: '#d6c59d', name: '硫酸铜', badgeFormula: <>CuSO₄ · 0.5M</> },
       { category: '金属盐', dot: '#e2e8f0', name: '硝酸银', badgeFormula: <>AgNO₃ · 0.1M</> },
       { category: '金属盐', dot: '#eab308', name: '氯化铁', badgeFormula: <>FeCl₃ · 0.5M</> },
       { category: '金属盐', dot: '#a3e635', name: '硫酸亚铁', badgeFormula: <>FeSO₄ · 0.5M</> },
@@ -408,26 +408,26 @@ export function ReagentShelf({
         onPointerUp={finishPointer}
         onPointerCancel={cancelPointer}
         className={`reagent-card isolate min-h-[68px] flex items-center justify-between pl-2.5 pr-3 py-2 rounded-xl border transition-all duration-200 cursor-grab group relative overflow-visible ${isDragging ? 'reagent-card-dragging opacity-35' : ''} ${quickAddEnabled ? 'active:scale-[0.99]' : ''} ${isHighlighted
-          ? 'border-[#22d3ee]/40 bg-[rgba(34,211,238,0.10)] shadow-[0_0_18px_rgba(34,211,238,0.12)]'
+          ? 'border-[#d6c59d]/40 bg-[rgba(214,197,157,0.10)] shadow-[0_0_18px_rgba(214,197,157,0.12)]'
           : isSuggested
-          ? 'border-[#c084fc]/28 bg-[rgba(168,85,247,0.08)] shadow-[0_0_14px_rgba(168,85,247,0.08)]'
-          : 'border-white/6 bg-[rgba(255,255,255,0.02)] hover:border-[#22d3ee]/18 hover:bg-[rgba(34,211,238,0.05)] hover:shadow-[0_0_16px_rgba(34,211,238,0.08)]'} ${isMuted ? 'opacity-50 saturate-[0.75]' : ''}`}
+          ? 'border-[#d6c59d]/18 bg-[rgba(214,197,157,0.035)] shadow-[0_0_14px_rgba(214,197,157,0.05)]'
+          : 'border-white/6 bg-[rgba(255,255,255,0.02)] hover:border-[#d6c59d]/18 hover:bg-[rgba(214,197,157,0.05)] hover:shadow-[0_0_16px_rgba(214,197,157,0.08)]'} ${isMuted ? 'opacity-50 saturate-[0.75]' : ''}`}
         style={{ touchAction: 'none', userSelect: 'none' }}
       >
         <div
-          className={`absolute inset-0 z-0 transition-opacity duration-200 pointer-events-none rounded-xl ${isHighlighted || isSuggested ? 'opacity-[0.16]' : 'opacity-0 group-hover:opacity-10'}`}
-          style={{ backgroundColor: item.dot }}
+          className={`absolute inset-0 z-0 transition-opacity duration-200 pointer-events-none rounded-xl ${isHighlighted ? 'opacity-[0.10]' : isSuggested ? 'opacity-[0.07]' : 'opacity-0 group-hover:opacity-[0.06]'}`}
+          style={{ backgroundColor: isHighlighted || isSuggested ? '#d6c59d' : item.dot }}
         ></div>
 
         {(isHighlighted || isSuggested) && (
           <div
-            className={`absolute left-0 top-2 bottom-2 w-1 rounded-full pointer-events-none ${isHighlighted ? 'bg-[#22d3ee]' : 'bg-[#a855f7]'}`}
+            className={`absolute left-0 top-2 bottom-2 w-1 rounded-full pointer-events-none ${isHighlighted ? 'bg-[#d6c59d]' : 'bg-[#d6c59d]/70'}`}
           />
         )}
 
         <div className="flex items-center gap-3 overflow-hidden mr-2 relative z-10 pointer-events-none min-w-0">
           <span
-            className={`relative z-20 grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/10 bg-[#07101f] shadow-[0_10px_24px_rgba(2,6,23,0.34)] transition-transform duration-200 ease-out ${isHighlighted ? 'scale-[1.04] ring-1 ring-[#22d3ee]/32' : 'group-hover:scale-[1.03]'}`}
+            className={`relative z-20 grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/10 bg-[#07101f] shadow-[0_10px_24px_rgba(2,6,23,0.34)] transition-transform duration-200 ease-out ${isHighlighted ? 'scale-[1.04] ring-1 ring-[#d6c59d]/32' : 'group-hover:scale-[1.03]'}`}
           >
             <img
               src={imageSrc}
@@ -465,7 +465,7 @@ export function ReagentShelf({
       {dragGhost && (
         <div
           ref={dragGhostRef}
-          className="reagent-drag-ghost pointer-events-none fixed left-0 top-0 z-[9999] flex min-h-[58px] w-[232px] items-center justify-between rounded-2xl border border-[#22d3ee]/34 bg-[rgba(8,13,24,0.92)] px-3 py-2 shadow-[0_18px_44px_rgba(2,6,23,0.48),0_0_18px_rgba(34,211,238,0.12)] will-change-transform"
+          className="reagent-drag-ghost pointer-events-none fixed left-0 top-0 z-[9999] flex min-h-[58px] w-[232px] items-center justify-between rounded-2xl border border-[#d6c59d]/34 bg-[rgba(8,13,24,0.92)] px-3 py-2 shadow-[0_18px_44px_rgba(2,6,23,0.48),0_0_18px_rgba(214,197,157,0.12)] will-change-transform"
           style={{ transform: 'translate3d(-9999px, -9999px, 0) translate(-50%, -50%)' }}
         >
           <div className="flex min-w-0 items-center gap-3">
@@ -491,7 +491,7 @@ export function ReagentShelf({
         <button
           type="button"
           onClick={() => setActiveCategory('全部')}
-          className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] border transition-colors ${effectiveActiveCategory === '全部' ? 'border-[#22d3ee]/40 bg-[#22d3ee]/12 text-[#22d3ee] shadow-[0_0_14px_rgba(34,211,238,0.12)]' : 'border-white/8 bg-white/4 text-[#94a3b8] hover:text-white'}`}
+          className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] border transition-colors ${effectiveActiveCategory === '全部' ? 'border-[#d6c59d]/40 bg-[#d6c59d]/12 text-[#d6c59d] shadow-[0_0_14px_rgba(214,197,157,0.12)]' : 'border-white/8 bg-white/4 text-[#94a3b8] hover:text-white'}`}
         >
           全部
         </button>
@@ -500,7 +500,7 @@ export function ReagentShelf({
             key={group.id}
             type="button"
             onClick={() => setActiveCategory(group.id)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] border transition-colors ${effectiveActiveCategory === group.id ? 'border-[#22d3ee]/40 bg-[#22d3ee]/12 text-[#22d3ee] shadow-[0_0_14px_rgba(34,211,238,0.12)]' : 'border-white/8 bg-white/4 text-[#94a3b8] hover:text-white'}`}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] border transition-colors ${effectiveActiveCategory === group.id ? 'border-[#d6c59d]/40 bg-[#d6c59d]/12 text-[#d6c59d] shadow-[0_0_14px_rgba(214,197,157,0.12)]' : 'border-white/8 bg-white/4 text-[#94a3b8] hover:text-white'}`}
           >
             {group.label}
           </button>
@@ -508,19 +508,19 @@ export function ReagentShelf({
       </div>
       <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-4 pr-2">
         {hasMissionHighlights && (
-          <section className="rounded-2xl border border-[#22d3ee]/16 bg-[rgba(34,211,238,0.05)] px-3 py-2.5">
+          <section className="rounded-2xl border border-[#d6c59d]/16 bg-[rgba(214,197,157,0.05)] px-3 py-2.5">
             <div className="mb-2 flex items-center justify-between gap-2 text-[11px]">
-              <span className="font-semibold text-[#67e8f9]">本关试剂</span>
+              <span className="font-semibold text-[#f8e7bd]">本关试剂</span>
               <span className="text-[#64748b]">支线会污染</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {highlightedReagents.map(name => (
-                <span key={name} className="px-2 py-0.5 rounded-full border border-[#22d3ee]/25 bg-[#22d3ee]/10 text-[10px] text-[#67e8f9]">
+                <span key={name} className="px-2 py-0.5 rounded-full border border-[#d6c59d]/25 bg-[#d6c59d]/10 text-[10px] text-[#f8e7bd]">
                   {name}
                 </span>
               ))}
               {suggestedReagents.filter(name => !highlightedSet.has(name)).map(name => (
-                <span key={name} className="px-2 py-0.5 rounded-full border border-[#a855f7]/25 bg-[#a855f7]/10 text-[10px] text-[#e9d5ff]">
+                <span key={name} className="px-2 py-0.5 rounded-full border border-[#d6c59d]/14 bg-white/[0.035] text-[10px] text-[#b7ad9c]">
                   {name}
                 </span>
               ))}
