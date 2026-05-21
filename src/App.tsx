@@ -4231,7 +4231,7 @@ function App() {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.22, ease: 'easeOut' }}
-                  className="absolute left-1/2 top-[204px] z-[55] w-[min(760px,calc(100%-32px))] -translate-x-1/2 overflow-hidden rounded-[26px] border border-white/10 bg-[rgba(7,11,23,0.78)] px-3 py-2.5 shadow-[0_14px_44px_rgba(2,6,23,0.34)] backdrop-blur-2xl sm:top-[118px]"
+                  className={`absolute left-1/2 top-[204px] z-[55] w-[min(760px,calc(100%-32px))] -translate-x-1/2 overflow-hidden rounded-[26px] border border-white/10 bg-[rgba(7,11,23,0.78)] px-3 py-2.5 shadow-[0_14px_44px_rgba(2,6,23,0.34)] backdrop-blur-2xl sm:top-[118px] ${showMissionProofPanel ? 'hidden' : ''}`}
                 >
                   <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d6c59d]/50 to-transparent" />
                   <div className="flex items-center gap-3">
@@ -4290,7 +4290,7 @@ function App() {
                     initial={{ opacity: 0, y: 18, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-                    className="absolute bottom-5 left-1/2 z-[68] w-[min(520px,calc(100%-32px))] -translate-x-1/2 rounded-[28px] border border-[#d6c59d]/18 bg-[rgba(7,11,23,0.88)] p-3 shadow-[0_18px_58px_rgba(2,6,23,0.48)] backdrop-blur-2xl sm:left-[58%] sm:w-[min(500px,calc(100%-180px))]"
+                    className="absolute left-1/2 top-[204px] z-[68] w-[min(760px,calc(100%-32px))] -translate-x-1/2 rounded-[26px] border border-[#d6c59d]/18 bg-[rgba(7,11,23,0.88)] px-3 py-2.5 shadow-[0_18px_58px_rgba(2,6,23,0.48)] backdrop-blur-2xl sm:top-[118px]"
                   >
 		                    <div className="flex flex-wrap items-center justify-between gap-2">
 		                      <div className="min-w-0 flex-1">
@@ -4300,7 +4300,7 @@ function App() {
 		                        </div>
 		                        <div className="mt-1 truncate text-[13px] font-semibold text-white">{activeProofCurrent.question}</div>
 		                      </div>
-		                      <div className="w-[158px] shrink-0">
+		                      <div className="hidden w-[158px] shrink-0 sm:block">
 		                        <MissionEvidenceBar value={activeMissionEvidenceScore} integrity={activeMissionStats.integrity} pollution={activeMissionStats.pollution} compact />
 		                      </div>
 	                      <div className="flex flex-wrap gap-1">
@@ -4329,7 +4329,7 @@ function App() {
                       </button>
                     </div>
 
-                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <div className="mt-2 grid gap-2 sm:grid-cols-3">
                       {activeProofCurrent.options.map(option => {
                         const isSelected = activeProofCurrentAnswer?.selectedId === option.id;
                         const isWrong = isSelected && activeProofCurrentAnswer?.correct === false;
