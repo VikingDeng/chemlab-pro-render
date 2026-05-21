@@ -151,6 +151,11 @@ type MissionProofOption = {
   detail: string;
 };
 
+type MissionProofPenalty = {
+  integrity: number;
+  pollution: number;
+};
+
 type MissionProofCheckpoint = {
   id: string;
   stage?: MissionProofStage;
@@ -159,6 +164,7 @@ type MissionProofCheckpoint = {
   answerId: string;
   success: string;
   hint?: string;
+  penalty?: MissionProofPenalty;
   options: MissionProofOption[];
 };
 
@@ -241,7 +247,9 @@ const AGENT_REQUEST_TIMEOUT_MS = 18000;
 const MISSION_MIN_INTEGRITY = 70;
 const MISSION_HINT_PENALTY = 5;
 const MISSION_PROOF_PENALTY = 18;
+const MISSION_PROOF_POLLUTION = 6;
 const MISSION_PREDICTION_PENALTY = 22;
+const MISSION_PREDICTION_POLLUTION = 8;
 const MISSION_WRONG_ORDER_PENALTY = 12;
 const MISSION_SIDE_REAGENT_PENALTY = 8;
 const MISSION_POLLUTION_LIMIT = 45;
@@ -394,6 +402,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         answerId: 'blue-floc',
         success: '预测成立，开始验证。',
         hint: '线索：A 的主线是铜盐遇碱。',
+        penalty: { integrity: 22, pollution: 8 },
         options: [
           { id: 'blue-floc', label: '蓝绿色絮状', detail: 'Cu(OH)₂ 沉淀' },
           { id: 'white-clot', label: '白色凝乳', detail: '更像 AgCl' },
@@ -454,6 +463,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         answerId: 'white-precipitate',
         success: '预测成立，开始验证。',
         hint: '线索：B 的关键变量是 Cl⁻。',
+        penalty: { integrity: 22, pollution: 8 },
         options: [
           { id: 'white-precipitate', label: '白色沉淀', detail: 'Ag⁺ + Cl⁻' },
           { id: 'red-complex', label: '血红显色', detail: 'Fe³⁺ + SCN⁻' },
@@ -514,6 +524,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         answerId: 'blood-red',
         success: '预测成立，开始验证。',
         hint: '线索：SCN⁻ 是 Fe³⁺ 的显色试剂。',
+        penalty: { integrity: 22, pollution: 8 },
         options: [
           { id: 'blood-red', label: '血红加深', detail: 'Fe(SCN)₃ 络合' },
           { id: 'blue-floc', label: '蓝色沉淀', detail: '铜盐遇碱' },
@@ -574,6 +585,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         answerId: 'bubbles',
         success: '预测成立，开始验证。',
         hint: '线索：D 的主线是碳酸盐遇酸。',
+        penalty: { integrity: 22, pollution: 8 },
         options: [
           { id: 'bubbles', label: '连续气泡', detail: '生成 CO₂' },
           { id: 'white-solid', label: '白色沉淀', detail: '银盐路线' },
@@ -634,6 +646,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         answerId: 'organic-layer',
         success: '预测成立，开始验证。',
         hint: '线索：碘更偏向非极性有机相。',
+        penalty: { integrity: 22, pollution: 8 },
         options: [
           { id: 'organic-layer', label: '进入有机层', detail: '分层后有机相显紫' },
           { id: 'solid-bottom', label: '杯底沉淀', detail: '不是碘萃取' },
@@ -694,6 +707,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         answerId: 'fade',
         success: '预测成立，开始验证。',
         hint: '线索：酸性草酸能还原 MnO₄⁻。',
+        penalty: { integrity: 22, pollution: 8 },
         options: [
           { id: 'fade', label: '紫色褪去', detail: 'MnO₄⁻ 被还原' },
           { id: 'white-clot', label: '白色凝乳', detail: '银盐沉淀' },
@@ -736,6 +750,7 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
         answerId: 'avoid-cl2',
         success: '避免氯离子被氧化成 Cl₂。',
         hint: '线索：强氧化体系里要避开 Cl⁻。',
+        penalty: { integrity: 18, pollution: 10 },
         options: [
           { id: 'avoid-cl2', label: '避免 Cl₂', detail: '盐酸可能被氧化' },
           { id: 'make-agcl', label: '生成 AgCl', detail: '没有银离子' },
@@ -951,7 +966,11 @@ function isMissionPredictionCheckpoint(checkpoint: MissionProofCheckpoint) {
 }
 
 function getMissionProofPenalty(checkpoint: MissionProofCheckpoint) {
-  return isMissionPredictionCheckpoint(checkpoint) ? MISSION_PREDICTION_PENALTY : MISSION_PROOF_PENALTY;
+  return checkpoint.penalty?.integrity ?? (isMissionPredictionCheckpoint(checkpoint) ? MISSION_PREDICTION_PENALTY : MISSION_PROOF_PENALTY);
+}
+
+function getMissionProofPollution(checkpoint: MissionProofCheckpoint) {
+  return checkpoint.penalty?.pollution ?? (isMissionPredictionCheckpoint(checkpoint) ? MISSION_PREDICTION_POLLUTION : MISSION_PROOF_POLLUTION);
 }
 
 function getMissionEvidenceScore(
@@ -2900,6 +2919,15 @@ function App() {
   const activeProofSolved = Boolean(activeMissionProof && activeProofSolvedCount === activeMissionProof.checkpoints.length);
   const activeProofStageLabel = getMissionProofStageLabel(activeProofCurrent?.stage);
   const activeProofStageAccent = getMissionProofStageAccent(activeProofCurrent?.stage);
+  const activeProofRisk = useMemo(
+    () => activeProofCurrent
+      ? {
+          integrity: getMissionProofPenalty(activeProofCurrent),
+          pollution: getMissionProofPollution(activeProofCurrent),
+        }
+      : null,
+    [activeProofCurrent]
+  );
   const activeMissionStats = activeChallenge
     ? (missionRunStats[activeChallenge.id] || createMissionRunStats())
     : createMissionRunStats();
@@ -3162,12 +3190,14 @@ function App() {
   }, [agentRemoteSummary, handleAgentQuickAction, primaryAgentContainerId, syncReadouts]);
 
   const agentSkillPrompts = useMemo(() => {
-    const missionPrompts = activeChallenge?.completed
+    const missionPrompts = activeMissionFailed
+      ? ['两句话复盘', '最短正确路线']
+      : activeChallenge?.completed
       ? ['解释刚才现象', '下一关怎么做']
       : shouldShowPredictionGate
-      ? ['帮我做预测', '为什么先预测']
+      ? ['给我一个线索', '为什么先预测']
       : challengeProductReady && activeMissionProof && !activeProofSolved
-      ? ['我该选哪个证据', '解释这个现象']
+      ? ['给我一个线索', '解释这个现象']
       : [];
     const localPrompts = [
       ...missionPrompts,
@@ -3176,7 +3206,7 @@ function App() {
       ...(dragGuide?.kind === 'reagent' && dragGuide.targetId && dragGuide.name ? [`${dragGuide.name}加到当前容器会怎样`] : []),
     ];
     return dedupePromptStrings([...localPrompts, ...agentSuggestedPrompts]).slice(0, 3);
-  }, [activeChallenge?.completed, activeMissionProof, activeProofSolved, agentSuggestedPrompts, challengeInsight, challengeProductReady, dragGuide, primaryAgentContainer, shouldShowPredictionGate]);
+  }, [activeChallenge?.completed, activeMissionFailed, activeMissionProof, activeProofSolved, agentSuggestedPrompts, challengeInsight, challengeProductReady, dragGuide, primaryAgentContainer, shouldShowPredictionGate]);
   const agentDockSide = useMemo(() => {
     return agentPosition.x + AGENT_ORB_WIDTH / 2 >= agentViewport.width / 2 ? 'right' : 'left';
   }, [agentPosition.x, agentViewport.width]);
@@ -3287,6 +3317,7 @@ function App() {
               label: activeProofCurrent.label,
             question: activeProofCurrent.question,
             hint: activeProofCurrent.hint || null,
+            wrongAnswerPenalty: activeProofRisk,
             selectedFeedback: activeProofCurrentFeedback,
 	            options: activeProofCurrent.options.map(option => ({
 	              id: option.id,
@@ -3434,7 +3465,7 @@ function App() {
         agentAbortControllerRef.current = null;
       }
     }
-  }, [activeChallenge, activeMissionBrief, activeMissionCanComplete, activeMissionEvidenceScore, activeMissionFailureReason, activeMissionGrade.grade, activeMissionProof, activeMissionStats.hintUses, activeMissionStats.integrity, activeMissionStats.lastPenalty, activeMissionStats.operations, activeMissionStats.pollution, activeMissionStats.wrongProofs, activeMissionStats.wrongReagents, activeProofCurrent, activeProofCurrentAnswer, activeProofCurrentFeedback, activeProofSolved, activeProofSolvedCount, agentLastEvent, agentMessages, agentState.goal, agentState.intent, agentState.risks, appendAgentMessage, appendUserMessage, challengeCoachLine, challengeDisplayDoneCount, challengeDisplayStepCount, challengeProductReady, challengeStageLabel, gameMode, placedItems, primaryAgentContainerId, runAgentToolCalls, lavoisierApiUrl, setAgentDraft, setAgentError, setAgentExpanded, setAgentIsLoading, setAgentRemoteHeadline, setAgentRemoteSummary, setAgentStatusLabel, setAgentSuggestedPrompts, shouldShowPredictionGate]);
+  }, [activeChallenge, activeMissionBrief, activeMissionCanComplete, activeMissionEvidenceScore, activeMissionFailureReason, activeMissionGrade.grade, activeMissionProof, activeMissionStats.hintUses, activeMissionStats.integrity, activeMissionStats.lastPenalty, activeMissionStats.operations, activeMissionStats.pollution, activeMissionStats.wrongProofs, activeMissionStats.wrongReagents, activeProofCurrent, activeProofCurrentAnswer, activeProofCurrentFeedback, activeProofRisk, activeProofSolved, activeProofSolvedCount, agentLastEvent, agentMessages, agentState.goal, agentState.intent, agentState.risks, appendAgentMessage, appendUserMessage, challengeCoachLine, challengeDisplayDoneCount, challengeDisplayStepCount, challengeProductReady, challengeStageLabel, gameMode, placedItems, primaryAgentContainerId, runAgentToolCalls, lavoisierApiUrl, setAgentDraft, setAgentError, setAgentExpanded, setAgentIsLoading, setAgentRemoteHeadline, setAgentRemoteSummary, setAgentStatusLabel, setAgentSuggestedPrompts, shouldShowPredictionGate]);
 
   const submitAgentQuery = useCallback((query: string) => {
     void requestLavoisierApi(query, { includeUserMessage: true });
@@ -4318,7 +4349,7 @@ function App() {
 	                        type="button"
 	                        onClick={() => {
 	                          recordMissionEvent(activeChallenge.id, 'hint', MISSION_HINT_PENALTY, '使用拉瓦锡提示');
-	                          submitAgentQuery('这道证据题应该怎么判断？请结合当前现象给一个提示。');
+	                          submitAgentQuery('只给一个线索，不要直接说答案。');
 	                        }}
 	                        className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-2.5 py-1 text-[10px] font-semibold text-[#a5f3fc] hover:bg-[#22d3ee]/16 transition-colors"
 	                      >
@@ -4355,10 +4386,11 @@ function App() {
 	                                });
 	                              } else {
 	                                const penalty = getMissionProofPenalty(activeProofCurrent);
-	                                recordMissionEvent(activeChallenge.id, 'proof', penalty, `证据误判：${option.label}`);
+                                  const pollutionDelta = getMissionProofPollution(activeProofCurrent);
+	                                recordMissionEvent(activeChallenge.id, 'proof', penalty, `证据误判：${option.label}`, pollutionDelta);
 	                                showMissionCue({
-	                                  title: '证据扣分',
-	                                  detail: `不是 ${option.label} · -${penalty}`,
+	                                  title: '判断受损',
+	                                  detail: `不是 ${option.label} · -${penalty} · 污染+${pollutionDelta}`,
 	                                  accent: '#f43f5e',
 	                                  tone: 'side',
 	                                }, 2600);
@@ -4375,6 +4407,12 @@ function App() {
                     {activeProofCurrentFeedback && (
                       <div className="mt-2 rounded-2xl border border-[#f43f5e]/18 bg-[#f43f5e]/8 px-3 py-2 text-[11px] leading-snug text-[#fda4af]">
                         {activeProofCurrentFeedback}
+                      </div>
+                    )}
+                    {activeProofRisk && !activeProofCurrentFeedback && (
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-[#64748b]">
+                        <span className="rounded-full border border-white/8 bg-white/[0.025] px-2 py-0.5">错判 -{activeProofRisk.integrity} HP</span>
+                        <span className="rounded-full border border-[#f59e0b]/16 bg-[#f59e0b]/8 px-2 py-0.5 text-[#fbbf24]">污染 +{activeProofRisk.pollution}</span>
                       </div>
                     )}
                     <AnimatePresence>

@@ -508,16 +508,19 @@ export function ReagentShelf({
       </div>
       <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-4 pr-2">
         {hasMissionHighlights && (
-          <section className="rounded-2xl border border-[#22d3ee]/16 bg-[rgba(34,211,238,0.05)] px-3 py-3">
-            <div className="mb-2 text-[11px] font-semibold text-[#67e8f9]">本关试剂</div>
-            <div className="flex flex-wrap gap-2">
+          <section className="rounded-2xl border border-[#22d3ee]/16 bg-[rgba(34,211,238,0.05)] px-3 py-2.5">
+            <div className="mb-2 flex items-center justify-between gap-2 text-[11px]">
+              <span className="font-semibold text-[#67e8f9]">本关试剂</span>
+              <span className="text-[#64748b]">支线会污染</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
               {highlightedReagents.map(name => (
-                <span key={name} className="px-2 py-1 rounded-full border border-[#22d3ee]/25 bg-[#22d3ee]/10 text-[11px] text-[#67e8f9]">
+                <span key={name} className="px-2 py-0.5 rounded-full border border-[#22d3ee]/25 bg-[#22d3ee]/10 text-[10px] text-[#67e8f9]">
                   {name}
                 </span>
               ))}
               {suggestedReagents.filter(name => !highlightedSet.has(name)).map(name => (
-                <span key={name} className="px-2 py-1 rounded-full border border-[#a855f7]/25 bg-[#a855f7]/10 text-[11px] text-[#e9d5ff]">
+                <span key={name} className="px-2 py-0.5 rounded-full border border-[#a855f7]/25 bg-[#a855f7]/10 text-[10px] text-[#e9d5ff]">
                   {name}
                 </span>
               ))}

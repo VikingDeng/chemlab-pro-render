@@ -264,6 +264,12 @@ function sanitizeMissionContext(mission) {
                 label: sanitizeString(current.label, undefined, 40),
                 question: sanitizeString(current.question, undefined, 100),
                 hint: sanitizeString(current.hint, undefined, 80),
+                wrongAnswerPenalty: current.wrongAnswerPenalty && typeof current.wrongAnswerPenalty === 'object'
+                  ? {
+                      integrity: Number.isFinite(current.wrongAnswerPenalty.integrity) ? Number(current.wrongAnswerPenalty.integrity) : null,
+                      pollution: Number.isFinite(current.wrongAnswerPenalty.pollution) ? Number(current.wrongAnswerPenalty.pollution) : null,
+                    }
+                  : null,
                 selectedFeedback: sanitizeString(current.selectedFeedback, undefined, 120),
                 options: Array.isArray(current.options)
                   ? current.options
@@ -538,6 +544,7 @@ function buildLlmInstruction(contextDigest) {
     '你需要结合实验上下文、最近对话和可用 skill，给出简洁、可执行、具备化学解释的建议。',
     '如果 mission 存在，优先围绕 mission.title、mission.target、mission.nextAction 和 mission.proof.current 回答；这是当前演示的真实任务状态。',
     '如果 mission.proof.current.stage="predict"，不要直接替用户选最终答案；用当前题目和选项提示如何预测，并提醒先预测再验证。',
+    '当用户只要“线索”时，只给一个观察角度，不点名最终选项；不要直接说“选 X”。',
     '当 mission.productReady=true 且 mission.proof.current 存在时，先确认“现象已出现”，再用当前题目、选项、hint 帮用户判断证据；不要重复长路线。',
     '当 mission.completed=true 时，建议用户解释现象或进入下一关；不要继续要求加同一主线试剂。',
     '当 mission.pollution 较高或 mission.canComplete=false 时，优先指出污染/可信度问题，用最短路线复盘；不要鼓励继续乱加试剂。',

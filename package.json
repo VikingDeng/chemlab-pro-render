@@ -8,6 +8,7 @@
     "dev:api": "node server/index.mjs",
     "build": "tsc -b && vite build",
     "check:api": "node --check server/index.mjs",
+    "check:ui": "node scripts/check-ui-overlap.mjs",
     "start:api": "node server/index.mjs",
     "test": "node ./node_modules/typescript/bin/tsc -p ./tsconfig.test.json && node --test ./.test-dist/tests/challengeGuidance.test.js ./tests/lavoisierApi.test.mjs",
     "lint": "eslint .",
@@ -47,6 +48,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
+    "playwright": "^1.60.0",
     "typescript-eslint": "^8.58.2"
   },
   "main": "electron/main.cjs",

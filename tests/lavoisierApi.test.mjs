@@ -276,6 +276,7 @@ test('Lavoisier prompt carries mission proof state for tutor-style guidance', as
               label: '离子',
               question: '蓝绿色絮状沉淀锁定哪个阳离子？',
               hint: '线索：蓝绿色 + 遇碱沉淀。',
+              wrongAnswerPenalty: { integrity: 18, pollution: 6 },
               options: [
                 { id: 'cu2', label: 'Cu²⁺', detail: '遇 OH⁻ 生成 Cu(OH)₂' },
                 { id: 'ag', label: 'Ag⁺', detail: '更像白色 AgCl' },
@@ -305,6 +306,7 @@ test('Lavoisier prompt carries mission proof state for tutor-style guidance', as
     assert.match(systemPrompt, /"hintUses":1/)
     assert.match(systemPrompt, /"lastPenalty":"证据误判：Ag⁺"/)
     assert.match(systemPrompt, /"coachLine":"现象已出现，判断“离子”。"/)
+    assert.match(systemPrompt, /"wrongAnswerPenalty":\{"integrity":18,"pollution":6\}/)
     assert.match(systemPrompt, /蓝绿色絮状沉淀锁定哪个阳离子/)
     assert.match(systemPrompt, /线索：蓝绿色/)
     assert.deepEqual(capturedRequest.chat_template_kwargs, { enable_thinking: false })
