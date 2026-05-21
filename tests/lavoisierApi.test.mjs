@@ -260,6 +260,10 @@ test('Lavoisier prompt carries mission proof state for tutor-style guidance', as
           stepCount: 6,
           evidenceScore: 60,
           integrity: 88,
+          pollution: 16,
+          purity: 84,
+          canComplete: true,
+          failureReason: null,
           hintUses: 1,
           lastPenalty: '证据误判：Ag⁺',
           coachLine: '现象已出现，判断“离子”。',
@@ -296,6 +300,8 @@ test('Lavoisier prompt carries mission proof state for tutor-style guidance', as
 
     const systemPrompt = capturedRequest.messages[0].content
     assert.match(systemPrompt, /"productReady":true/)
+    assert.match(systemPrompt, /"pollution":16/)
+    assert.match(systemPrompt, /"canComplete":true/)
     assert.match(systemPrompt, /"hintUses":1/)
     assert.match(systemPrompt, /"lastPenalty":"证据误判：Ag⁺"/)
     assert.match(systemPrompt, /"coachLine":"现象已出现，判断“离子”。"/)

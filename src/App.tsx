@@ -131,6 +131,7 @@ type MissionCompletionCard = {
   integrity: number;
   evidenceScore: number;
   mistakes: number;
+  pollution: number;
   recap: MissionRecap;
 };
 
@@ -184,6 +185,7 @@ type MissionRunStats = {
   wrongProofs: number;
   hintUses: number;
   integrity: number;
+  pollution: number;
   lastPenalty?: string;
 };
 
@@ -242,6 +244,10 @@ const MISSION_PROOF_PENALTY = 18;
 const MISSION_PREDICTION_PENALTY = 22;
 const MISSION_WRONG_ORDER_PENALTY = 12;
 const MISSION_SIDE_REAGENT_PENALTY = 8;
+const MISSION_POLLUTION_LIMIT = 45;
+const MISSION_NON_MISSION_POLLUTION = 24;
+const MISSION_WRONG_ORDER_POLLUTION = 16;
+const MISSION_SIDE_REAGENT_POLLUTION = 10;
 const PHENOMENON_TAG_VISIBLE_MS = 12000;
 const PHENOMENON_TAG_STALE_MS = 18000;
 const PUBLIC_LAVOISIER_API_URL = 'https://chemlab-pro.onrender.com/api/lavoisier';
@@ -791,11 +797,22 @@ function createMissionRunStats(): MissionRunStats {
     wrongProofs: 0,
     hintUses: 0,
     integrity: 100,
+    pollution: 0,
   };
 }
 
 function clampMissionIntegrity(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function isMissionSampleFailed(stats: MissionRunStats) {
+  return stats.integrity < MISSION_MIN_INTEGRITY || stats.pollution >= MISSION_POLLUTION_LIMIT;
+}
+
+function getMissionFailureReason(stats: MissionRunStats) {
+  if (stats.pollution >= MISSION_POLLUTION_LIMIT) return `污染 ${stats.pollution}%`;
+  if (stats.integrity < MISSION_MIN_INTEGRITY) return `可信度 ${stats.integrity}%`;
+  return '';
 }
 
 function getMissionGrade(integrity: number) {
@@ -808,10 +825,11 @@ function getMissionGrade(integrity: number) {
 function getMissionFinalGrade(integrity: number, stats: MissionRunStats) {
   const base = getMissionGrade(integrity);
   const mistakes = stats.wrongProofs + stats.wrongReagents;
-  if (base.grade === 'S' && (mistakes > 0 || stats.hintUses > 0)) {
+  const pollution = stats.pollution || 0;
+  if (base.grade === 'S' && (mistakes > 0 || stats.hintUses > 0 || pollution > 0)) {
     return { grade: 'A', stars: 2 };
   }
-  if (base.grade === 'A' && mistakes >= 2) {
+  if ((base.grade === 'S' || base.grade === 'A') && (mistakes >= 2 || pollution >= 25)) {
     return { grade: 'B', stars: 1 };
   }
   return base;
@@ -827,22 +845,28 @@ function buildMissionRecap(
   const preset = MISSION_SEQUENCE.find(entry => MISSION_BRIEFS[entry].challengeId === challengeId);
   const mission = preset ? MISSION_BRIEFS[preset] : null;
   const mistakes = stats.wrongProofs + stats.wrongReagents;
+  const pollution = stats.pollution || 0;
   const controlSolved = Boolean(proof?.checkpoints.some(checkpoint => checkpoint.stage === 'control' && answers[checkpoint.id]?.correct));
   const badges = [
     mistakes === 0 ? '零失误' : `失误 ${mistakes}`,
     stats.hintUses === 0 ? '无提示' : `提示 ${stats.hintUses}`,
+    pollution === 0 ? '无污染' : `污染 ${pollution}%`,
     controlSolved ? '完成对照' : '证据链完成',
   ];
   const weakPoint = stats.lastPenalty
     ? stats.lastPenalty
     : stats.wrongProofs > 0
     ? '证据判断还可更稳'
+    : pollution > 0
+    ? '支线/错序增加了污染'
     : stats.wrongReagents > 0
     ? '试剂顺序还可更准'
     : '路线干净';
   const routeLine = mission ? mission.route.join(' → ') : '主线完成';
-  const coachLine = evidenceScore >= 100 && mistakes === 0
+  const coachLine = evidenceScore >= 100 && mistakes === 0 && pollution === 0
     ? '预测、现象、解释、对照全部闭环。'
+    : pollution > 0
+    ? '现象成立；但样品被污染，下次先推理再加料。'
     : controlSolved
     ? '现象成立；复盘扣分点，下次争取 S。'
     : '现象成立；补强对照判断会更像真实实验。';
@@ -873,9 +897,9 @@ function getMissionReagentEvent(
   items: PlacedItem[],
   reagentName: string,
 ) {
-  if (!activeChallenge || activeChallenge.completed) return { penalty: 0 };
+  if (!activeChallenge || activeChallenge.completed) return { penalty: 0, pollutionDelta: 0 };
   const insight = computeChallengeInsight(activeChallenge, items);
-  if (!insight) return { penalty: 0 };
+  if (!insight) return { penalty: 0, pollutionDelta: 0 };
 
   const productReady = computeChallengeCompleted(activeChallenge, items);
   const nextAction = insight.checklist.find(item => !item.done)?.label || null;
@@ -886,6 +910,7 @@ function getMissionReagentEvent(
   if (!isPrimary && !isSecondary) {
     return {
       penalty: 18,
+      pollutionDelta: MISSION_NON_MISSION_POLLUTION,
       message: `非本关试剂：${compactMissionLabel(reagentName)}`,
     };
   }
@@ -893,6 +918,7 @@ function getMissionReagentEvent(
   if (isPrimary && !productReady && !matchesCurrentStep) {
     return {
       penalty: MISSION_WRONG_ORDER_PENALTY,
+      pollutionDelta: MISSION_WRONG_ORDER_POLLUTION,
       message: `顺序偏离：当前应先${compactMissionLabel(nextAction || '观察')}`,
     };
   }
@@ -900,11 +926,12 @@ function getMissionReagentEvent(
   if (isSecondary && !productReady) {
     return {
       penalty: MISSION_SIDE_REAGENT_PENALTY,
+      pollutionDelta: MISSION_SIDE_REAGENT_POLLUTION,
       message: `支线消耗：${compactMissionLabel(reagentName)}`,
     };
   }
 
-  return { penalty: 0 };
+  return { penalty: 0, pollutionDelta: 0 };
 }
 
 function buildMissionProofFeedback(checkpoint: MissionProofCheckpoint, selectedId?: string) {
@@ -1286,27 +1313,31 @@ function getMissionAccentClasses(accent: MissionBrief['accent']) {
 function MissionEvidenceBar({
   value,
   integrity,
+  pollution = 0,
   compact = false,
 }: {
   value: number;
   integrity: number;
+  pollution?: number;
   compact?: boolean;
 }) {
   const safeValue = clampMissionIntegrity(value);
   const safeIntegrity = clampMissionIntegrity(integrity);
-  const isCritical = safeIntegrity < MISSION_MIN_INTEGRITY;
+  const safePollution = clampMissionIntegrity(pollution);
+  const isCritical = safeIntegrity < MISSION_MIN_INTEGRITY || safePollution >= MISSION_POLLUTION_LIMIT;
   const fillClass = isCritical
     ? 'from-[#f43f5e] via-[#fb7185] to-[#f59e0b]'
     : safeValue >= 80
     ? 'from-[#10b981] via-[#22d3ee] to-[#67e8f9]'
     : 'from-[#f59e0b] via-[#22d3ee] to-[#38bdf8]';
   const hpFillClass = isCritical ? 'from-[#f43f5e] to-[#f59e0b]' : 'from-[#10b981] to-[#22d3ee]';
+  const pollutionText = safePollution > 0 ? (compact ? ` · 污${safePollution}` : ` · 污染 ${safePollution}`) : '';
 
   return (
     <div className={compact ? 'min-w-[140px]' : 'w-full'}>
       <div className="mb-1 flex items-center justify-between gap-2">
         <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#64748b]">{compact ? '证据' : '证据强度'}</span>
-        <span className={`font-mono text-[12px] font-bold ${isCritical ? 'text-[#fda4af]' : 'text-[#a5f3fc]'}`}>{safeValue}% · HP {safeIntegrity}</span>
+        <span className={`font-mono text-[12px] font-bold ${isCritical ? 'text-[#fda4af]' : 'text-[#a5f3fc]'}`}>{safeValue}% · HP {safeIntegrity}{pollutionText}</span>
       </div>
       <div className="relative h-3 overflow-hidden rounded-full border border-white/10 bg-black/30 shadow-[inset_0_0_14px_rgba(2,6,23,0.65)]">
         <motion.div
@@ -1327,8 +1358,11 @@ function MissionEvidenceBar({
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/24">
             <div className={`h-full rounded-full bg-gradient-to-r ${hpFillClass}`} style={{ width: `${safeIntegrity}%` }} />
           </div>
+          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-black/24">
+            <div className="h-full rounded-full bg-gradient-to-r from-[#f59e0b] to-[#f43f5e]" style={{ width: `${safePollution}%` }} />
+          </div>
           <div className={`mt-1 text-[10px] ${isCritical ? 'text-[#fda4af]' : 'text-[#64748b]'}`}>
-            样本可信度 {safeIntegrity}%{isCritical ? ` · 低于通关线 ${MISSION_MIN_INTEGRITY}%` : ` · 通关线 ${MISSION_MIN_INTEGRITY}%`}
+            样本可信度 {safeIntegrity}% · 污染 {safePollution}%{isCritical ? ` · 通关线 ${MISSION_MIN_INTEGRITY}% / 污染线 ${MISSION_POLLUTION_LIMIT}%` : ` · 通关线 ${MISSION_MIN_INTEGRITY}%`}
           </div>
         </>
       )}
@@ -1752,6 +1786,7 @@ function App() {
   const [completedMissionIds, setCompletedMissionIds] = useState<Set<string>>(() => readStoredMissionCompletionIds());
   const [missionProofAnswers, setMissionProofAnswers] = useState<Record<string, Record<string, MissionProofAnswer>>>({});
   const [missionRunStats, setMissionRunStats] = useState<Record<string, MissionRunStats>>({});
+  const missionRunStatsRef = useRef<Record<string, MissionRunStats>>({});
   
   // Custom Toast State
   const [toast, setToast] = useState<{id: string, message: string} | null>(null);
@@ -1779,13 +1814,14 @@ function App() {
   }, []);
 
   const updateMissionRunStats = useCallback((challengeId: string, updater: (stats: MissionRunStats) => MissionRunStats) => {
-    setMissionRunStats(prev => {
-      const current = prev[challengeId] || createMissionRunStats();
-      return {
-        ...prev,
-        [challengeId]: updater(current),
-      };
-    });
+    const currentStats = missionRunStatsRef.current;
+    const current = currentStats[challengeId] || createMissionRunStats();
+    const nextStats = {
+      ...currentStats,
+      [challengeId]: updater(current),
+    };
+    missionRunStatsRef.current = nextStats;
+    setMissionRunStats(nextStats);
   }, []);
 
   const recordMissionEvent = useCallback((
@@ -1793,6 +1829,7 @@ function App() {
     kind: 'operation' | 'reagent' | 'proof' | 'hint',
     penalty = 0,
     message?: string,
+    pollutionDelta = 0,
   ) => {
     updateMissionRunStats(challengeId, current => ({
       ...current,
@@ -1801,7 +1838,8 @@ function App() {
       wrongProofs: current.wrongProofs + (kind === 'proof' && penalty > 0 ? 1 : 0),
       hintUses: current.hintUses + (kind === 'hint' ? 1 : 0),
       integrity: clampMissionIntegrity(current.integrity - penalty),
-      lastPenalty: penalty > 0 ? message : current.lastPenalty,
+      pollution: clampMissionIntegrity((current.pollution || 0) + pollutionDelta),
+      lastPenalty: penalty > 0 || pollutionDelta > 0 ? message : current.lastPenalty,
     }));
   }, [updateMissionRunStats]);
 
@@ -1902,63 +1940,71 @@ function App() {
   }, []);
 
   function addReagentToContainer(targetId: string, reagentName: string, volumeML = 20) {
+    const committedEffects = new Set<string>();
+    const runEffectOnce = (key: string, effect: () => void) => {
+      if (committedEffects.has(key)) return;
+      committedEffects.add(key);
+      effect();
+    };
+
     setPlacedItems(currentItems => {
       const target = currentItems.find(i => i.id === targetId);
       if (!target || !LIQUID_CONTAINER_TYPES.has(target.type)) {
-        showToast('先选择一个容器');
+        runEffectOnce('missing-target', () => showToast('先选择一个容器'));
         return currentItems;
       }
 
       const capacity = getContainerCapacity(target.type);
       const currentVolume = getTotalLiquidVolume(target.chemState);
       if (currentVolume + volumeML > capacity) {
-        showToast(`🚫 ${target.name} 容量不足，无法加入 ${volumeML}mL`);
+        runEffectOnce('capacity', () => showToast(`🚫 ${target.name} 容量不足，无法加入 ${volumeML}mL`));
         return currentItems;
       }
 
       if (gameMode === 'challenge' && activeChallenge && !activeChallenge.completed) {
-        const runStats = missionRunStats[activeChallenge.id] || createMissionRunStats();
-        if (runStats.integrity < MISSION_MIN_INTEGRITY) {
-          showMissionCue({
-            title: '样本失效',
-            detail: `可信度 ${runStats.integrity}% · 重开本关`,
-            accent: '#f43f5e',
-            tone: 'side',
-          }, 2600);
-          showToast('样本可信度不足，请重开本关');
+        const runStats = missionRunStatsRef.current[activeChallenge.id] || createMissionRunStats();
+        if (isMissionSampleFailed(runStats)) {
+          const reason = getMissionFailureReason(runStats);
+          runEffectOnce('failed-sample', () => {
+            showMissionCue({
+              title: '样本失效',
+              detail: `${reason} · 重开本关`,
+              accent: '#f43f5e',
+              tone: 'side',
+            }, 2600);
+            showToast(`${reason}，请重开本关`);
+          });
           return currentItems;
         }
       }
 
       if (gameMode === 'challenge' && shouldBlockMissionReagentForPrediction(reagentName)) {
-        promptMissionPredictionGate();
-        showToast('先完成预测，再验证现象');
+        runEffectOnce('prediction-gate', () => {
+          promptMissionPredictionGate();
+          showToast('先完成预测，再验证现象');
+        });
         return currentItems;
       }
 
       if (gameMode === 'challenge' && activeChallenge && !activeChallenge.completed) {
         const missionEvent = getMissionReagentEvent(activeChallenge, currentItems, reagentName);
 
-        recordMissionEvent(activeChallenge.id, missionEvent.penalty > 0 ? 'reagent' : 'operation', missionEvent.penalty, missionEvent.message);
-        if (missionEvent.penalty > 0 && missionEvent.message) {
-          showMissionCue({
-            title: '可信度下降',
-            detail: `${missionEvent.message} · -${missionEvent.penalty}`,
-            accent: '#f59e0b',
-            tone: 'side',
-          }, 2600);
-        }
+        runEffectOnce('mission-event', () => {
+          recordMissionEvent(activeChallenge.id, missionEvent.penalty > 0 ? 'reagent' : 'operation', missionEvent.penalty, missionEvent.message, missionEvent.pollutionDelta);
+          if (missionEvent.penalty > 0 && missionEvent.message) {
+            const pollutionNote = missionEvent.pollutionDelta ? ` · 污染+${missionEvent.pollutionDelta}` : '';
+            showMissionCue({
+              title: '样本受损',
+              detail: `${missionEvent.message} · -${missionEvent.penalty}${pollutionNote}`,
+              accent: '#f59e0b',
+              tone: 'side',
+            }, 2600);
+          }
+        });
       }
 
-      saveSnapshot(currentItems, brokenGlass);
       const previousState = target.chemState;
       const result = mixReagent(previousState, reagentName, volumeML);
-
-      setTimeout(() => {
-        emitReactionOutcomeRef.current(reagentName, result);
-        const hint = computeReactionHint(target, reagentName, previousState, result);
-        showInlineContainerHint({ ...hint, targetId: target.id });
-      }, 0);
 
       const nextItems = currentItems.map(item => {
         if (item.id !== target.id) return item;
@@ -1970,9 +2016,17 @@ function App() {
         };
       });
       placedItemsRef.current = nextItems;
-      if (focusedItemIdRef.current === target.id) {
-        syncReadouts(result.newState);
-      }
+      runEffectOnce('commit', () => {
+        saveSnapshot(currentItems, brokenGlass);
+        setTimeout(() => {
+          emitReactionOutcomeRef.current(reagentName, result);
+          const hint = computeReactionHint(target, reagentName, previousState, result);
+          showInlineContainerHint({ ...hint, targetId: target.id });
+        }, 0);
+        if (focusedItemIdRef.current === target.id) {
+          syncReadouts(result.newState);
+        }
+      });
       return nextItems;
     });
   }
@@ -2246,10 +2300,12 @@ function App() {
       delete next[mission.challengeId];
       return next;
     });
-    setMissionRunStats(prev => ({
-      ...prev,
+    const nextMissionRunStats = {
+      ...missionRunStatsRef.current,
       [mission.challengeId]: createMissionRunStats(),
-    }));
+    };
+    missionRunStatsRef.current = nextMissionRunStats;
+    setMissionRunStats(nextMissionRunStats);
     pendingChallengeCompletionRef.current = null;
     setActiveChallenge({
       id: mission.challengeId,
@@ -2848,8 +2904,9 @@ function App() {
     ? (missionRunStats[activeChallenge.id] || createMissionRunStats())
     : createMissionRunStats();
   const activeMissionGrade = getMissionFinalGrade(activeMissionStats.integrity, activeMissionStats);
-  const activeMissionCanComplete = activeMissionStats.integrity >= MISSION_MIN_INTEGRITY;
-  const activeMissionFailed = Boolean(activeChallenge && !activeChallenge.completed && activeMissionStats.integrity < MISSION_MIN_INTEGRITY);
+  const activeMissionFailureReason = getMissionFailureReason(activeMissionStats);
+  const activeMissionCanComplete = !isMissionSampleFailed(activeMissionStats);
+  const activeMissionFailed = Boolean(activeChallenge && !activeChallenge.completed && isMissionSampleFailed(activeMissionStats));
   const showMissionProofPanel = Boolean(
     activeChallenge
     && !activeChallenge.completed
@@ -2920,7 +2977,7 @@ function App() {
   const challengeStageLabel = useMemo(() => {
     if (!activeChallenge) return '选一关';
     if (activeChallenge.completed) return '下一关';
-    if (activeMissionFailed) return '样本失效';
+    if (activeMissionFailed) return activeMissionStats.pollution >= MISSION_POLLUTION_LIMIT ? '样品污染' : '样本失效';
     if (challengeProductReady && activeProofSolved && !activeMissionCanComplete) return '样本失效';
     if (shouldShowPredictionGate && activePredictionCheckpoint) {
       return `预测：${activePredictionCheckpoint.label}`;
@@ -2931,17 +2988,18 @@ function App() {
     if (challengeQuickReagent) return `加${compactMissionLabel(challengeQuickReagent)}`;
     if (challengeNextAction) return `做 ${compactMissionLabel(challengeNextAction)}`;
     return '观察';
-  }, [activeChallenge, activeMissionCanComplete, activeMissionFailed, activeMissionProof, activePredictionCheckpoint, activeProofCurrent, activeProofSolved, challengeNextAction, challengeProductReady, challengeQuickReagent, shouldShowPredictionGate]);
+  }, [activeChallenge, activeMissionCanComplete, activeMissionFailed, activeMissionProof, activeMissionStats.pollution, activePredictionCheckpoint, activeProofCurrent, activeProofSolved, challengeNextAction, challengeProductReady, challengeQuickReagent, shouldShowPredictionGate]);
   const challengeCoachLine = useMemo(() => {
     if (!activeChallenge) return '';
-    if (activeMissionFailed) return '样本失效：重开本关，先按主线验证。';
+    if (activeMissionFailed) return `${activeMissionFailureReason}：重开本关，先推理再加料。`;
+    if (activeMissionStats.pollution > 0) return `污染 ${activeMissionStats.pollution}%：别再加支线，先补证据。`;
     if (activeChallenge.completed) return '本关闭环，进入下一关或复盘现象。';
     if (shouldShowPredictionGate && activeProofCurrent) return '先预测，再动手验证。';
     if (challengeProductReady && activeProofCurrent) return `现象已出现，判断“${activeProofCurrent.label}”。`;
     if (challengeQuickReagent) return `下一步加入 ${compactMissionLabel(challengeQuickReagent)}。`;
     if (challengeNextAction) return `先完成 ${compactMissionLabel(challengeNextAction)}。`;
     return '观察颜色、沉淀、气泡或分层。';
-  }, [activeChallenge, activeMissionFailed, activeProofCurrent, challengeNextAction, challengeProductReady, challengeQuickReagent, shouldShowPredictionGate]);
+  }, [activeChallenge, activeMissionFailed, activeMissionFailureReason, activeMissionStats.pollution, activeProofCurrent, challengeNextAction, challengeProductReady, challengeQuickReagent, shouldShowPredictionGate]);
   const challengeActionOptions = useMemo(() => {
     if (!challengeInsight || !primaryAgentContainerId || activeChallenge?.completed) return [];
     if (activeMissionFailed) return [];
@@ -3204,6 +3262,10 @@ function App() {
         doneCount: challengeDisplayDoneCount,
         stepCount: challengeDisplayStepCount,
         integrity: activeMissionStats.integrity,
+        pollution: activeMissionStats.pollution,
+        purity: 100 - activeMissionStats.pollution,
+        canComplete: activeMissionCanComplete,
+        failureReason: activeMissionFailureReason || null,
         grade: activeMissionGrade.grade,
         mistakes: activeMissionStats.wrongProofs + activeMissionStats.wrongReagents,
         operations: activeMissionStats.operations,
@@ -3372,7 +3434,7 @@ function App() {
         agentAbortControllerRef.current = null;
       }
     }
-  }, [activeChallenge, activeMissionBrief, activeMissionEvidenceScore, activeMissionGrade.grade, activeMissionProof, activeMissionStats.hintUses, activeMissionStats.integrity, activeMissionStats.lastPenalty, activeMissionStats.operations, activeMissionStats.wrongProofs, activeMissionStats.wrongReagents, activeProofCurrent, activeProofCurrentAnswer, activeProofCurrentFeedback, activeProofSolved, activeProofSolvedCount, agentLastEvent, agentMessages, agentState.goal, agentState.intent, agentState.risks, appendAgentMessage, appendUserMessage, challengeCoachLine, challengeDisplayDoneCount, challengeDisplayStepCount, challengeProductReady, challengeStageLabel, gameMode, placedItems, primaryAgentContainerId, runAgentToolCalls, lavoisierApiUrl, setAgentDraft, setAgentError, setAgentExpanded, setAgentIsLoading, setAgentRemoteHeadline, setAgentRemoteSummary, setAgentStatusLabel, setAgentSuggestedPrompts, shouldShowPredictionGate]);
+  }, [activeChallenge, activeMissionBrief, activeMissionCanComplete, activeMissionEvidenceScore, activeMissionFailureReason, activeMissionGrade.grade, activeMissionProof, activeMissionStats.hintUses, activeMissionStats.integrity, activeMissionStats.lastPenalty, activeMissionStats.operations, activeMissionStats.pollution, activeMissionStats.wrongProofs, activeMissionStats.wrongReagents, activeProofCurrent, activeProofCurrentAnswer, activeProofCurrentFeedback, activeProofSolved, activeProofSolvedCount, agentLastEvent, agentMessages, agentState.goal, agentState.intent, agentState.risks, appendAgentMessage, appendUserMessage, challengeCoachLine, challengeDisplayDoneCount, challengeDisplayStepCount, challengeProductReady, challengeStageLabel, gameMode, placedItems, primaryAgentContainerId, runAgentToolCalls, lavoisierApiUrl, setAgentDraft, setAgentError, setAgentExpanded, setAgentIsLoading, setAgentRemoteHeadline, setAgentRemoteSummary, setAgentStatusLabel, setAgentSuggestedPrompts, shouldShowPredictionGate]);
 
   const submitAgentQuery = useCallback((query: string) => {
     void requestLavoisierApi(query, { includeUserMessage: true });
@@ -3580,7 +3642,7 @@ function App() {
     const answers = missionProofAnswers[activeChallenge.id] || {};
     const proofSolved = proof ? proof.checkpoints.every(checkpoint => answers[checkpoint.id]?.correct) : true;
     const runStats = missionRunStats[activeChallenge.id] || createMissionRunStats();
-    const canComplete = runStats.integrity >= MISSION_MIN_INTEGRITY;
+    const canComplete = !isMissionSampleFailed(runStats);
     const success = computeChallengeCompleted(activeChallenge, placedItems) && proofSolved && canComplete;
     if (!success || pendingChallengeCompletionRef.current === activeChallenge.id) return;
 
@@ -3601,6 +3663,7 @@ function App() {
       integrity: runStats.integrity,
       evidenceScore: activeMissionEvidenceScore,
       mistakes: runStats.wrongProofs + runStats.wrongReagents,
+      pollution: runStats.pollution,
       recap,
     });
     setCompletedMissionIds(previousIds => {
@@ -3629,6 +3692,13 @@ function App() {
   const handleConfirmDrop = () => {
     if (!activeDrop) return;
 
+    const committedEffects = new Set<string>();
+    const runEffectOnce = (key: string, effect: () => void) => {
+      if (committedEffects.has(key)) return;
+      committedEffects.add(key);
+      effect();
+    };
+
     setPlacedItems(currentItems => {
       const collisionItem = currentItems.find(i => i.id === activeDrop.targetId);
       if (!collisionItem) return currentItems;
@@ -3636,57 +3706,49 @@ function App() {
       const absoluteMax = getContainerCapacity(collisionItem.type);
       const currentTotalVolume = getTotalLiquidVolume(collisionItem.chemState);
       if (currentTotalVolume + dropVolume > absoluteMax) {
-        showToast(`🚫 该容器已装入 ${currentTotalVolume.toFixed(1)}mL，无法再加入 ${dropVolume}mL (最大容量 ${absoluteMax}mL)`);
+        runEffectOnce('capacity', () => showToast(`🚫 该容器已装入 ${currentTotalVolume.toFixed(1)}mL，无法再加入 ${dropVolume}mL (最大容量 ${absoluteMax}mL)`));
         return currentItems;
       }
 
       if (gameMode === 'challenge' && activeChallenge && !activeChallenge.completed) {
-        const runStats = missionRunStats[activeChallenge.id] || createMissionRunStats();
-        if (runStats.integrity < MISSION_MIN_INTEGRITY) {
-          showMissionCue({
-            title: '样本失效',
-            detail: `可信度 ${runStats.integrity}% · 重开本关`,
-            accent: '#f43f5e',
-            tone: 'side',
-          }, 2600);
-          showToast('样本可信度不足，请重开本关');
+        const runStats = missionRunStatsRef.current[activeChallenge.id] || createMissionRunStats();
+        if (isMissionSampleFailed(runStats)) {
+          const reason = getMissionFailureReason(runStats);
+          runEffectOnce('failed-sample', () => {
+            showMissionCue({
+              title: '样本失效',
+              detail: `${reason} · 重开本关`,
+              accent: '#f43f5e',
+              tone: 'side',
+            }, 2600);
+            showToast(`${reason}，请重开本关`);
+          });
           return currentItems;
         }
       }
 
       if (gameMode === 'challenge' && shouldBlockMissionReagentForPrediction(activeDrop.reagentName)) {
-        promptMissionPredictionGate();
-        showToast('先完成预测，再验证现象');
+        runEffectOnce('prediction-gate', () => {
+          promptMissionPredictionGate();
+          showToast('先完成预测，再验证现象');
+        });
         return currentItems;
       }
 
-      if (gameMode === 'challenge' && activeChallenge && challengeInsight && !activeChallenge.completed) {
-        const isPrimary = challengeInsight.primaryReagents.includes(activeDrop.reagentName);
-        const isSecondary = challengeInsight.secondaryReagents.includes(activeDrop.reagentName);
-        const matchesCurrentStep = missionReagentMatchesAction(activeDrop.reagentName, challengeNextAction);
-        let penalty = 0;
-        let message: string | undefined;
-
-        if (!isPrimary && !isSecondary) {
-          penalty = 18;
-          message = `非本关试剂：${compactMissionLabel(activeDrop.reagentName)}`;
-        } else if (isPrimary && !challengeProductReady && !matchesCurrentStep) {
-          penalty = MISSION_WRONG_ORDER_PENALTY;
-          message = `顺序偏离：当前应先${compactMissionLabel(challengeNextAction || '观察')}`;
-        } else if (isSecondary && !challengeProductReady) {
-          penalty = MISSION_SIDE_REAGENT_PENALTY;
-          message = `支线消耗：${compactMissionLabel(activeDrop.reagentName)}`;
-        }
-
-        recordMissionEvent(activeChallenge.id, penalty > 0 ? 'reagent' : 'operation', penalty, message);
-        if (penalty > 0 && message) {
-          showMissionCue({
-            title: '可信度下降',
-            detail: `${message} · -${penalty}`,
-            accent: '#f59e0b',
-            tone: 'side',
-          }, 2600);
-        }
+      if (gameMode === 'challenge' && activeChallenge && !activeChallenge.completed) {
+        const missionEvent = getMissionReagentEvent(activeChallenge, currentItems, activeDrop.reagentName);
+        runEffectOnce('mission-event', () => {
+          recordMissionEvent(activeChallenge.id, missionEvent.penalty > 0 ? 'reagent' : 'operation', missionEvent.penalty, missionEvent.message, missionEvent.pollutionDelta);
+          if (missionEvent.penalty > 0 && missionEvent.message) {
+            const pollutionNote = missionEvent.pollutionDelta ? ` · 污染+${missionEvent.pollutionDelta}` : '';
+            showMissionCue({
+              title: '样本受损',
+              detail: `${missionEvent.message} · -${missionEvent.penalty}${pollutionNote}`,
+              accent: '#f59e0b',
+              tone: 'side',
+            }, 2600);
+          }
+        });
       }
 
       // Thermal shock logic
@@ -3697,29 +3759,24 @@ function App() {
       const thermalShockDelta = targetGlassTemp - incomingTemp;
 
       if (thermalShockDelta > 55 && incomingThermalShockRatio > 0.45 && dropVolume > 10) {
-         saveSnapshot(currentItems, brokenGlass); // adding >20ml of cold liquid to hot >80C glass
-         playSound('break', 0, collisionItem.id);
-         showToast("⚠️ 高温玻璃遭遇大体积冷液冲击，容器破裂！");
-         setBrokenGlass(prev => [...prev, { id: collisionItem.id, x: collisionItem.x, y: collisionItem.y, color: getChemColor(collisionItem.chemState) }]);
-         setActiveDrop(null);
-         stopSound(collisionItem.id);
+         runEffectOnce('break', () => {
+           saveSnapshot(currentItems, brokenGlass); // adding >20ml of cold liquid to hot >80C glass
+           playSound('break', 0, collisionItem.id);
+           showToast("⚠️ 高温玻璃遭遇大体积冷液冲击，容器破裂！");
+           setBrokenGlass(prev => [...prev, { id: collisionItem.id, x: collisionItem.x, y: collisionItem.y, color: getChemColor(collisionItem.chemState) }]);
+           setActiveDrop(null);
+           stopSound(collisionItem.id);
+         });
          return currentItems.filter(i => i.id !== collisionItem.id);
       }
 
       // Mix using the stoich engine
-      saveSnapshot(currentItems, brokenGlass);
       const previousState = collisionItem.chemState;
       const { newState, log, reactionType, equation } = mixReagent(
         previousState,
         activeDrop.reagentName, 
         dropVolume
       );
-
-      setTimeout(() => {
-        emitReactionOutcome(activeDrop.reagentName, { newState, log, reactionType, equation });
-        const hint = computeReactionHint(collisionItem, activeDrop.reagentName, previousState, { newState, log, reactionType, equation });
-        showInlineContainerHint({ ...hint, targetId: collisionItem.id });
-      }, 0);
 
       const nextItems = currentItems.map(item => {
         if (item.id === collisionItem.id) {
@@ -3733,6 +3790,14 @@ function App() {
         return item;
       });
       placedItemsRef.current = nextItems;
+      runEffectOnce('commit', () => {
+        saveSnapshot(currentItems, brokenGlass);
+        setTimeout(() => {
+          emitReactionOutcome(activeDrop.reagentName, { newState, log, reactionType, equation });
+          const hint = computeReactionHint(collisionItem, activeDrop.reagentName, previousState, { newState, log, reactionType, equation });
+          showInlineContainerHint({ ...hint, targetId: collisionItem.id });
+        }, 0);
+      });
       return nextItems;
     });
 
@@ -4205,7 +4270,7 @@ function App() {
 		                          HP {activeMissionStats.integrity}%
 		                        </span>
 		                      </div>
-		                      <MissionEvidenceBar value={activeMissionEvidenceScore} integrity={activeMissionStats.integrity} compact />
+		                      <MissionEvidenceBar value={activeMissionEvidenceScore} integrity={activeMissionStats.integrity} pollution={activeMissionStats.pollution} compact />
 		                      <div className="mt-1 max-w-[190px] truncate rounded-full border border-[#22d3ee]/20 bg-[#22d3ee]/10 px-2.5 py-1 text-[11px] font-medium text-[#a5f3fc]">
 		                        {challengeStageLabel}
 		                      </div>
@@ -4233,7 +4298,7 @@ function App() {
 		                        <div className="mt-1 truncate text-[13px] font-semibold text-white">{activeProofCurrent.question}</div>
 		                      </div>
 		                      <div className="w-[158px] shrink-0">
-		                        <MissionEvidenceBar value={activeMissionEvidenceScore} integrity={activeMissionStats.integrity} compact />
+		                        <MissionEvidenceBar value={activeMissionEvidenceScore} integrity={activeMissionStats.integrity} pollution={activeMissionStats.pollution} compact />
 		                      </div>
 	                      <div className="flex flex-wrap gap-1">
 	                        {activeMissionProof.checkpoints.map((checkpoint, checkpointIndex) => {
@@ -4340,9 +4405,9 @@ function App() {
 	                    {!activeChallenge.completed && activeMissionFailed ? (
 	                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
 	                        <div className="min-w-0">
-	                          <div className="text-[12px] font-semibold text-[#fda4af]">样本失效</div>
+	                          <div className="text-[12px] font-semibold text-[#fda4af]">样本失效 · {activeMissionFailureReason}</div>
 	                          <div className="mt-1 text-[11px] leading-snug text-[#94a3b8]">
-	                            当前 {activeMissionStats.integrity}% ，通关线 {MISSION_MIN_INTEGRITY}%。乱序、误判和提示都会扣分。
+	                            可信度 {activeMissionStats.integrity}% · 污染 {activeMissionStats.pollution}%；通关线 {MISSION_MIN_INTEGRITY}% / 污染线 {MISSION_POLLUTION_LIMIT}%。
 	                          </div>
 	                          {activeMissionStats.lastPenalty && (
 	                            <div className="mt-1 truncate text-[11px] text-[#fda4af]">{activeMissionStats.lastPenalty}</div>
@@ -4360,7 +4425,7 @@ function App() {
 	                          </button>
 	                          <button
 	                            type="button"
-	                            onClick={() => submitAgentQuery('我这关样本可信度不够，请帮我复盘哪里扣分，以及下一次最短正确路线。')}
+	                            onClick={() => submitAgentQuery('我这关样本失效，请用两句话复盘扣分/污染来源，以及下一次最短正确路线。')}
 	                            className="rounded-full border border-[#22d3ee]/24 bg-[#22d3ee]/10 px-3 py-2 text-[11px] font-semibold text-[#a5f3fc] transition-all hover:-translate-y-0.5 hover:bg-[#22d3ee]/16"
 	                          >
 	                            复盘
@@ -4554,13 +4619,13 @@ function App() {
 		                    <div className="min-w-0">
 		                      <div className="text-[13px] font-semibold text-[#f8fafc]">{missionCompletionCard.product}</div>
 		                      <div className="mt-1 text-[12px] text-[#94a3b8]">
-		                        可信度 {missionCompletionCard.integrity}% · 失误 {missionCompletionCard.mistakes}
+		                        可信度 {missionCompletionCard.integrity}% · 污染 {missionCompletionCard.pollution}% · 失误 {missionCompletionCard.mistakes}
 		                      </div>
 		                      <div className="mt-1 truncate text-[11px] text-[#86efac]">{getMissionUnlockText(missionCompletionCard.challengeId)}</div>
 		                    </div>
 	                  </div>
 	                  <div className="mt-3 rounded-[18px] border border-white/8 bg-white/[0.025] px-3 py-2">
-	                    <MissionEvidenceBar value={missionCompletionCard.evidenceScore} integrity={missionCompletionCard.integrity} />
+	                    <MissionEvidenceBar value={missionCompletionCard.evidenceScore} integrity={missionCompletionCard.integrity} pollution={missionCompletionCard.pollution} />
 	                  </div>
 	                  <div className="mt-3 rounded-[18px] border border-white/8 bg-white/[0.025] px-3 py-2">
 	                    <div className="flex flex-wrap gap-1.5">
