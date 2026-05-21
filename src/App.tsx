@@ -4,6 +4,7 @@ import { RotateCcw } from 'lucide-react'
 import { Beaker, FlaskConical, Flame, TestTubes, TestTube, Pipette, Gauge, Menu, X, ChevronUp, ChevronDown, Droplets, Thermometer, PenTool, Blend, Cable, BookOpen } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { EquipmentCard } from './EquipmentCard'
+import { getEquipmentMedia } from './equipmentMedia'
 import { ReagentShelf } from './ReagentShelf'
 import { ObservationLog } from './ObservationLog'
 import { DashboardReadouts } from './DashboardReadouts'
@@ -21,6 +22,7 @@ import { DistillationSetup } from './components/DistillationSetup'
 import { HolographicTooltip } from './components/HolographicTooltip'
 import { TestTubeRack } from './components/TestTubeRack'
 import { RealisticTestTube } from './components/RealisticTestTube'
+import { GlassRodArtwork, PipetteArtwork, TransferTubeArtwork, FunnelArtwork } from './components/BenchEquipment'
 import { ThermoChart } from './components/ThermoChart'
 import {
   buildDragProximityHint as computeDragProximityHint,
@@ -3901,21 +3903,17 @@ function App() {
         return <RealisticBeaker volume={volume} color={contentColor} isReacting={isReacting} reactionType={item.state} particles={particles} particleColor={particleColor} width={100} timeSinceReaction={timeSinceReaction} velocity={item.velocity} organicVolume={item.chemState.organicVolume} organicColor={item.chemState.organicColor} organicDensity={item.chemState.organicDensity} temperature={item.chemState.temperature} />;
       case 'pipette': 
         return (
-          <div className="relative group flex items-center justify-center h-[90px] w-[30px]">
-             <Pipette size={56} className="text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.6)] transform rotate-180 transition-transform duration-300 group-hover:scale-110 group-hover:text-emerald-300" strokeWidth={1.5} />
-             {/* Liquid indicator inside pipette */}
-             <div className="absolute bottom-[4px] left-1/2 -translate-x-1/2 w-[8px] rounded-b-sm bg-black/40 overflow-hidden backdrop-blur-md shadow-[inset_0_0_5px_rgba(0,0,0,0.5)]" style={{ height: '38px' }}>
-                <div className="absolute bottom-0 w-full transition-all duration-300" style={{ height: `${(volume / 10) * 100}%`, backgroundColor: contentColor, boxShadow: `inset 0 2px 5px rgba(255,255,255,0.5)` }} />
-             </div>
-             {volume > 0 && (
-                <motion.div 
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="absolute top-2 right-[-45px] text-[12px] font-mono font-bold text-white bg-[#0a0e1a]/90 border border-white/20 px-2 py-0.5 rounded shadow-[0_0_15px_rgba(255,255,255,0.2)] backdrop-blur-md whitespace-nowrap"
-                >
-                  {volume.toFixed(1)}mL
-                </motion.div>
-             )}
+          <div className="relative">
+            <PipetteArtwork volume={volume} color={contentColor} />
+            {volume > 0 && (
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="absolute top-2 right-[-48px] text-[12px] font-mono font-bold text-white bg-[#0a0e1a]/90 border border-white/20 px-2 py-0.5 rounded shadow-[0_0_15px_rgba(255,255,255,0.2)] backdrop-blur-md whitespace-nowrap"
+              >
+                {volume.toFixed(1)}mL
+              </motion.div>
+            )}
           </div>
         );
       case 'phmeter': 
@@ -3949,10 +3947,7 @@ function App() {
         const targetLabel = item.linkedTargetId ? placedItems.find(placed => placed.id === item.linkedTargetId)?.name : undefined;
         return (
           <div className="relative flex flex-col items-center">
-            <div className="relative w-[56px] h-[88px] flex items-center justify-center">
-              <FlaskConical size={54} className="rotate-180 text-[#f8fafc] opacity-90 drop-shadow-[0_0_12px_rgba(248,250,252,0.25)]" strokeWidth={1.7} />
-              <div className="absolute bottom-[10px] w-[6px] h-[26px] rounded-full bg-gradient-to-b from-white/70 to-white/20 border border-white/20 shadow-[0_0_8px_rgba(255,255,255,0.16)]" />
-            </div>
+            <FunnelArtwork />
             <div className="mt-1 text-[10px] px-2 py-0.5 rounded-full bg-[#0a0e1a]/80 border border-white/10 text-[#cbd5e1] whitespace-nowrap">
               {targetLabel ? `过滤 → ${targetLabel}` : '漏斗待接收'}
             </div>
@@ -3996,9 +3991,9 @@ function App() {
         );
       case 'tube':
         return (
-          <div className="relative text-gray-400 opacity-50 flex flex-col items-center">
-             <Cable size={30} />
-             <span className="text-[10px] mt-1">请放置在两容器间</span>
+          <div className="relative flex flex-col items-center">
+             <TransferTubeArtwork />
+             <span className="text-[10px] mt-1 text-[#cbd5e1]">请放置在两容器间</span>
           </div>
         );
       case 'glassrod': {
@@ -4009,16 +4004,7 @@ function App() {
         );
         return (
           <div className="relative pointer-events-none">
-            <motion.div 
-              animate={{ 
-                rotate: isStirring ? [0, 15, -15, 0] : 0,
-                x: isStirring ? [0, 5, -5, 0] : 0 
-              }} 
-              transition={{ repeat: Infinity, duration: 1, ease: "easeInOut" }}
-              className="origin-bottom"
-            >
-              <div className="w-[8px] h-[120px] rounded-full bg-gradient-to-b from-white/40 to-white/10 border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.2)] backdrop-blur-sm" />
-            </motion.div>
+            <GlassRodArtwork isStirring={isStirring} />
             {isStirring && (
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-black/60 px-2 py-1 rounded text-[10px] text-white whitespace-nowrap">
                 搅拌中...
@@ -4129,18 +4115,18 @@ function App() {
             </div>
             
             <div className={`flex-1 overflow-y-auto space-y-0 pb-4 -mx-4 px-4 ${isTablet && !sidebarOpen ? 'opacity-0' : 'opacity-100'}`}>
-              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'beaker', '烧杯')} icon={<Beaker size={20} />} name="烧杯" subtitle="250ml" collapsed={isTablet && !sidebarOpen} />
-              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'glassrod', '玻璃棒')} icon={<PenTool size={20} />} name="玻璃棒" subtitle="搅拌" collapsed={isTablet && !sidebarOpen} />
-              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'testtube', '试管')} icon={<TestTube size={20} />} name="试管" subtitle="20mL" collapsed={isTablet && !sidebarOpen} />
+              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'beaker', '烧杯')} icon={<Beaker size={20} />} name="烧杯" subtitle="250ml" imageSrc={getEquipmentMedia('烧杯').imageSrc} imageAlt={getEquipmentMedia('烧杯').imageAlt} collapsed={isTablet && !sidebarOpen} />
+              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'glassrod', '玻璃棒')} icon={<PenTool size={20} />} name="玻璃棒" subtitle="搅拌" imageSrc={getEquipmentMedia('玻璃棒').imageSrc} imageAlt={getEquipmentMedia('玻璃棒').imageAlt} collapsed={isTablet && !sidebarOpen} />
+              <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'testtube', '试管')} icon={<TestTube size={20} />} name="试管" subtitle="20mL" imageSrc={getEquipmentMedia('试管').imageSrc} imageAlt={getEquipmentMedia('试管').imageAlt} collapsed={isTablet && !sidebarOpen} />
               {gameMode !== 'challenge' && (
                 <>
-                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'flask', '锥形瓶')} icon={<FlaskConical size={20} />} name="锥形瓶" subtitle="500ml" state="hover" collapsed={isTablet && !sidebarOpen} />
-                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'flame', '酒精灯')} icon={<Flame size={20} />} name="酒精灯" subtitle="加热装备" collapsed={isTablet && !sidebarOpen} />
-                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'burette', '滴定管')} icon={<Blend size={20} />} name="滴定管" subtitle="50mL 精密" collapsed={isTablet && !sidebarOpen} />
-                  <EquipmentCard dragType="funnel" onDragEnd={(e, i) => handleDragEnd(e, i, 'funnel', '过滤漏斗')} icon={<FlaskConical size={20} className="rotate-180" />} name="过滤漏斗" subtitle="固液分离" collapsed={isTablet && !sidebarOpen} />
-                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'tube', '蒸馏管')} icon={<Cable size={20} />} name="蒸馏导管" subtitle="连接容器" collapsed={isTablet && !sidebarOpen} />
-                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'testtubes', '试管架')} icon={<TestTubes size={20} />} name="试管架" subtitle="6 孔" collapsed={isTablet && !sidebarOpen} />
-                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'pipette', '移液管')} icon={<Pipette size={20} />} name="移液管" subtitle="10ml 刻度" collapsed={isTablet && !sidebarOpen} />
+                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'flask', '锥形瓶')} icon={<FlaskConical size={20} />} name="锥形瓶" subtitle="500ml" imageSrc={getEquipmentMedia('锥形瓶').imageSrc} imageAlt={getEquipmentMedia('锥形瓶').imageAlt} state="hover" collapsed={isTablet && !sidebarOpen} />
+                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'flame', '酒精灯')} icon={<Flame size={20} />} name="酒精灯" subtitle="加热装备" imageSrc={getEquipmentMedia('酒精灯').imageSrc} imageAlt={getEquipmentMedia('酒精灯').imageAlt} collapsed={isTablet && !sidebarOpen} />
+                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'burette', '滴定管')} icon={<Blend size={20} />} name="滴定管" subtitle="50mL 精密" imageSrc={getEquipmentMedia('滴定管').imageSrc} imageAlt={getEquipmentMedia('滴定管').imageAlt} collapsed={isTablet && !sidebarOpen} />
+                  <EquipmentCard dragType="funnel" onDragEnd={(e, i) => handleDragEnd(e, i, 'funnel', '过滤漏斗')} icon={<FlaskConical size={20} className="rotate-180" />} name="过滤漏斗" subtitle="固液分离" imageSrc={getEquipmentMedia('过滤漏斗').imageSrc} imageAlt={getEquipmentMedia('过滤漏斗').imageAlt} collapsed={isTablet && !sidebarOpen} />
+                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'tube', '蒸馏管')} icon={<Cable size={20} />} name="蒸馏导管" subtitle="连接容器" imageSrc={getEquipmentMedia('蒸馏导管').imageSrc} imageAlt={getEquipmentMedia('蒸馏导管').imageAlt} collapsed={isTablet && !sidebarOpen} />
+                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'testtubes', '试管架')} icon={<TestTubes size={20} />} name="试管架" subtitle="6 孔" imageSrc={getEquipmentMedia('试管架').imageSrc} imageAlt={getEquipmentMedia('试管架').imageAlt} collapsed={isTablet && !sidebarOpen} />
+                  <EquipmentCard onDragEnd={(e, i) => handleDragEnd(e, i, 'pipette', '移液管')} icon={<Pipette size={20} />} name="移液管" subtitle="10ml 刻度" imageSrc={getEquipmentMedia('移液管').imageSrc} imageAlt={getEquipmentMedia('移液管').imageAlt} collapsed={isTablet && !sidebarOpen} />
                 </>
               )}
             </div>
