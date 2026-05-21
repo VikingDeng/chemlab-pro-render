@@ -208,151 +208,50 @@ body::before {
   margin-inline: auto;
 }
 
-.mission-launchpad {
+.mission-minimal-panel {
   box-shadow:
-    0 34px 110px rgba(0,0,0,0.38),
-    0 0 0 1px rgba(255,255,255,0.018),
-    inset 0 1px 0 rgba(255,255,255,0.07);
+    0 28px 84px rgba(0,0,0,0.28),
+    0 0 0 1px rgba(255,255,255,0.015),
+    inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
-.mission-launchpad::before {
+.mission-minimal-panel::before {
   content: "";
   position: absolute;
   inset: 1px;
-  border-radius: 33px;
+  border-radius: 29px;
   background:
-    linear-gradient(135deg, rgba(255,255,255,0.068), transparent 34%),
-    radial-gradient(circle at 52% 0%, rgba(103,232,249,0.08), transparent 34%);
+    linear-gradient(135deg, rgba(255,255,255,0.06), transparent 28%),
+    radial-gradient(circle at 16% 18%, rgba(214,197,157,0.08), transparent 30%);
   pointer-events: none;
 }
 
-.mission-launch-grid {
-  background:
-    linear-gradient(90deg, transparent 0 49.7%, rgba(148,163,184,0.075) 50%, transparent 50.3%),
-    linear-gradient(0deg, transparent 0 49.7%, rgba(148,163,184,0.055) 50%, transparent 50.3%);
-  background-size: 78px 78px;
-  mask-image: radial-gradient(ellipse at 44% 44%, black 0%, transparent 72%);
-}
-
-.mission-sample-stage {
+.mission-sample-thumb {
   box-shadow:
-    0 24px 70px rgba(0,0,0,0.34),
-    inset 0 1px 0 rgba(255,255,255,0.07);
+    0 14px 36px rgba(0,0,0,0.28),
+    inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
-.mission-sample-stage::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(120deg, rgba(255,255,255,0.12), transparent 24%, transparent 70%, rgba(255,255,255,0.04)),
-    radial-gradient(circle at 30% 18%, rgba(255,255,255,0.16), transparent 18%);
-  mix-blend-mode: screen;
-  pointer-events: none;
-}
-
-.mission-level-track {
+.mission-minilevel-track {
   scrollbar-width: thin;
-  scrollbar-color: rgba(103,232,249,0.24) transparent;
+  scrollbar-color: rgba(214,197,157,0.22) transparent;
 }
 
-.mission-level-track::-webkit-scrollbar {
+.mission-minilevel-track::-webkit-scrollbar {
   height: 6px;
 }
 
-.mission-level-track::-webkit-scrollbar-thumb {
+.mission-minilevel-track::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(103,232,249,0.22);
+  background: rgba(214,197,157,0.22);
 }
 
-.mission-level-node {
+.mission-minilevel-node {
   transform: translateZ(0);
 }
 
-.mission-level-node:not([data-locked="true"]):hover {
-  box-shadow: 0 18px 42px rgba(0,0,0,0.22);
-}
-
-.mission-hero,
-.mission-card {
-  box-shadow: 0 26px 80px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.055);
-}
-
-.mission-hero {
-  background:
-    linear-gradient(135deg, rgba(9, 15, 31, 0.92), rgba(6, 10, 24, 0.72)),
-    radial-gradient(circle at 14% 22%, rgba(103, 232, 249, 0.14), transparent 36%) !important;
-}
-
-.mission-card {
-  transform: translateZ(0);
-}
-
-.mission-card::before {
-  content: "";
-  position: absolute;
-  inset: 1px;
-  border-radius: 25px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.052), transparent 44%);
-  pointer-events: none;
-}
-
-.mission-card:hover {
-  border-color: rgba(103,232,249,0.34) !important;
-  box-shadow: 0 28px 88px rgba(0,0,0,0.34), 0 0 0 1px rgba(103,232,249,0.09);
-}
-
-.mission-card-current {
-  background:
-    linear-gradient(135deg, rgba(8, 16, 34, 0.96), rgba(5, 9, 22, 0.72)),
-    radial-gradient(circle at 74% 24%, rgba(103, 232, 249, 0.18), transparent 34%) !important;
-}
-
-.mission-card-current::after {
-  content: "";
-  position: absolute;
-  right: 28px;
-  bottom: 22px;
-  width: 168px;
-  height: 168px;
-  border-radius: 999px;
-  border: 1px solid rgba(103,232,249,0.12);
-  background:
-    radial-gradient(circle at 50% 50%, rgba(103,232,249,0.12), transparent 58%),
-    repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,0.055) 0 1px, transparent 1px 18px);
-  opacity: 0.42;
-  pointer-events: none;
-}
-
-.mission-focus-row {
-  align-items: stretch;
-}
-
-.mission-spotlight {
-  box-shadow:
-    0 34px 96px rgba(0,0,0,0.34),
-    0 0 0 1px rgba(103,232,249,0.07),
-    inset 0 1px 0 rgba(255,255,255,0.07);
-}
-
-.mission-spotlight::after {
-  right: 36px;
-  bottom: 28px;
-  width: 196px;
-  height: 196px;
-  opacity: 0.34;
-}
-
-.mission-path-panel {
-  box-shadow: 0 26px 80px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.052);
-}
-
-.mission-path-item {
-  transform: translateZ(0);
-}
-
-.mission-path-item:hover {
-  transform: translate3d(3px, 0, 0);
+.mission-minilevel-node:not([data-locked="true"]):hover {
+  box-shadow: 0 14px 34px rgba(0,0,0,0.18);
 }
 
 [data-panel="challenge-hud"],
