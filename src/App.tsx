@@ -381,6 +381,14 @@ const MISSION_BRIEFS: Record<MissionPreset, MissionBrief> = {
   },
 };
 const MISSION_SEQUENCE: MissionPreset[] = ['prepCu', 'prepAg', 'prepFe', 'prepCo2', 'prepIodine', 'prepMn'];
+const MISSION_IMAGE_BY_PRESET: Record<MissionPreset, string> = {
+  prepCu: '/reagents/unknown-a.jpg',
+  prepAg: '/reagents/unknown-b.jpg',
+  prepFe: '/reagents/unknown-c.jpg',
+  prepCo2: '/reagents/unknown-d.jpg',
+  prepIodine: '/reagents/unknown-e.jpg',
+  prepMn: '/reagents/unknown-f.jpg',
+};
 const DISCOVERY_STORAGE_KEY = 'chemlab:discovery-unlocks:v1';
 const MISSION_COMPLETION_STORAGE_KEY = 'chemlab:mission-completions:v1';
 const MISSION_SUCCESS_META: Record<string, { product: string; formula: string; accent: string }> = {
@@ -4800,164 +4808,171 @@ function App() {
             </AnimatePresence>
 
             {placedItems.length === 0 && brokenGlass.length === 0 && gameMode === 'challenge' ? (
-              <div data-panel="challenge-mission-select" className="mission-select absolute inset-0 z-[20] flex w-full flex-col items-center overflow-y-auto px-5 pb-7 pt-[232px] sm:pt-[116px]">
-                <div data-panel="mission-library-card" className={`mission-hero mb-4 min-h-[224px] w-full overflow-hidden rounded-[30px] border border-white/8 bg-[rgba(7,11,23,0.62)] backdrop-blur-2xl ${isTablet ? 'pl-24' : ''}`}>
-                  <div className="grid gap-0 md:grid-cols-[0.95fr_1.35fr]">
-                    <div className="relative min-h-[158px] border-b border-white/8 p-5 md:border-b-0 md:border-r">
-                      <div className="absolute -left-16 -top-16 h-44 w-44 rounded-full bg-[#22d3ee]/12 blur-3xl" />
-                      <div className="relative">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#64748b]">闯关进度</div>
-	                        <div className="mt-2 text-[24px] font-semibold tracking-[-0.03em] text-white">实验侦探</div>
-	                        <div className="mt-3 flex items-end gap-3">
-	                          <div className="font-mono text-[34px] font-bold leading-none text-[#67e8f9]">{completedMissionCount}/{MISSION_SEQUENCE.length}</div>
-	                          <div className="pb-1 text-[12px] text-[#94a3b8]">已完成</div>
-	                        </div>
-	                        <div className="mt-1 text-[11px] text-[#64748b]">{lockedMissionCount > 0 ? `${lockedMissionCount} 关待解锁` : '全线开放'}</div>
-	                        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/8">
-	                          <div className="h-full rounded-full bg-gradient-to-r from-[#22d3ee] via-[#f43f5e] to-[#a855f7] transition-all duration-500" style={{ width: `${(completedMissionCount / MISSION_SEQUENCE.length) * 100}%` }} />
-	                        </div>
-                        <button
-                          type="button"
-                          onClick={() => launchQuickStart(currentLevelPreset)}
-                          className="mt-5 rounded-full border border-[#22d3ee]/35 bg-[#22d3ee]/12 px-4 py-2 text-[12px] font-semibold text-[#a5f3fc] transition-all hover:-translate-y-0.5 hover:bg-[#22d3ee]/20"
-                        >
-                          开始第 {currentLevelIndex + 1} 关
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="p-5">
-                      <div className="grid grid-cols-6 gap-2">
-	                        {MISSION_SEQUENCE.map((preset, index) => {
-	                          const mission = MISSION_BRIEFS[preset];
-	                          const isMissionDone = completedMissionIds.has(mission.challengeId);
-	                          const isCurrentLevel = index === currentLevelIndex && !isMissionDone;
-	                          const unlocked = isMissionUnlocked(index, completedMissionIds);
-	                          const isLocked = !unlocked;
-	                          return (
-	                            <button
-	                              key={`rail-${mission.challengeId}`}
-	                              type="button"
-	                              data-locked={isLocked ? 'true' : undefined}
-	                              title={isLocked ? `先完成第 ${index} 关` : mission.title}
-	                              onClick={() => launchMissionFromSelect(mission.preset, index)}
-	                              className={`group flex min-h-[70px] flex-col items-center justify-center gap-1 rounded-2xl border transition-all ${isLocked ? 'cursor-not-allowed border-white/5 bg-black/16 text-[#475569]' : 'hover:-translate-y-0.5'} ${isMissionDone ? 'border-[#10b981]/26 bg-[#10b981]/10 text-[#bbf7d0]' : isCurrentLevel ? 'border-[#22d3ee]/35 bg-[#22d3ee]/12 text-[#a5f3fc] shadow-[0_0_18px_rgba(34,211,238,0.10)]' : isLocked ? '' : 'border-white/8 bg-white/[0.025] text-[#94a3b8] hover:border-[#22d3ee]/28 hover:text-[#a5f3fc]'}`}
-	                            >
-	                              <span className="font-mono text-[12px] font-semibold">{isMissionDone ? '✓' : isLocked ? '锁' : String(index + 1).padStart(2, '0')}</span>
-	                              <span className="max-w-full truncate px-1 text-[10px]">{isLocked ? '未解锁' : isCurrentLevel ? '当前关' : mission.signal}</span>
-	                            </button>
-	                          );
-	                        })}
-                      </div>
-                      <div className="mt-4 grid grid-cols-4 gap-2 text-[11px] text-[#64748b]">
-	                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">预测</div>
-	                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">验证</div>
-	                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">证据</div>
-	                        <div className="rounded-2xl border border-white/8 bg-white/[0.025] px-3 py-2">对照</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={`mission-focus-row grid w-full grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_310px] ${isTablet ? 'pl-24' : ''}`}>
-                  {(() => {
-                    const mission = currentMissionBrief;
-                    const accent = getMissionAccentClasses(mission.accent);
-                    const isMissionDone = completedMissionIds.has(mission.challengeId);
-                    return (
-                      <motion.button
-                        key={mission.challengeId}
-                        type="button"
-                        onClick={() => launchQuickStart(mission.preset)}
-                        whileHover={{ y: -3 }}
-                        whileTap={{ scale: 0.985 }}
-                        className={`mission-card mission-card-current mission-spotlight group relative min-h-[238px] overflow-hidden rounded-[28px] border bg-[rgba(7,11,23,0.66)] p-6 text-left backdrop-blur-xl transition-colors duration-200 hover:bg-[rgba(15,23,42,0.76)] ${isMissionDone ? 'border-[#10b981]/28' : 'border-[#22d3ee]/42'}`}
+              <div data-panel="challenge-mission-select" className="mission-select absolute inset-0 z-[20] flex w-full flex-col items-center overflow-y-auto px-5 pb-7 pt-[226px] sm:pt-[112px]">
+                {(() => {
+                  const mission = currentMissionBrief;
+                  const accent = getMissionAccentClasses(mission.accent);
+                  const isMissionDone = completedMissionIds.has(mission.challengeId);
+                  const missionNumber = currentLevelIndex + 1;
+                  const accentColor = MISSION_SUCCESS_META[mission.challengeId]?.accent || '#22d3ee';
+                  const proofCount = MISSION_PROOFS[mission.challengeId]?.checkpoints.length || 0;
+                  const progressPercent = (completedMissionCount / MISSION_SEQUENCE.length) * 100;
+                  return (
+                    <div className={`mission-select-shell w-full max-w-[1040px] ${isTablet ? 'pl-24' : ''}`}>
+                      <motion.div
+                        data-panel="mission-library-card"
+                        className="mission-launchpad relative overflow-hidden rounded-[34px] border border-white/8 bg-[rgba(5,8,18,0.76)] text-left backdrop-blur-2xl"
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
                       >
-                        <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full opacity-55 blur-2xl transition-opacity group-hover:opacity-85" style={{ backgroundColor: isMissionDone ? '#10b981' : MISSION_SUCCESS_META[mission.challengeId]?.accent }} />
-                        <div className="relative grid h-full gap-5 md:grid-cols-[minmax(0,1fr)_220px]">
-                          <div className="min-w-0">
-                            <div className="mb-3 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">
-                              <span>第 {currentLevelIndex + 1} 关</span>
-                              <span>{mission.family}</span>
-                              <span className="rounded-full border border-white/8 bg-white/[0.035] px-2 py-0.5 tracking-normal text-[#94a3b8]">
-                                证据链 {MISSION_PROOFS[mission.challengeId]?.checkpoints.length || 0}
-                              </span>
-                              <span className={`rounded-full border px-2 py-0.5 tracking-normal ${isMissionDone ? 'border-[#10b981]/22 bg-[#10b981]/10 text-[#86efac]' : 'border-[#22d3ee]/22 bg-[#22d3ee]/10 text-[#67e8f9]'}`}>
-                                {isMissionDone ? '已完成' : '当前'}
-                              </span>
-                            </div>
-                            <div className="text-[28px] font-semibold leading-tight tracking-[-0.045em] text-[#f8fafc]">{mission.title}</div>
-                            <div className="mt-3 text-[15px] font-medium text-[#cbd5e1]">{mission.signal}</div>
-                            <div className="mt-6 flex flex-wrap items-center gap-2">
-                              {mission.route.map((step, stepIndex) => (
-                                <div key={step} className="flex min-w-0 items-center gap-2">
-                                  <span className="truncate rounded-full border border-white/8 bg-white/[0.04] px-3 py-1.5 text-[11px] text-[#dbeafe]">{step}</span>
-                                  {stepIndex < mission.route.length - 1 && <span className="text-[#475569]">→</span>}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
+                        <div className="pointer-events-none absolute inset-0">
+                          <div className="absolute -left-24 -top-24 h-64 w-64 rounded-full blur-3xl" style={{ backgroundColor: `${accentColor}22` }} />
+                          <div className="absolute -right-20 bottom-10 h-72 w-72 rounded-full bg-[#0f172a] blur-3xl" />
+                          <div className="mission-launch-grid absolute inset-0 opacity-70" />
+                        </div>
 
-                          <div className="relative flex min-h-[132px] flex-col justify-between rounded-[24px] border border-white/8 bg-black/15 p-4">
-                            <div className={`absolute right-4 top-4 flex h-9 min-w-9 items-center justify-center rounded-full text-[12px] font-bold ${isMissionDone ? 'border border-[#10b981]/30 bg-[#10b981]/12 text-[#86efac]' : accent.dot}`}>
-                              {isMissionDone ? '✓' : String(currentLevelIndex + 1).padStart(2, '0')}
-                            </div>
-                            <div className="pr-12">
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#64748b]">关键试剂</div>
-                              <div className="mt-3 flex flex-wrap gap-1.5">
-                                {mission.reagents.map(reagent => (
-                                  <span key={reagent} className="rounded-full border border-white/8 bg-black/18 px-2.5 py-1 text-[11px] text-[#cbd5e1]">
-                                    {reagent.replace('指示剂', '')}
-                                  </span>
-                                ))}
+                        <div className="relative grid xl:grid-cols-[minmax(0,1fr)_292px]">
+                          <div className="min-w-0 p-5 sm:p-7">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full shadow-[0_0_18px_currentColor]" style={{ backgroundColor: accentColor, color: accentColor }} />
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#64748b]">Challenge</span>
+                              </div>
+                              <div className="flex items-center gap-3 text-[11px] text-[#64748b]">
+                                <span className="font-mono text-[#cbd5e1]">{completedMissionCount}/{MISSION_SEQUENCE.length}</span>
+                                <span>{lockedMissionCount > 0 ? `${lockedMissionCount} 锁定` : '全线开放'}</span>
                               </div>
                             </div>
-                            <div className="mt-5 flex items-center justify-between gap-3">
-                              <span className="min-w-0 truncate text-[12px] text-[#64748b]">{mission.branch}</span>
-                              <span className={`shrink-0 rounded-full border px-4 py-2 text-[12px] font-semibold transition-colors ${isMissionDone ? 'border-[#10b981]/30 bg-[#10b981]/10 text-[#bbf7d0] hover:bg-[#10b981]/16' : accent.button}`}>{isMissionDone ? '再试' : '开始'}</span>
+
+                            <div className="mt-6 grid items-center gap-6 lg:grid-cols-[minmax(0,1fr)_248px]">
+                              <div className="min-w-0">
+                                <div className="mb-3 flex flex-wrap items-center gap-2">
+                                  <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${isMissionDone ? 'border-[#10b981]/24 bg-[#10b981]/10 text-[#86efac]' : accent.button}`}>
+                                    第 {missionNumber} 关
+                                  </span>
+                                  <span className="rounded-full border border-white/8 bg-white/[0.035] px-3 py-1 text-[11px] text-[#94a3b8]">{mission.family}</span>
+                                  <span className="rounded-full border border-white/8 bg-white/[0.035] px-3 py-1 text-[11px] text-[#94a3b8]">证据 {proofCount}</span>
+                                </div>
+                                <h2 className="max-w-[520px] text-[34px] font-semibold leading-[1.02] tracking-[-0.055em] text-[#f8fafc] sm:text-[42px]">
+                                  {mission.title}
+                                </h2>
+                                <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-[#94a3b8]">
+                                  <span className="text-[#e2e8f0]">{mission.signal}</span>
+                                  <span className="h-1 w-1 rounded-full bg-[#475569]" />
+                                  <span>{mission.branch}</span>
+                                </div>
+
+                                <div className="mt-7 flex flex-wrap items-center gap-2">
+                                  {mission.route.map((step, stepIndex) => (
+                                    <div key={step} className="flex min-w-0 items-center gap-2">
+                                      <span className="truncate rounded-full border border-white/8 bg-black/20 px-3 py-1.5 text-[12px] text-[#dbeafe]">{step}</span>
+                                      {stepIndex < mission.route.length - 1 && <span className="text-[#475569]">→</span>}
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <div className="mt-7 flex flex-wrap items-center gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => launchQuickStart(mission.preset)}
+                                    className="group rounded-full bg-[#e2e8f0] px-5 py-3 text-[13px] font-semibold text-[#020617] shadow-[0_16px_42px_rgba(226,232,240,0.16)] transition-all hover:-translate-y-0.5 hover:bg-white"
+                                  >
+                                    {isMissionDone ? '再玩一次' : `开始第 ${missionNumber} 关`}
+                                    <span className="ml-2 inline-block transition-transform group-hover:translate-x-0.5">→</span>
+                                  </button>
+                                  <div className="text-[11px] text-[#64748b]">错试剂会扣可信度</div>
+                                </div>
+                              </div>
+
+                              <div className="mission-sample-stage relative mx-auto h-[248px] w-full max-w-[260px] overflow-hidden rounded-[28px] border border-white/8 bg-black/20">
+                                <img
+                                  src={MISSION_IMAGE_BY_PRESET[mission.preset]}
+                                  alt={`${mission.title} 样品`}
+                                  draggable={false}
+                                  className="h-full w-full object-cover opacity-[0.88] saturate-[1.05]"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-[#020617]/72 via-transparent to-[#020617]/10" />
+                                <div className="absolute left-4 top-4 rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[11px] font-semibold text-[#e2e8f0] backdrop-blur-md">
+                                  UNKNOWN {String.fromCharCode(64 + missionNumber)}
+                                </div>
+                                <div className="absolute bottom-4 left-4 right-4">
+                                  <div className="h-1 overflow-hidden rounded-full bg-white/10">
+                                    <div className="h-full rounded-full bg-gradient-to-r from-[#10b981] via-[#22d3ee] to-[#a855f7]" style={{ width: `${Math.max(4, progressPercent)}%` }} />
+                                  </div>
+                                  <div className="mt-2 flex items-center justify-between text-[10px] text-[#94a3b8]">
+                                    <span>进度</span>
+                                    <span>{completedMissionCount}/{MISSION_SEQUENCE.length}</span>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </motion.button>
-                    );
-                  })()}
 
-                  <div className="mission-path-panel rounded-[28px] border border-white/8 bg-[rgba(7,11,23,0.58)] p-4 backdrop-blur-xl">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div>
-	                        <div className="text-[12px] font-semibold text-[#e2e8f0]">逐关解锁</div>
-	                        <div className="mt-0.5 text-[11px] text-[#64748b]">{completedMissionCount}/{MISSION_SEQUENCE.length} 已完成</div>
-                      </div>
-                      <div className="h-2 w-2 rounded-full bg-[#67e8f9] shadow-[0_0_16px_rgba(103,232,249,0.7)]" />
+                          <div className="mission-brief-panel border-t border-white/8 bg-black/16 p-5 xl:border-l xl:border-t-0">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#64748b]">本关试剂</div>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {mission.reagents.map(reagent => (
+                                <span key={reagent} className="rounded-full border border-white/8 bg-white/[0.04] px-3 py-1.5 text-[12px] text-[#cbd5e1]">
+                                  {reagent.replace('指示剂', '')}
+                                </span>
+                              ))}
+                            </div>
+
+                            <div className="mt-6 space-y-4">
+                              <div>
+                                <div className="text-[11px] text-[#64748b]">目标现象</div>
+                                <div className="mt-1 text-[15px] font-semibold text-[#f8fafc]">{mission.signal}</div>
+                              </div>
+                              <div>
+                                <div className="text-[11px] text-[#64748b]">通关状态</div>
+                                <div className="mt-1 text-[13px] text-[#cbd5e1]">{isMissionDone ? '已完成，可复盘' : '待开始'}</div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => launchQuickStart(mission.preset)}
+                              className={`mt-7 w-full rounded-2xl border px-4 py-3 text-[13px] font-semibold transition-all hover:-translate-y-0.5 ${isMissionDone ? 'border-[#10b981]/30 bg-[#10b981]/10 text-[#bbf7d0] hover:bg-[#10b981]/16' : accent.button}`}
+                            >
+                              进入实验台
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="relative border-t border-white/8 px-4 py-4 sm:px-6">
+                          <div className="mission-level-track flex gap-2 overflow-x-auto pb-1">
+                            {MISSION_SEQUENCE.map((preset, index) => {
+                              const levelMission = MISSION_BRIEFS[preset];
+                              const isMissionDone = completedMissionIds.has(levelMission.challengeId);
+                              const isCurrentLevel = index === currentLevelIndex && !isMissionDone;
+                              const unlocked = isMissionUnlocked(index, completedMissionIds);
+                              const isLocked = !unlocked;
+                              return (
+                                <button
+                                  key={`level-${levelMission.challengeId}`}
+                                  type="button"
+                                  data-locked={isLocked ? 'true' : undefined}
+                                  title={isLocked ? `先完成第 ${index} 关` : levelMission.title}
+                                  onClick={() => launchMissionFromSelect(levelMission.preset, index)}
+                                  className={`mission-level-node group flex min-w-[126px] flex-1 items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-all ${isLocked ? 'cursor-not-allowed border-white/5 bg-black/18 opacity-[0.62]' : 'hover:-translate-y-0.5'} ${isMissionDone ? 'border-[#10b981]/24 bg-[#10b981]/10 text-[#bbf7d0]' : isCurrentLevel ? 'border-[#22d3ee]/34 bg-[#22d3ee]/10 text-[#a5f3fc] shadow-[0_0_24px_rgba(34,211,238,0.10)]' : isLocked ? 'text-[#64748b]' : 'border-white/8 bg-white/[0.025] text-[#94a3b8] hover:border-[#22d3ee]/28 hover:text-[#a5f3fc]'}`}
+                                >
+                                  <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-[11px] font-bold ${isMissionDone ? 'bg-[#10b981]/16 text-[#86efac]' : isCurrentLevel ? 'bg-[#22d3ee]/16 text-[#67e8f9]' : isLocked ? 'bg-black/24 text-[#475569]' : 'bg-white/[0.04] text-[#cbd5e1]'}`}>
+                                    {isMissionDone ? '✓' : isLocked ? '锁' : String(index + 1).padStart(2, '0')}
+                                  </span>
+                                  <span className="min-w-0">
+                                    <span className={`block truncate text-[12px] font-semibold ${isLocked ? 'text-[#64748b]' : 'text-[#e2e8f0]'}`}>{isLocked ? `第 ${index + 1} 关` : levelMission.title}</span>
+                                    <span className="block truncate text-[10.5px] text-[#64748b]">{isLocked ? '未解锁' : levelMission.signal}</span>
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </motion.div>
                     </div>
-                    <div className="space-y-2">
-                      {MISSION_SEQUENCE.map((preset, index) => {
-	                        const mission = MISSION_BRIEFS[preset];
-	                        const isMissionDone = completedMissionIds.has(mission.challengeId);
-	                        const isCurrentLevel = index === currentLevelIndex && !isMissionDone;
-	                        const unlocked = isMissionUnlocked(index, completedMissionIds);
-	                        const isLocked = !unlocked;
-	                        return (
-	                          <button
-	                            key={`path-${mission.challengeId}`}
-	                            type="button"
-	                            data-locked={isLocked ? 'true' : undefined}
-	                            onClick={() => launchMissionFromSelect(mission.preset, index)}
-	                            className={`mission-path-item flex w-full items-center gap-3 rounded-2xl border px-3 py-2 text-left transition-all ${isLocked ? 'cursor-not-allowed border-white/5 bg-black/14 opacity-65' : ''} ${isMissionDone ? 'border-[#10b981]/24 bg-[#10b981]/8' : isCurrentLevel ? 'border-[#22d3ee]/32 bg-[#22d3ee]/10' : isLocked ? '' : 'border-white/7 bg-white/[0.025] hover:border-[#22d3ee]/22 hover:bg-white/[0.04]'}`}
-	                          >
-	                            <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold ${isMissionDone ? 'bg-[#10b981]/14 text-[#86efac]' : isCurrentLevel ? 'bg-[#22d3ee]/16 text-[#67e8f9]' : isLocked ? 'bg-black/20 text-[#475569]' : 'bg-white/[0.04] text-[#94a3b8]'}`}>
-	                              {isMissionDone ? '✓' : isLocked ? '锁' : String(index + 1).padStart(2, '0')}
-	                            </span>
-	                            <span className="min-w-0 flex-1">
-	                              <span className={`block truncate text-[13px] font-medium ${isLocked ? 'text-[#64748b]' : 'text-[#e2e8f0]'}`}>{mission.title}</span>
-	                              <span className="block truncate text-[11px] text-[#64748b]">{isLocked ? '完成上一关后开放' : mission.signal}</span>
-	                            </span>
-	                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             ) : placedItems.length === 0 && brokenGlass.length === 0 ? (
               <div className="pointer-events-none absolute inset-0">
