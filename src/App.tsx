@@ -1154,54 +1154,117 @@ type WebkitAudioWindow = Window & typeof globalThis & {
   webkitAudioContext?: typeof AudioContext;
 };
 
-function createSoftNoiseBuffer(audioCtx: AudioContext, durationSeconds: number) {
-  const frameCount = Math.max(1, Math.floor(audioCtx.sampleRate * durationSeconds));
-  const buffer = audioCtx.createBuffer(1, frameCount, audioCtx.sampleRate);
-  const data = buffer.getChannelData(0);
-  let filtered = 0;
+type LabSoundType = 'place' | 'pour' | 'reaction' | 'break' | 'boil';
 
-  for (let index = 0; index < frameCount; index += 1) {
-    const white = (Math.random() * 2) - 1;
-    filtered = (filtered * 0.86) + (white * 0.14);
-    data[index] = filtered * 0.65;
+type LabSoundConfig = {
+  src: string;
+  gain: number;
+  fadeIn: number;
+  fadeOut: number;
+  loop?: boolean;
+  playbackJitter?: number;
+};
+
+type ContinuousSoundHandle = {
+  source: AudioBufferSourceNode;
+  gainNode: GainNode;
+};
+
+const LAB_SOUND_CONFIG: Record<LabSoundType, LabSoundConfig> = {
+  place: {
+    src: '/sounds/place.mp3',
+    gain: 0.28,
+    fadeIn: 0.012,
+    fadeOut: 0.12,
+    playbackJitter: 0.035,
+  },
+  pour: {
+    src: '/sounds/pour.mp3',
+    gain: 0.22,
+    fadeIn: 0.04,
+    fadeOut: 0.18,
+    playbackJitter: 0.025,
+  },
+  reaction: {
+    src: '/sounds/reaction.mp3',
+    gain: 0.2,
+    fadeIn: 0.035,
+    fadeOut: 0.2,
+    playbackJitter: 0.03,
+  },
+  break: {
+    src: '/sounds/break.mp3',
+    gain: 0.24,
+    fadeIn: 0.008,
+    fadeOut: 0.14,
+    playbackJitter: 0.02,
+  },
+  boil: {
+    src: '/sounds/boil.mp3',
+    gain: 0.13,
+    fadeIn: 0.18,
+    fadeOut: 0.16,
+    loop: true,
+    playbackJitter: 0.015,
+  },
+};
+
+function getLabAudioContext(audioContextRef: { current: AudioContext | null }) {
+  const AudioContextClass = window.AudioContext || (window as WebkitAudioWindow).webkitAudioContext;
+  if (!AudioContextClass) return null;
+  if (!audioContextRef.current) {
+    audioContextRef.current = new AudioContextClass();
   }
-
-  return buffer;
+  return audioContextRef.current;
 }
 
-function scheduleNoiseBurst(
+function loadLabSoundBuffer(
+  type: LabSoundType,
   audioCtx: AudioContext,
-  destination: AudioNode,
-  options: {
-    start: number;
-    duration: number;
-    peakGain: number;
-    filterType: BiquadFilterType;
-    frequency: number;
-    q?: number;
-  },
+  audioBuffersRef: { current: Partial<Record<LabSoundType, AudioBuffer>> },
+  audioLoadingRef: { current: Partial<Record<LabSoundType, Promise<AudioBuffer | null>>> },
 ) {
-  const source = audioCtx.createBufferSource();
-  const filter = audioCtx.createBiquadFilter();
-  const gain = audioCtx.createGain();
-  const attack = Math.min(0.045, options.duration * 0.25);
-  const end = options.start + options.duration;
+  const cached = audioBuffersRef.current[type];
+  if (cached) return Promise.resolve(cached);
 
-  source.buffer = createSoftNoiseBuffer(audioCtx, options.duration);
-  filter.type = options.filterType;
-  filter.frequency.setValueAtTime(options.frequency, options.start);
-  filter.Q.setValueAtTime(options.q ?? 0.8, options.start);
-  gain.gain.setValueAtTime(0.0001, options.start);
-  gain.gain.linearRampToValueAtTime(options.peakGain, options.start + attack);
-  gain.gain.exponentialRampToValueAtTime(0.0001, end);
+  const existingLoad = audioLoadingRef.current[type];
+  if (existingLoad) return existingLoad;
 
-  source.connect(filter);
-  filter.connect(gain);
-  gain.connect(destination);
-  source.start(options.start);
-  source.stop(end);
+  const { src } = LAB_SOUND_CONFIG[type];
+  const loadPromise = fetch(src)
+    .then(response => {
+      if (!response.ok) throw new Error(`Sound asset failed: ${src}`);
+      return response.arrayBuffer();
+    })
+    .then(arrayBuffer => audioCtx.decodeAudioData(arrayBuffer.slice(0)))
+    .then(buffer => {
+      audioBuffersRef.current[type] = buffer;
+      return buffer;
+    })
+    .catch(() => null);
 
-  return [source, filter, gain] as AudioNode[];
+  audioLoadingRef.current[type] = loadPromise;
+  return loadPromise;
+}
+
+function stopContinuousLabSound(
+  continuousAudioRef: { current: Record<string, ContinuousSoundHandle> },
+  itemId: string,
+) {
+  const activeSound = continuousAudioRef.current[itemId];
+  if (!activeSound) return;
+
+  try {
+    const audioCtx = activeSound.source.context;
+    const now = audioCtx.currentTime;
+    activeSound.gainNode.gain.cancelScheduledValues(now);
+    activeSound.gainNode.gain.setTargetAtTime(0.0001, now, 0.045);
+    activeSound.source.stop(now + 0.18);
+  } catch {
+    void 0;
+  }
+
+  delete continuousAudioRef.current[itemId];
 }
 
 function createRuntimeId(prefix: string) {
@@ -1869,7 +1932,9 @@ function App() {
 
   // Audio nodes cache for continuous sounds
   const audioContextRef = useRef<AudioContext | null>(null);
-  const continuousAudioRef = useRef<{[id: string]: {oscillator: OscillatorNode, gainNode: GainNode, mod: OscillatorNode}}>({});
+  const audioBuffersRef = useRef<Partial<Record<LabSoundType, AudioBuffer>>>({});
+  const audioLoadingRef = useRef<Partial<Record<LabSoundType, Promise<AudioBuffer | null>>>>({});
+  const continuousAudioRef = useRef<Record<string, ContinuousSoundHandle>>({});
   const focusedItemIdRef = useRef<string | null>(focusedItemId);
   const lastThermoSampleRef = useRef<{ time: number; temp: number } | null>(null);
   const pendingChallengeCompletionRef = useRef<string | null>(null);
@@ -2360,200 +2425,107 @@ function App() {
     setGameMode('challenge');
   };
 
-  const playSound = useCallback((type: 'place' | 'pour' | 'reaction' | 'break' | 'boil', _durationParam?: number, itemId?: string) => {
+  const stopSound = useCallback((itemId: string) => {
+    stopContinuousLabSound(continuousAudioRef, itemId);
+  }, []);
+
+  const playSound = useCallback((type: LabSoundType, _durationParam?: number, itemId?: string) => {
     try {
-      const AudioContextClass = window.AudioContext || (window as WebkitAudioWindow).webkitAudioContext;
-      if (!AudioContextClass) return;
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContextClass();
-      }
-      const audioCtx = audioContextRef.current;
+      if (type === 'boil' && itemId && continuousAudioRef.current[itemId]) return;
+      if (type === 'break' && itemId) stopContinuousLabSound(continuousAudioRef, itemId);
+
+      const audioCtx = getLabAudioContext(audioContextRef);
+      if (!audioCtx) return;
+
       if (audioCtx.state === 'suspended') {
         void audioCtx.resume().catch(() => {
           void 0;
         });
       }
 
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-      let cleanupNodes: AudioNode[] = [oscillator, gainNode];
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
+      void loadLabSoundBuffer(type, audioCtx, audioBuffersRef, audioLoadingRef).then(buffer => {
+        if (!buffer) return;
+        if (type === 'boil' && itemId && continuousAudioRef.current[itemId]) return;
 
-      oscillator.onended = () => {
-        cleanupNodes.forEach(node => {
+        const config = LAB_SOUND_CONFIG[type];
+        const source = audioCtx.createBufferSource();
+        const gainNode = audioCtx.createGain();
+        const now = audioCtx.currentTime;
+        const jitter = config.playbackJitter
+          ? (Math.random() - 0.5) * config.playbackJitter
+          : 0;
+        const playbackRate = Math.max(0.92, Math.min(1.08, 1 + jitter));
+        const duration = buffer.duration / playbackRate;
+        const fadeOutStart = Math.max(config.fadeIn, duration - config.fadeOut);
+
+        source.buffer = buffer;
+        source.playbackRate.setValueAtTime(playbackRate, now);
+        source.loop = Boolean(config.loop);
+        if (config.loop && buffer.duration > 0.5) {
+          source.loopStart = 0.05;
+          source.loopEnd = Math.max(source.loopStart + 0.1, buffer.duration - 0.08);
+        }
+
+        gainNode.gain.setValueAtTime(0.0001, now);
+        gainNode.gain.linearRampToValueAtTime(config.gain, now + config.fadeIn);
+        if (!config.loop) {
+          gainNode.gain.setValueAtTime(config.gain, now + fadeOutStart);
+          gainNode.gain.linearRampToValueAtTime(0.0001, now + duration);
+        }
+
+        source.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        source.onended = () => {
           try {
-            node.disconnect();
+            source.disconnect();
+            gainNode.disconnect();
           } catch {
             void 0;
           }
-        });
-      };
-      
-      const now = audioCtx.currentTime;
-      
-      if (type === 'place') {
-        // Soft glass-on-bench tap: short, low and not startling.
-        oscillator.type = 'triangle';
-        oscillator.frequency.setValueAtTime(118, now);
-        oscillator.frequency.exponentialRampToValueAtTime(64, now + 0.14);
-        gainNode.gain.setValueAtTime(0.11, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.006, now + 0.14);
-        cleanupNodes = [
-          ...cleanupNodes,
-          ...scheduleNoiseBurst(audioCtx, audioCtx.destination, {
-            start: now,
-            duration: 0.06,
-            peakGain: 0.018,
-            filterType: 'highpass',
-            frequency: 860,
-            q: 0.55,
-          }),
-        ];
-        oscillator.start(now);
-        oscillator.stop(now + 0.14);
-        
-        if (navigator.vibrate) navigator.vibrate(4);
-      } else if (type === 'pour') {
-        // Filtered noise carries the stream texture; oscillator only adds a quiet body tone.
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(212, now);
-        oscillator.frequency.linearRampToValueAtTime(238, now + 0.42);
-        
-        gainNode.gain.setValueAtTime(0, now);
-        gainNode.gain.linearRampToValueAtTime(0.014, now + 0.06);
-        gainNode.gain.linearRampToValueAtTime(0, now + 0.42);
-        
-        const lfo = audioCtx.createOscillator();
-        lfo.type = 'sine';
-        lfo.frequency.value = 7.5;
-        const lfoGain = audioCtx.createGain();
-        lfoGain.gain.value = 7;
-        cleanupNodes = [
-          ...cleanupNodes,
-          lfo,
-          lfoGain,
-          ...scheduleNoiseBurst(audioCtx, audioCtx.destination, {
-            start: now,
-            duration: 0.42,
-            peakGain: 0.03,
-            filterType: 'bandpass',
-            frequency: 520,
-            q: 0.7,
-          }),
-        ];
-        lfo.connect(lfoGain);
-        lfoGain.connect(oscillator.frequency);
-        lfo.start(now);
-        lfo.stop(now + 0.42);
-        
-        oscillator.start(now);
-        oscillator.stop(now + 0.42);
-        
-        if (navigator.vibrate) navigator.vibrate(6);
-      } else if (type === 'reaction') {
-        // Gentle bubbling/hiss; noise texture feels closer to fizzing liquid than a synth alarm.
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(118, now);
-        oscillator.frequency.linearRampToValueAtTime(86, now + 0.9);
-        
-        gainNode.gain.setValueAtTime(0.036, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.005, now + 0.9);
-        
-        const bubbleMod = audioCtx.createOscillator();
-        bubbleMod.type = 'sine';
-        bubbleMod.frequency.value = 4.8;
-        const bubbleGain = audioCtx.createGain();
-        bubbleGain.gain.value = 20;
-        cleanupNodes = [
-          ...cleanupNodes,
-          bubbleMod,
-          bubbleGain,
-          ...scheduleNoiseBurst(audioCtx, audioCtx.destination, {
-            start: now,
-            duration: 0.9,
-            peakGain: 0.026,
-            filterType: 'bandpass',
-            frequency: 760,
-            q: 1.15,
-          }),
-        ];
-        bubbleMod.connect(bubbleGain);
-        bubbleGain.connect(oscillator.frequency);
-        bubbleMod.start(now);
-        bubbleMod.stop(now + 0.9);
-        
-        oscillator.start(now);
-        oscillator.stop(now + 0.9);
-        
-        if (navigator.vibrate) navigator.vibrate([8, 20, 8]);
-      } else if (type === 'boil' && itemId) {
-        // Only start if not already boiling for this item
-        if (continuousAudioRef.current[itemId]) return;
-        
-        oscillator.type = 'triangle';
-        oscillator.frequency.setValueAtTime(72, now);
-        gainNode.gain.setValueAtTime(0.022, now);
-        
-        const bubbleMod = audioCtx.createOscillator();
-        bubbleMod.type = 'sine';
-        bubbleMod.frequency.value = 2.6 + (((itemId?.length || 1) % 3) * 0.45);
-        const bubbleGain = audioCtx.createGain();
-        bubbleGain.gain.value = 14;
-        cleanupNodes = [...cleanupNodes, bubbleMod, bubbleGain];
-        bubbleMod.connect(bubbleGain);
-        bubbleGain.connect(oscillator.frequency);
-        
-        bubbleMod.start(now);
-        oscillator.start(now);
-        
-        continuousAudioRef.current[itemId] = { oscillator, gainNode, mod: bubbleMod };
-      } else if (type === 'break') {
-        // If it breaks, stop any boiling sound it might have had
-        if (itemId && continuousAudioRef.current[itemId]) {
-          const { oscillator, mod } = continuousAudioRef.current[itemId];
-          try { oscillator.stop(); mod.stop(); } catch { void 0; }
-          delete continuousAudioRef.current[itemId];
+          if (itemId && continuousAudioRef.current[itemId]?.source === source) {
+            delete continuousAudioRef.current[itemId];
+          }
+        };
+
+        source.start(now);
+        if (config.loop && itemId) {
+          continuousAudioRef.current[itemId] = { source, gainNode };
+        } else {
+          source.stop(now + duration + 0.02);
         }
-        
-        oscillator.type = 'triangle';
-        oscillator.frequency.setValueAtTime(640, now);
-        oscillator.frequency.exponentialRampToValueAtTime(126, now + 0.34);
-        gainNode.gain.setValueAtTime(0.18, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.008, now + 0.34);
-        cleanupNodes = [
-          ...cleanupNodes,
-          ...scheduleNoiseBurst(audioCtx, audioCtx.destination, {
-            start: now,
-            duration: 0.18,
-            peakGain: 0.05,
-            filterType: 'bandpass',
-            frequency: 1500,
-            q: 0.9,
-          }),
-        ];
-        oscillator.start(now);
-        oscillator.stop(now + 0.34);
-        if (navigator.vibrate) navigator.vibrate([18, 28, 18]);
+      });
+
+      if (navigator.vibrate) {
+        if (type === 'place') navigator.vibrate(4);
+        if (type === 'pour') navigator.vibrate(6);
+        if (type === 'reaction') navigator.vibrate([6, 18, 6]);
+        if (type === 'break') navigator.vibrate([14, 22, 14]);
       }
     } catch {
       void 0;
     }
   }, []);
 
-  const stopSound = useCallback((itemId: string) => {
-    if (continuousAudioRef.current[itemId]) {
-      const { oscillator, mod, gainNode } = continuousAudioRef.current[itemId];
-      try { 
-        // Fade out slightly to avoid popping
-        const audioCtx = oscillator.context;
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-        oscillator.stop(audioCtx.currentTime + 0.1); 
-        mod.stop(audioCtx.currentTime + 0.1); 
-      } catch { void 0; }
-      delete continuousAudioRef.current[itemId];
-    }
+  useEffect(() => {
+    const warmAudio = () => {
+      const audioCtx = getLabAudioContext(audioContextRef);
+      if (!audioCtx) return;
+      if (audioCtx.state === 'suspended') {
+        void audioCtx.resume().catch(() => {
+          void 0;
+        });
+      }
+      (Object.keys(LAB_SOUND_CONFIG) as LabSoundType[]).forEach(type => {
+        void loadLabSoundBuffer(type, audioCtx, audioBuffersRef, audioLoadingRef);
+      });
+    };
+
+    window.addEventListener('pointerdown', warmAudio, { once: true, passive: true });
+    window.addEventListener('keydown', warmAudio, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', warmAudio);
+      window.removeEventListener('keydown', warmAudio);
+    };
   }, []);
 
   useEffect(() => {
