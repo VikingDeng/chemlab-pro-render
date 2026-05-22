@@ -21,10 +21,10 @@ USER_AGENT = "ChemLabProDemo/1.0 (educational local asset downloader)"
 EQUIPMENT = [
     {
         "slug": "beaker",
-        "title": "50 ml beaker.JPG",
-        "url": "https://upload.wikimedia.org/wikipedia/commons/c/c9/50_ml_beaker.JPG",
+        "title": "Glass 100ml beaker.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/e/e4/Glass_100ml_beaker.jpg",
         "label": "烧杯",
-        "author": "Cjp24",
+        "author": "Lilly_M",
         "license": "CC BY-SA 3.0",
         "note": "inventory thumbnail only",
     },

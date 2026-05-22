@@ -5,7 +5,7 @@ They are bundled locally so Render deployment and Electron packaging do not depe
 
 | Local file | Shown as | Source | Author | License | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `beaker.jpg` | 烧杯 | [50 ml beaker.JPG](https://upload.wikimedia.org/wikipedia/commons/c/c9/50_ml_beaker.JPG) | Cjp24 | CC BY-SA 3.0 | inventory thumbnail only |
+| `beaker.jpg` | 烧杯 | [Glass 100ml beaker.jpg](https://upload.wikimedia.org/wikipedia/commons/e/e4/Glass_100ml_beaker.jpg) | Lilly_M | CC BY-SA 3.0 | inventory thumbnail only |
 | `glassrod.jpg` | 玻璃棒 | [Glass rod.jpg](https://upload.wikimedia.org/wikipedia/commons/1/1d/Glass_rod.jpg) | TarnPraewan | CC BY-SA 4.0 | inventory thumbnail only |
 | `testtube.jpg` | 试管 | [Test tube with plastic stopper.JPG](https://upload.wikimedia.org/wikipedia/commons/2/2c/Test_tube_with_plastic_stopper.JPG) | Cjp24 | CC BY-SA 3.0 | inventory thumbnail only |
 | `flask.jpg` | 锥形瓶 | [250 mL Erlenmeyer flask.jpg](https://upload.wikimedia.org/wikipedia/commons/7/78/250_mL_Erlenmeyer_flask.jpg) | Pilarbini | CC BY-SA 4.0 | inventory thumbnail only |
