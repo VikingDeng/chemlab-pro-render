@@ -232,6 +232,14 @@ type MissionBrief = {
   target: string;
 };
 
+type MissionDeck = {
+  id: string;
+  episode: number;
+  title: string;
+  source: 'preset' | 'agent' | 'template';
+  missions: MissionBrief[];
+};
+
 type AgentDragState = {
   pointerId: number | null;
   startX: number;
@@ -393,6 +401,7 @@ const MISSION_IMAGE_BY_PRESET: Record<MissionPreset, string> = {
 };
 const DISCOVERY_STORAGE_KEY = 'chemlab:discovery-unlocks:v1';
 const MISSION_COMPLETION_STORAGE_KEY = 'chemlab:mission-completions:v1';
+const MISSION_DECK_STORAGE_KEY = 'chemlab:mission-deck:v1';
 const MISSION_SUCCESS_META: Record<string, { product: string; formula: string; accent: string }> = {
   c1: { product: '蓝绿色絮状沉淀', formula: 'Cu(OH)₂', accent: '#d6c59d' },
   c2: { product: '白色沉淀', formula: 'AgCl', accent: '#f8fafc' },
@@ -401,6 +410,177 @@ const MISSION_SUCCESS_META: Record<string, { product: string; formula: string; a
   c5: { product: '紫色有机层', formula: 'I₂(org)', accent: '#a855f7' },
   c6: { product: '紫色褪去', formula: 'Mn²⁺', accent: '#c4b5fd' },
 };
+function cloneMissionBrief(brief: MissionBrief): MissionBrief {
+  return {
+    ...brief,
+    route: [...brief.route],
+    reagents: [...brief.reagents],
+  };
+}
+
+function createDefaultMissionDeck(): MissionDeck {
+  return {
+    id: 'preset-v1',
+    episode: 1,
+    title: '基础反应鉴定',
+    source: 'preset',
+    missions: MISSION_SEQUENCE.map(preset => cloneMissionBrief(MISSION_BRIEFS[preset])),
+  };
+}
+
+function getDeckMissionBrief(deck: MissionDeck, preset: MissionPreset) {
+  return deck.missions.find(mission => mission.preset === preset) || MISSION_BRIEFS[preset];
+}
+
+function getDeckMissionByChallengeId(deck: MissionDeck, challengeId: string) {
+  return deck.missions.find(mission => mission.challengeId === challengeId)
+    || MISSION_SEQUENCE.map(preset => MISSION_BRIEFS[preset]).find(mission => mission.challengeId === challengeId)
+    || null;
+}
+
+function sanitizeDeckText(value: unknown, fallback: string, maxLength = 80) {
+  return typeof value === 'string' && value.trim()
+    ? value.trim().slice(0, maxLength)
+    : fallback;
+}
+
+function sanitizeDeckList(value: unknown, fallback: string[], maxItems: number, maxLength = 36) {
+  if (!Array.isArray(value)) return [...fallback];
+  const next = value
+    .map(entry => sanitizeDeckText(entry, '', maxLength))
+    .filter(Boolean)
+    .slice(0, maxItems);
+  return next.length > 0 ? next : [...fallback];
+}
+
+function normalizeMissionDeck(rawDeck: unknown, fallbackEpisode = 1): MissionDeck | null {
+  if (!rawDeck || typeof rawDeck !== 'object') return null;
+  const source = rawDeck as Partial<MissionDeck> & { missions?: unknown[] };
+  if (!Array.isArray(source.missions)) return null;
+
+  const missions = MISSION_SEQUENCE.map(preset => {
+    const base = MISSION_BRIEFS[preset];
+    const rawMission = source.missions?.find(entry => {
+      if (!entry || typeof entry !== 'object') return false;
+      const mission = entry as Partial<MissionBrief> & { templateId?: string };
+      return mission.preset === preset
+        || mission.challengeId === base.challengeId
+        || mission.templateId === preset
+        || mission.templateId === base.challengeId;
+    }) as Partial<MissionBrief> | undefined;
+
+    return {
+      ...base,
+      title: sanitizeDeckText(rawMission?.title, base.title, 48),
+      family: sanitizeDeckText(rawMission?.family, base.family, 32),
+      signal: sanitizeDeckText(rawMission?.signal, base.signal, 32),
+      route: sanitizeDeckList(rawMission?.route, base.route, 4, 18),
+      branch: sanitizeDeckText(rawMission?.branch, base.branch, 64),
+      // Keep exact reagent names and challenge ids: they are engine contracts.
+      reagents: [...base.reagents],
+      accent: base.accent,
+      preset,
+      challengeId: base.challengeId,
+      discoveryId: base.discoveryId,
+      target: sanitizeDeckText(rawMission?.target, base.target, 120),
+    };
+  });
+
+  const order = Array.isArray(source.missions)
+    ? source.missions
+        .map(entry => {
+          if (!entry || typeof entry !== 'object') return null;
+          const mission = entry as Partial<MissionBrief> & { templateId?: string };
+          return missions.find(candidate =>
+            candidate.preset === mission.preset
+            || candidate.challengeId === mission.challengeId
+            || candidate.preset === mission.templateId
+            || candidate.challengeId === mission.templateId
+          ) || null;
+        })
+        .filter((mission): mission is MissionBrief => Boolean(mission))
+    : [];
+  const orderedMissions = [
+    ...order.filter((mission, index, array) => array.findIndex(item => item.challengeId === mission.challengeId) === index),
+    ...missions.filter(mission => !order.some(item => item.challengeId === mission.challengeId)),
+  ];
+
+  return {
+    id: sanitizeDeckText(source.id, `deck-${fallbackEpisode}-${Date.now()}`, 48),
+    episode: Number.isFinite(source.episode) ? Math.max(1, Number(source.episode)) : fallbackEpisode,
+    title: sanitizeDeckText(source.title, `第 ${fallbackEpisode} 组实验`, 42),
+    source: source.source === 'agent' || source.source === 'template' ? source.source : 'template',
+    missions: orderedMissions,
+  };
+}
+
+function createLocalMissionDeck(episode: number): MissionDeck {
+  const deckThemes = [
+    { title: '沉淀与显色复核', order: ['prepAg', 'prepFe', 'prepCu', 'prepCo2', 'prepIodine', 'prepMn'] as MissionPreset[] },
+    { title: '未知样品二轮挑战', order: ['prepCo2', 'prepCu', 'prepIodine', 'prepAg', 'prepMn', 'prepFe'] as MissionPreset[] },
+    { title: '证据链强化', order: ['prepFe', 'prepMn', 'prepAg', 'prepIodine', 'prepCu', 'prepCo2'] as MissionPreset[] },
+  ];
+  const theme = deckThemes[(episode - 2 + deckThemes.length) % deckThemes.length];
+  const variants: Partial<Record<MissionPreset, Pick<MissionBrief, 'title' | 'signal' | 'family' | 'route' | 'branch'>>> = {
+    prepCu: { title: '未知 A：蓝絮复核', signal: '蓝绿色絮凝', family: '金属离子鉴定', route: ['样品 A', '预测', '加碱', '沉淀'], branch: '氨水对照会推向深蓝' },
+    prepAg: { title: '未知 B：白浊锁定', signal: '白色凝乳', family: '阴离子沉淀', route: ['样品 B', '预测', '加 Cl⁻', '沉淀'], branch: '硝酸对照不提供 Cl⁻' },
+    prepFe: { title: '未知 C：血红证据', signal: '血红显色', family: '络合显色', route: ['样品 C', '预测', 'SCN⁻', '显色'], branch: 'NaOH 会抢先沉淀铁离子' },
+    prepCo2: { title: '未知 D：放气确认', signal: '细密气泡', family: '气体生成', route: ['样品 D', '预测', '加酸', '气泡'], branch: '酸化速度决定气泡强弱' },
+    prepIodine: { title: '未知 E：紫相迁移', signal: '紫色有机层', family: '萃取分配', route: ['样品 E', '预测', '有机相', '分层'], branch: '正己烷对比层位不同' },
+    prepMn: { title: '未知 F：紫色褪去', signal: '紫色衰减', family: '氧化还原', route: ['样品 F', '预测', '草酸', '酸化'], branch: '硫酸比盐酸更干净' },
+  };
+
+  return {
+    id: `template-${episode}-${theme.order.join('-')}`,
+    episode,
+    title: theme.title,
+    source: 'template',
+    missions: theme.order.map(preset => ({
+      ...cloneMissionBrief(MISSION_BRIEFS[preset]),
+      ...(variants[preset] || {}),
+    })),
+  };
+}
+
+function readStoredMissionDeck() {
+  if (typeof window === 'undefined') return createDefaultMissionDeck();
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(MISSION_DECK_STORAGE_KEY) || 'null');
+    return normalizeMissionDeck(parsed, 1) || createDefaultMissionDeck();
+  } catch {
+    return createDefaultMissionDeck();
+  }
+}
+
+function writeStoredMissionDeck(deck: MissionDeck) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(MISSION_DECK_STORAGE_KEY, JSON.stringify(deck));
+  } catch {
+    void 0;
+  }
+}
+
+function isMissionUnlocked(index: number, completedIds: Set<string>, missions: MissionBrief[] = createDefaultMissionDeck().missions) {
+  if (index <= 0) return true;
+  return missions
+    .slice(0, index)
+    .every(mission => completedIds.has(mission.challengeId));
+}
+
+function getNextMissionInDeck(deck: MissionDeck, challengeId: string) {
+  const currentIndex = deck.missions.findIndex(mission => mission.challengeId === challengeId);
+  if (currentIndex < 0) return deck.missions[0] || MISSION_BRIEFS[MISSION_SEQUENCE[0]];
+  return deck.missions[(currentIndex + 1 + deck.missions.length) % deck.missions.length];
+}
+
+function getMissionUnlockText(challengeId: string, deck: MissionDeck) {
+  const index = deck.missions.findIndex(mission => mission.challengeId === challengeId);
+  if (index < 0 || index >= deck.missions.length - 1) return '本组已完成，拉瓦锡会生成新实验';
+  const nextMission = deck.missions[index + 1];
+  return `已解锁第 ${index + 2} 关 · ${nextMission.title}`;
+}
+
 const MISSION_PROOFS: Record<string, MissionProof> = {
   c1: {
     checkpoints: [
@@ -771,29 +951,6 @@ const MISSION_PROOFS: Record<string, MissionProof> = {
   },
 };
 
-function getNextMissionPreset(challengeId: string) {
-  const currentIndex = MISSION_SEQUENCE.findIndex(preset => MISSION_BRIEFS[preset].challengeId === challengeId);
-  return MISSION_SEQUENCE[(currentIndex + 1 + MISSION_SEQUENCE.length) % MISSION_SEQUENCE.length];
-}
-
-function getMissionSequenceIndexFromChallengeId(challengeId: string) {
-  return MISSION_SEQUENCE.findIndex(preset => MISSION_BRIEFS[preset].challengeId === challengeId);
-}
-
-function getMissionUnlockText(challengeId: string) {
-  const index = getMissionSequenceIndexFromChallengeId(challengeId);
-  if (index < 0 || index >= MISSION_SEQUENCE.length - 1) return '全部关卡已解锁';
-  const nextMission = MISSION_BRIEFS[MISSION_SEQUENCE[index + 1]];
-  return `已解锁第 ${index + 2} 关 · ${nextMission.title}`;
-}
-
-function isMissionUnlocked(index: number, completedIds: Set<string>) {
-  if (index <= 0) return true;
-  return MISSION_SEQUENCE
-    .slice(0, index)
-    .every(preset => completedIds.has(MISSION_BRIEFS[preset].challengeId));
-}
-
 function getMissionSuccessMeta(challengeId: string) {
   return MISSION_SUCCESS_META[challengeId] || { product: '目标现象', formula: '✓', accent: '#d6c59d' };
 }
@@ -866,9 +1023,10 @@ function buildMissionRecap(
   proof: MissionProof | undefined,
   answers: Record<string, MissionProofAnswer>,
   evidenceScore: number,
+  missionBrief?: MissionBrief | null,
 ): MissionRecap {
   const preset = MISSION_SEQUENCE.find(entry => MISSION_BRIEFS[entry].challengeId === challengeId);
-  const mission = preset ? MISSION_BRIEFS[preset] : null;
+  const mission = missionBrief || (preset ? MISSION_BRIEFS[preset] : null);
   const mistakes = stats.wrongProofs + stats.wrongReagents;
   const pollution = stats.pollution || 0;
   const controlSolved = Boolean(proof?.checkpoints.some(checkpoint => checkpoint.stage === 'control' && answers[checkpoint.id]?.correct));
@@ -1840,6 +1998,8 @@ function App() {
   const [reagentFocusSignal, setReagentFocusSignal] = useState(0);
   const [unlockedDiscoveryIds, setUnlockedDiscoveryIds] = useState<Set<string>>(() => readStoredDiscoveryIds());
   const [completedMissionIds, setCompletedMissionIds] = useState<Set<string>>(() => readStoredMissionCompletionIds());
+  const [missionDeck, setMissionDeck] = useState<MissionDeck>(() => readStoredMissionDeck());
+  const [missionDeckStatus, setMissionDeckStatus] = useState<'idle' | 'generating'>('idle');
   const [missionProofAnswers, setMissionProofAnswers] = useState<Record<string, Record<string, MissionProofAnswer>>>({});
   const [missionRunStats, setMissionRunStats] = useState<Record<string, MissionRunStats>>({});
   const missionRunStatsRef = useRef<Record<string, MissionRunStats>>({});
@@ -1949,6 +2109,7 @@ function App() {
   const agentMessagesEndRef = useRef<HTMLDivElement | null>(null);
   const inlineContainerFeedbackTimeoutRef = useRef<number | null>(null);
   const missionCueTimeoutRef = useRef<number | null>(null);
+  const autoDeckRefreshRef = useRef(false);
   const missionPredictionGateRef = useRef<MissionPredictionGateSnapshot>({
     active: false,
     nextAction: null,
@@ -2343,7 +2504,7 @@ function App() {
 
     let nextItems: PlacedItem[] = [];
     let nextFocusedId: string | null = null;
-    const mission = MISSION_BRIEFS[preset];
+    const mission = getDeckMissionBrief(missionDeck, preset);
     const beaker = createWorkspaceItem('beaker', '烧杯', centerX, centerY + 82);
     nextItems = [beaker];
     nextFocusedId = beaker.id;
@@ -2527,6 +2688,71 @@ function App() {
       window.removeEventListener('keydown', warmAudio);
     };
   }, []);
+
+  const refreshMissionDeck = useCallback(async (reason: 'auto' | 'manual' = 'auto') => {
+    if (missionDeckStatus === 'generating') {
+      showToast('正在生成新实验…');
+      return;
+    }
+    setMissionDeckStatus('generating');
+    showToast(reason === 'manual' ? '正在生成新实验…' : '本组完成，正在刷新新实验…');
+    const nextEpisode = Math.max(2, missionDeck.episode + 1);
+    let nextDeck = createLocalMissionDeck(nextEpisode);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 6500);
+
+    try {
+      const response = await fetch('/api/missions/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          episode: nextEpisode,
+          reason,
+          completed: Array.from(completedMissionIds),
+        }),
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        const normalizedDeck = normalizeMissionDeck(payload?.deck || payload, nextEpisode);
+        if (normalizedDeck) nextDeck = normalizedDeck;
+      }
+    } catch {
+      void 0;
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+
+    Object.keys(continuousAudioRef.current).forEach(id => stopSound(id));
+    writeStoredMissionDeck(nextDeck);
+    writeStoredMissionCompletionIds(new Set());
+    setMissionDeck(nextDeck);
+    setCompletedMissionIds(new Set());
+    setMissionProofAnswers({});
+    missionRunStatsRef.current = {};
+    setMissionRunStats({});
+    setMissionCompletionCard(null);
+    setMissionCue(null);
+    setReactionSpotlight(null);
+    setDiscoveryToast(null);
+    setActiveChallenge(null);
+    setPlacedItems([]);
+    placedItemsRef.current = [];
+    setBrokenGlass([]);
+    setFocusedItemId(null);
+    setTemperatureHistory([]);
+    setActiveDrop(null);
+    setAgentMessages([]);
+    setAgentRemoteHeadline('');
+    setAgentRemoteSummary('');
+    setAgentSuggestedPrompts([]);
+    setAgentHasFreshUpdate(false);
+    setGameMode('challenge');
+    syncReadouts(null);
+    autoDeckRefreshRef.current = false;
+    setMissionDeckStatus('idle');
+    showToast(nextDeck.source === 'agent' ? `拉瓦锡生成了「${nextDeck.title}」` : `已刷新「${nextDeck.title}」`);
+  }, [completedMissionIds, missionDeck.episode, missionDeckStatus, showToast, stopSound, syncReadouts]);
 
   useEffect(() => {
     const activeContinuousAudio = continuousAudioRef.current;
@@ -2894,33 +3120,34 @@ function App() {
   const discoveryCards = useMemo(() => buildDiscoveryCards(placedItems, unlockedDiscoveryIds), [placedItems, unlockedDiscoveryIds]);
   const unlockedDiscoveryCount = useMemo(() => discoveryCards.filter(card => card.unlocked).length, [discoveryCards]);
   const completedMissionCount = useMemo(
-    () => MISSION_SEQUENCE.filter(preset => completedMissionIds.has(MISSION_BRIEFS[preset].challengeId)).length,
-    [completedMissionIds]
+    () => missionDeck.missions.filter(mission => completedMissionIds.has(mission.challengeId)).length,
+    [completedMissionIds, missionDeck.missions]
   );
   const currentLevelIndex = useMemo(() => {
-    const firstOpen = MISSION_SEQUENCE.findIndex(preset => !completedMissionIds.has(MISSION_BRIEFS[preset].challengeId));
-    return firstOpen === -1 ? MISSION_SEQUENCE.length - 1 : firstOpen;
-  }, [completedMissionIds]);
-  const currentLevelPreset = MISSION_SEQUENCE[currentLevelIndex] || MISSION_SEQUENCE[0];
-  const currentMissionBrief = MISSION_BRIEFS[currentLevelPreset];
+    const firstOpen = missionDeck.missions.findIndex(mission => !completedMissionIds.has(mission.challengeId));
+    return firstOpen === -1 ? missionDeck.missions.length - 1 : firstOpen;
+  }, [completedMissionIds, missionDeck.missions]);
+  const currentMissionBrief = missionDeck.missions[currentLevelIndex] || missionDeck.missions[0] || MISSION_BRIEFS[MISSION_SEQUENCE[0]];
   const lockedMissionCount = useMemo(
-    () => MISSION_SEQUENCE.filter((_, index) => !isMissionUnlocked(index, completedMissionIds)).length,
-    [completedMissionIds]
+    () => missionDeck.missions.filter((_, index) => !isMissionUnlocked(index, completedMissionIds, missionDeck.missions)).length,
+    [completedMissionIds, missionDeck.missions]
   );
-  const launchMissionFromSelect = (preset: MissionPreset, index: number) => {
-    if (!isMissionUnlocked(index, completedMissionIds)) {
-      const requiredMission = MISSION_BRIEFS[MISSION_SEQUENCE[Math.max(0, index - 1)]];
+  const launchMissionFromSelect = (mission: MissionBrief, index: number) => {
+    if (!isMissionUnlocked(index, completedMissionIds, missionDeck.missions)) {
+      const requiredMission = missionDeck.missions[Math.max(0, index - 1)] || missionDeck.missions[0];
       showToast(`先完成第 ${index} 关：${requiredMission.title}`);
       return;
     }
-    launchQuickStart(preset);
+    launchQuickStart(mission.preset);
   };
   const activeMissionPreset = useMemo(
-    () => activeChallenge ? MISSION_SEQUENCE.find(preset => MISSION_BRIEFS[preset].challengeId === activeChallenge.id) : undefined,
-    [activeChallenge]
+    () => activeChallenge ? getDeckMissionByChallengeId(missionDeck, activeChallenge.id)?.preset : undefined,
+    [activeChallenge, missionDeck]
   );
-  const activeLevelIndex = activeMissionPreset ? MISSION_SEQUENCE.indexOf(activeMissionPreset) : currentLevelIndex;
-  const activeMissionBrief = activeMissionPreset ? MISSION_BRIEFS[activeMissionPreset] : null;
+  const activeMissionBrief = activeChallenge ? getDeckMissionByChallengeId(missionDeck, activeChallenge.id) : null;
+  const activeLevelIndex = activeMissionBrief
+    ? Math.max(0, missionDeck.missions.findIndex(mission => mission.challengeId === activeMissionBrief.challengeId))
+    : currentLevelIndex;
   const challengeStepCount = challengeInsight?.checklist.length ?? 0;
   const challengeProofStepCount = activeMissionProof?.checkpoints.length ?? 0;
   const challengeDisplayDoneCount = challengeDoneCount + activeProofSolvedCount;
@@ -3053,6 +3280,23 @@ function App() {
     }
     addReagentToContainer(primaryAgentContainerId, option.name, option.volume);
     flashMissionCue(option.name, option.tone);
+  }
+
+  function launchNextMissionOrDeck(challengeId: string) {
+    const completedWithCurrent = new Set(completedMissionIds);
+    completedWithCurrent.add(challengeId);
+    const deckComplete = missionDeck.missions.length > 0
+      && missionDeck.missions.every(mission => completedWithCurrent.has(mission.challengeId));
+
+    if (deckComplete) {
+      setMissionCompletionCard(null);
+      void refreshMissionDeck('manual');
+      return;
+    }
+
+    const nextMission = getNextMissionInDeck(missionDeck, challengeId);
+    launchQuickStart(nextMission.preset);
+    showToast(`下一关：${nextMission.title}`);
   }
 
   const handleAgentQuickAction = useCallback((actionId: 'focus' | 'logs' | 'reagents' | 'note') => {
@@ -3627,7 +3871,7 @@ function App() {
     playSound('reaction');
     const meta = getMissionSuccessMeta(activeChallenge.id);
     const grade = getMissionFinalGrade(runStats.integrity, runStats);
-    const recap = buildMissionRecap(activeChallenge.id, runStats, proof, answers, activeMissionEvidenceScore);
+    const recap = buildMissionRecap(activeChallenge.id, runStats, proof, answers, activeMissionEvidenceScore, activeMissionBrief);
     setMissionCompletionCard({
       id: createRuntimeId('mission-complete'),
       challengeId: activeChallenge.id,
@@ -3653,7 +3897,27 @@ function App() {
     setTimeout(() => {
       setActiveChallenge(c => c?.id === activeChallenge.id ? { ...c, completed: true } : c);
     }, 0);
-  }, [activeChallenge, activeMissionEvidenceScore, gameMode, missionProofAnswers, missionRunStats, placedItems, playSound]);
+  }, [activeChallenge, activeMissionBrief, activeMissionEvidenceScore, gameMode, missionProofAnswers, missionRunStats, placedItems, playSound]);
+
+  useEffect(() => {
+    if (gameMode !== 'challenge') return;
+    if (missionDeckStatus === 'generating') return;
+    if (autoDeckRefreshRef.current) return;
+    if (missionDeck.missions.length === 0) return;
+
+    const deckComplete = missionDeck.missions.every(mission => completedMissionIds.has(mission.challengeId));
+    if (!deckComplete) {
+      autoDeckRefreshRef.current = false;
+      return;
+    }
+
+    autoDeckRefreshRef.current = true;
+    const timer = window.setTimeout(() => {
+      void refreshMissionDeck('auto');
+    }, missionCompletionCard ? 4200 : 1200);
+
+    return () => window.clearTimeout(timer);
+  }, [completedMissionIds, gameMode, missionCompletionCard, missionDeck.missions, missionDeckStatus, refreshMissionDeck]);
 
   usePhysicsEngine(
     placedItems, 
@@ -4067,7 +4331,7 @@ function App() {
               <span className="w-2 h-2 rounded-[9999px] bg-[#10b981]"></span>
               <span>在线</span>
             </div>
-            <div className="font-mono text-[13px] text-[#94a3b8]">任务 {completedMissionCount}/{MISSION_SEQUENCE.length}</div>
+            <div className="font-mono text-[13px] text-[#94a3b8]">任务 {completedMissionCount}/{missionDeck.missions.length}</div>
           </div>
         </header>
 
@@ -4507,14 +4771,13 @@ function App() {
                         </button>
                         <button
                           type="button"
+                          disabled={missionDeckStatus === 'generating'}
                           onClick={() => {
-                            const nextPreset = getNextMissionPreset(activeChallenge.id);
-                            launchQuickStart(nextPreset);
-                            showToast(`下一关：${MISSION_BRIEFS[nextPreset].title}`);
+	                            launchNextMissionOrDeck(activeChallenge.id);
                           }}
-                          className="rounded-full border border-[#f43f5e]/35 bg-[#f43f5e]/12 px-3 py-1.5 text-[11px] font-semibold text-[#fda4af] hover:bg-[#f43f5e]/20 transition-colors"
+                          className="rounded-full border border-[#f43f5e]/35 bg-[#f43f5e]/12 px-3 py-1.5 text-[11px] font-semibold text-[#fda4af] transition-colors hover:bg-[#f43f5e]/20 disabled:cursor-wait disabled:opacity-60"
                         >
-                          下一关
+	                          {missionDeckStatus === 'generating' ? '生成中' : completedMissionCount >= missionDeck.missions.length ? '新实验' : '下一关'}
                         </button>
                       </div>
                     )}
@@ -4589,7 +4852,7 @@ function App() {
 		                      <div className="mt-1 text-[12px] text-[#94a3b8]">
 		                        可信度 {missionCompletionCard.integrity}% · 污染 {missionCompletionCard.pollution}% · 失误 {missionCompletionCard.mistakes}
 		                      </div>
-		                      <div className="mt-1 truncate text-[11px] text-[#86efac]">{getMissionUnlockText(missionCompletionCard.challengeId)}</div>
+			                      <div className="mt-1 truncate text-[11px] text-[#86efac]">{getMissionUnlockText(missionCompletionCard.challengeId, missionDeck)}</div>
 		                    </div>
 	                  </div>
 	                  <div className="mt-3 rounded-[18px] border border-white/8 bg-white/[0.025] px-3 py-2">
@@ -4625,14 +4888,13 @@ function App() {
                     </button>
                     <button
                       type="button"
+                      disabled={missionDeckStatus === 'generating'}
                       onClick={() => {
-                        const nextPreset = getNextMissionPreset(missionCompletionCard.challengeId);
-                        launchQuickStart(nextPreset);
-                        showToast(`下一关：${MISSION_BRIEFS[nextPreset].title}`);
+	                        launchNextMissionOrDeck(missionCompletionCard.challengeId);
                       }}
-                      className="rounded-2xl border border-[#f43f5e]/30 bg-[#f43f5e]/10 px-2 py-2 text-[11px] font-semibold text-[#fda4af] hover:bg-[#f43f5e]/16 transition-colors"
+                      className="rounded-2xl border border-[#f43f5e]/30 bg-[#f43f5e]/10 px-2 py-2 text-[11px] font-semibold text-[#fda4af] transition-colors hover:bg-[#f43f5e]/16 disabled:cursor-wait disabled:opacity-60"
                     >
-                      下一关
+	                      {missionDeckStatus === 'generating' ? '生成中' : completedMissionCount >= missionDeck.missions.length ? '新实验' : '下一关'}
                     </button>
                   </div>
                 </motion.div>
@@ -4735,7 +4997,6 @@ function App() {
                   const mission = currentMissionBrief;
                   const isMissionDone = completedMissionIds.has(mission.challengeId);
                   const missionNumber = currentLevelIndex + 1;
-                  const accentColor = MISSION_SUCCESS_META[mission.challengeId]?.accent || '#d6c59d';
                   return (
                     <div className={`mission-select-shell w-full max-w-[860px] ${isTablet ? 'pl-24' : ''}`}>
                       <motion.div
@@ -4749,8 +5010,8 @@ function App() {
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-3 text-[11px] text-[#7d8594]">
                               <span className="font-semibold tracking-[0.22em] text-[#d6c59d]">任务挑战</span>
-                              <span className="font-mono text-[#cbd5e1]">{completedMissionCount}/{MISSION_SEQUENCE.length}</span>
-                              <span>{lockedMissionCount > 0 ? `${lockedMissionCount} 锁定` : '全线开放'}</span>
+	                              <span className="font-mono text-[#cbd5e1]">{completedMissionCount}/{missionDeck.missions.length}</span>
+	                              <span>{missionDeckStatus === 'generating' ? '生成中' : lockedMissionCount > 0 ? `${lockedMissionCount} 锁定` : missionDeck.source === 'agent' ? 'Agent 生成' : '全线开放'}</span>
                             </div>
 
                             <h2 className="mt-4 text-[30px] font-semibold leading-[1.05] tracking-[-0.045em] text-[#f8fafc] sm:text-[38px]">
@@ -4799,24 +5060,24 @@ function App() {
 
                         <div className="mt-6 border-t border-white/8 pt-4">
                           <div className="mission-minilevel-track flex items-center gap-2 overflow-x-auto pb-1">
-                            {MISSION_SEQUENCE.map((preset, index) => {
-                              const levelMission = MISSION_BRIEFS[preset];
-                              const isLevelDone = completedMissionIds.has(levelMission.challengeId);
-                              const isCurrentLevel = index === currentLevelIndex && !isLevelDone;
-                              const unlocked = isMissionUnlocked(index, completedMissionIds);
-                              const isLocked = !unlocked;
-                              return (
+	                            {missionDeck.missions.map((levelMission, index) => {
+	                              const isLevelDone = completedMissionIds.has(levelMission.challengeId);
+	                              const isCurrentLevel = index === currentLevelIndex && !isLevelDone;
+	                              const unlocked = isMissionUnlocked(index, completedMissionIds, missionDeck.missions);
+	                              const isLocked = !unlocked;
+                                const levelAccentColor = MISSION_SUCCESS_META[levelMission.challengeId]?.accent || '#d6c59d';
+	                              return (
                                 <button
                                   key={`level-${levelMission.challengeId}`}
                                   type="button"
                                   data-locked={isLocked ? 'true' : undefined}
                                   title={isLocked ? `先完成第 ${index} 关` : levelMission.title}
-                                  onClick={() => launchMissionFromSelect(levelMission.preset, index)}
+	                                  onClick={() => launchMissionFromSelect(levelMission, index)}
                                   className={`mission-minilevel-node grid h-9 w-9 shrink-0 place-items-center rounded-full border text-[10px] font-bold transition-all ${isLocked ? 'cursor-not-allowed border-white/5 bg-black/14 text-[#475569]' : 'hover:-translate-y-0.5'} ${isLevelDone ? 'border-[#d6c59d]/30 bg-[#d6c59d]/10 text-[#f8e7bd]' : isCurrentLevel ? 'border-[#d6c59d]/36 bg-[#d6c59d]/12 text-[#f8e7bd]' : isLocked ? '' : 'border-white/8 bg-white/[0.025] text-[#94a3b8] hover:border-[#d6c59d]/28'}`}
                                 >
                                   <span
                                     className="grid h-7 w-7 shrink-0 place-items-center rounded-full"
-                                    style={isCurrentLevel ? { backgroundColor: `${accentColor}22`, color: '#f8e7bd' } : undefined}
+	                                    style={isCurrentLevel ? { backgroundColor: `${levelAccentColor}22`, color: '#f8e7bd' } : undefined}
                                   >
                                     {isLevelDone ? '✓' : isLocked ? '锁' : String(index + 1).padStart(2, '0')}
                                   </span>

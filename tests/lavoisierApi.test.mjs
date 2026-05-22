@@ -36,6 +36,16 @@ async function postJson(baseUrl, payload) {
   return response.json()
 }
 
+async function postMissionJson(baseUrl, payload) {
+  const response = await fetch(`${baseUrl}/api/missions/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  assert.equal(response.status, 200)
+  return response.json()
+}
+
 test('Lavoisier does not fake a chemistry answer when LLM is not configured', async () => {
   process.env.LLM_API_KEY = ''
   process.env.LLM_MODEL = ''
@@ -312,6 +322,79 @@ test('Lavoisier prompt carries mission proof state for tutor-style guidance', as
     assert.deepEqual(capturedRequest.chat_template_kwargs, { enable_thinking: false })
     assert.ok(data.suggestedPrompts.includes('我该选哪个证据'))
     assert.match(data.reply, /Cu²⁺/)
+  } finally {
+    process.env.LLM_API_KEY = ''
+    process.env.LLM_MODEL = ''
+    process.env.LLM_API_URL = ''
+    process.env.LLM_PROVIDER = ''
+    await close(server)
+    await close(fakeLlm)
+  }
+})
+
+test('mission generator returns a complete template deck when LLM is not configured', async () => {
+  process.env.LLM_API_KEY = ''
+  process.env.LLM_MODEL = ''
+  process.env.LLM_API_URL = ''
+  process.env.LLM_PROVIDER = ''
+  const server = createLavoisierServer()
+  const baseUrl = await listen(server)
+  try {
+    const data = await postMissionJson(baseUrl, { episode: 2, reason: 'auto', completed: ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'] })
+
+    assert.equal(data.ok, true)
+    assert.equal(data.deck.episode, 2)
+    assert.equal(data.deck.source, 'template')
+    assert.equal(data.deck.missions.length, 6)
+    assert.deepEqual(new Set(data.deck.missions.map((mission) => mission.challengeId)), new Set(['c1', 'c2', 'c3', 'c4', 'c5', 'c6']))
+    assert.ok(data.deck.missions.every((mission) => Array.isArray(mission.reagents) && mission.reagents.length > 0))
+  } finally {
+    await close(server)
+  }
+})
+
+test('mission generator lets LLM vary deck copy without changing chemistry contracts', async () => {
+  const fakeLlm = createServer(async (req, res) => {
+    if (req.method !== 'POST' || req.url !== '/chat/completions') {
+      res.writeHead(404).end()
+      return
+    }
+    const content = JSON.stringify({
+      title: '午夜鉴定局',
+      missions: [
+        { preset: 'prepFe', challengeId: 'unsafe', reagents: ['火星试剂'], title: '红色暗号', family: '络合推理', signal: '血红一闪', route: ['样品 C', '先预测', '加 SCN⁻', '锁定'], branch: '错加碱会丢失信号', target: '锁定 Fe(SCN)₃ 证据' },
+        { preset: 'prepAg', title: '白色谜团', family: '沉淀推理', signal: '白浊下沉', route: ['样品 B', '加 Cl⁻', '静置'], branch: '氨水留作对照', target: '锁定 AgCl 白色沉淀' },
+        { preset: 'prepCu', title: '蓝色线索', family: '金属鉴定', signal: '蓝绿絮状', route: ['样品 A', '加碱', '观察'], branch: '氨水会转深蓝', target: '制备 Cu(OH)₂ 沉淀' },
+        { preset: 'prepCo2', title: '气泡证词', family: '气体生成', signal: '连续气泡', route: ['样品 D', '加酸', '冒泡'], branch: '慢加酸更稳', target: '制备 CO₂ 气泡' },
+        { preset: 'prepIodine', title: '紫层转移', family: '萃取分层', signal: '紫色有机层', route: ['样品 E', '加有机相', '分层'], branch: '正己烷作对比', target: '制备紫色有机层' },
+        { preset: 'prepMn', title: '紫色退场', family: '氧化还原', signal: '紫色褪去', route: ['样品 F', '酸化', '褪色'], branch: '硫酸更干净', target: '制备褪色体系' },
+      ],
+    })
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content } }] }))
+  })
+  const fakeUrl = await listen(fakeLlm)
+  process.env.LLM_API_KEY = 'test-key'
+  process.env.LLM_MODEL = 'mimo-v2.5'
+  process.env.LLM_API_URL = fakeUrl
+  process.env.LLM_PROVIDER = 'mimo'
+
+  const server = createLavoisierServer()
+  const baseUrl = await listen(server)
+  try {
+    const data = await postMissionJson(baseUrl, { episode: 4, reason: 'auto' })
+    const first = data.deck.missions[0]
+    const prepFe = data.deck.missions.find((mission) => mission.preset === 'prepFe')
+
+    assert.equal(data.ok, true)
+    assert.equal(data.deck.source, 'agent')
+    assert.equal(data.deck.title, '午夜鉴定局')
+    assert.equal(first.preset, 'prepFe')
+    assert.equal(prepFe.challengeId, 'c3')
+    assert.deepEqual(prepFe.reagents, ['未知样品 C', '硫氰化钾', '氢氧化钠'])
+    assert.equal(prepFe.title, '红色暗号')
+    assert.equal(prepFe.discoveryId, 'fe-scn')
+    assert.equal(prepFe.accent, 'rose')
   } finally {
     process.env.LLM_API_KEY = ''
     process.env.LLM_MODEL = ''

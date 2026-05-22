@@ -218,6 +218,199 @@ function sanitizeString(value, fallback = undefined, maxLength = 180) {
   return trimmed.slice(0, maxLength)
 }
 
+const MISSION_PRESETS = ['prepCu', 'prepAg', 'prepFe', 'prepCo2', 'prepIodine', 'prepMn']
+const MISSION_TEMPLATES = {
+  prepCu: {
+    preset: 'prepCu',
+    challengeId: 'c1',
+    discoveryId: 'cu-oh2',
+    title: '未知 A：蓝色沉淀',
+    family: '沉淀鉴定',
+    signal: '蓝绿色絮状',
+    route: ['样品 A', '加碱', '沉淀'],
+    branch: '氨水会转深蓝',
+    reagents: ['未知样品 A', '氢氧化钠', '氨水'],
+    accent: 'cyan',
+    target: '鉴定未知样品 A，制备蓝绿色 Cu(OH)₂ 沉淀',
+  },
+  prepAg: {
+    preset: 'prepAg',
+    challengeId: 'c2',
+    discoveryId: 'agcl',
+    title: '未知 B：白色沉淀',
+    family: '沉淀鉴定',
+    signal: '白色凝乳状',
+    route: ['样品 B', '加氯离子', '沉淀'],
+    branch: '氨水可做对照',
+    reagents: ['未知样品 B', '盐酸', '氨水'],
+    accent: 'emerald',
+    target: '鉴定未知样品 B，制备白色 AgCl 沉淀',
+  },
+  prepFe: {
+    preset: 'prepFe',
+    challengeId: 'c3',
+    discoveryId: 'fe-scn',
+    title: '未知 C：血红络合',
+    family: '络合显色',
+    signal: '瞬间血红',
+    route: ['样品 C', 'SCN⁻', '显色'],
+    branch: '加碱会变沉淀',
+    reagents: ['未知样品 C', '硫氰化钾', '氢氧化钠'],
+    accent: 'rose',
+    target: '鉴定未知样品 C，制备血红色 Fe(SCN)₃ 络合物',
+  },
+  prepCo2: {
+    preset: 'prepCo2',
+    challengeId: 'c4',
+    discoveryId: 'co2',
+    title: '未知 D：气泡',
+    family: '气体生成',
+    signal: '连续气泡',
+    route: ['样品 D', '加酸', '冒泡'],
+    branch: '指示剂看酸化',
+    reagents: ['未知样品 D', '盐酸', '甲基橙'],
+    accent: 'amber',
+    target: '鉴定未知样品 D，制备二氧化碳气泡',
+  },
+  prepIodine: {
+    preset: 'prepIodine',
+    challengeId: 'c5',
+    discoveryId: 'iodine-layer',
+    title: '未知 E：紫色分层',
+    family: '萃取分层',
+    signal: '有机层变紫',
+    route: ['样品 E', '有机相', '分层'],
+    branch: '正己烷可对比',
+    reagents: ['未知样品 E', '四氯化碳', '正己烷'],
+    accent: 'violet',
+    target: '鉴定未知样品 E，制备紫色有机层',
+  },
+  prepMn: {
+    preset: 'prepMn',
+    challengeId: 'c6',
+    discoveryId: 'permanganate-fade',
+    title: '未知 F：褪色',
+    family: '氧化还原',
+    signal: '紫色褪去',
+    route: ['样品 F', '还原剂', '酸化'],
+    branch: '酸度决定速度',
+    reagents: ['未知样品 F', '草酸', '硫酸'],
+    accent: 'amber',
+    target: '鉴定未知样品 F，制备高锰酸钾褪色体系',
+  },
+}
+
+function cloneMissionTemplate(template) {
+  return {
+    ...template,
+    route: [...template.route],
+    reagents: [...template.reagents],
+  }
+}
+
+function sanitizeMissionStringArray(value, maxItems = 4, maxLength = 24, fallback = []) {
+  if (!Array.isArray(value)) return [...fallback]
+  const next = value
+    .map((entry) => sanitizeString(entry, '', maxLength))
+    .filter(Boolean)
+    .slice(0, maxItems)
+  return next.length ? next : [...fallback]
+}
+
+function createTemplateMissionDeck(episode = 1) {
+  if (episode <= 1) {
+    return {
+      id: 'preset-v1',
+      episode: 1,
+      title: '基础反应鉴定',
+      source: 'preset',
+      missions: MISSION_PRESETS.map((preset) => cloneMissionTemplate(MISSION_TEMPLATES[preset])),
+    }
+  }
+
+  const themes = [
+    { title: '沉淀与显色复核', order: ['prepAg', 'prepFe', 'prepCu', 'prepCo2', 'prepIodine', 'prepMn'] },
+    { title: '未知样品二轮挑战', order: ['prepCo2', 'prepCu', 'prepIodine', 'prepAg', 'prepMn', 'prepFe'] },
+    { title: '证据链强化', order: ['prepFe', 'prepMn', 'prepAg', 'prepIodine', 'prepCu', 'prepCo2'] },
+  ]
+  const variants = {
+    prepCu: { title: '未知 A：蓝絮复核', signal: '蓝绿色絮凝', family: '金属离子鉴定', route: ['样品 A', '预测', '加碱', '沉淀'], branch: '氨水对照会推向深蓝' },
+    prepAg: { title: '未知 B：白浊锁定', signal: '白色凝乳', family: '阴离子沉淀', route: ['样品 B', '预测', '加 Cl⁻', '沉淀'], branch: '硝酸对照不提供 Cl⁻' },
+    prepFe: { title: '未知 C：血红证据', signal: '血红显色', family: '络合显色', route: ['样品 C', '预测', 'SCN⁻', '显色'], branch: 'NaOH 会抢先沉淀铁离子' },
+    prepCo2: { title: '未知 D：放气确认', signal: '细密气泡', family: '气体生成', route: ['样品 D', '预测', '加酸', '气泡'], branch: '酸化速度决定气泡强弱' },
+    prepIodine: { title: '未知 E：紫相迁移', signal: '紫色有机层', family: '萃取分配', route: ['样品 E', '预测', '有机相', '分层'], branch: '正己烷对比层位不同' },
+    prepMn: { title: '未知 F：紫色褪去', signal: '紫色衰减', family: '氧化还原', route: ['样品 F', '预测', '草酸', '酸化'], branch: '硫酸比盐酸更干净' },
+  }
+  const theme = themes[(episode - 2 + themes.length) % themes.length]
+
+  return {
+    id: `template-${episode}-${theme.order.join('-')}`,
+    episode,
+    title: theme.title,
+    source: 'template',
+    missions: theme.order.map((preset) => ({
+      ...cloneMissionTemplate(MISSION_TEMPLATES[preset]),
+      ...(variants[preset] || {}),
+    })),
+  }
+}
+
+function normalizeGeneratedMissionDeck(rawDeck, fallbackEpisode = 2, source = 'template') {
+  if (!rawDeck || typeof rawDeck !== 'object') return null
+  const missionsInput = Array.isArray(rawDeck.missions) ? rawDeck.missions : []
+  if (!missionsInput.length) return null
+
+  const byPreset = new Map()
+  for (const entry of missionsInput) {
+    if (!entry || typeof entry !== 'object') continue
+    const preset = typeof entry.preset === 'string'
+      ? entry.preset
+      : typeof entry.templateId === 'string'
+      ? entry.templateId
+      : ''
+    const normalizedPreset = MISSION_PRESETS.includes(preset)
+      ? preset
+      : MISSION_PRESETS.find((candidate) => MISSION_TEMPLATES[candidate].challengeId === preset)
+    if (!normalizedPreset || byPreset.has(normalizedPreset)) continue
+    byPreset.set(normalizedPreset, entry)
+  }
+
+  if (byPreset.size < MISSION_PRESETS.length) return null
+
+  const orderedPresets = [
+    ...missionsInput
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null
+        const preset = typeof entry.preset === 'string' ? entry.preset : typeof entry.templateId === 'string' ? entry.templateId : ''
+        return MISSION_PRESETS.includes(preset)
+          ? preset
+          : MISSION_PRESETS.find((candidate) => MISSION_TEMPLATES[candidate].challengeId === preset) || null
+      })
+      .filter(Boolean),
+    ...MISSION_PRESETS,
+  ].filter((preset, index, array) => array.indexOf(preset) === index)
+
+  return {
+    id: sanitizeString(rawDeck.id, `${source}-${fallbackEpisode}-${Date.now()}`, 48),
+    episode: Number.isFinite(rawDeck.episode) ? Math.max(1, Number(rawDeck.episode)) : fallbackEpisode,
+    title: sanitizeString(rawDeck.title, `第 ${fallbackEpisode} 组实验`, 42),
+    source,
+    missions: orderedPresets.map((preset) => {
+      const base = MISSION_TEMPLATES[preset]
+      const entry = byPreset.get(preset) || {}
+      return {
+        ...cloneMissionTemplate(base),
+        title: sanitizeString(entry.title, base.title, 48),
+        family: sanitizeString(entry.family, base.family, 32),
+        signal: sanitizeString(entry.signal, base.signal, 32),
+        route: sanitizeMissionStringArray(entry.route, 4, 18, base.route),
+        branch: sanitizeString(entry.branch, base.branch, 64),
+        target: sanitizeString(entry.target, base.target, 120),
+      }
+    }),
+  }
+}
+
 function sanitizeStringArray(values, maxItems = 6, maxLength = 40) {
   if (!Array.isArray(values)) return []
   return values
@@ -523,11 +716,11 @@ function shouldDisableThinking(llm) {
   return llm.provider.toLowerCase() === 'mimo' && llm.model.toLowerCase() === 'mimo-v2.5'
 }
 
-function buildChatCompletionBody(llm, messages) {
+function buildChatCompletionBody(llm, messages, options = {}) {
   const body = {
     model: llm.model,
-    temperature: 0.35,
-    max_tokens: parsePositiveInteger(process.env.LLM_MAX_TOKENS, 260),
+    temperature: Number.isFinite(options.temperature) ? options.temperature : 0.35,
+    max_tokens: parsePositiveInteger(options.maxTokens || process.env.LLM_MAX_TOKENS, 260),
     messages,
   }
 
@@ -650,6 +843,110 @@ async function callConfiguredLlm(input, fallback) {
   }, fallback)
 }
 
+function buildMissionDeckInstruction(episode, fallbackDeck) {
+  const safeTemplates = MISSION_PRESETS.map((preset) => {
+    const template = MISSION_TEMPLATES[preset]
+    return {
+      preset,
+      fixedChallengeId: template.challengeId,
+      fixedReagents: template.reagents,
+      baseline: {
+        title: template.title,
+        family: template.family,
+        signal: template.signal,
+        route: template.route,
+        branch: template.branch,
+        target: template.target,
+      },
+    }
+  })
+
+  return [
+    '你是 ChemLab Pro 的关卡策划 Agent。目标是让 6 个化学挑战像“下一组关卡”一样更有新鲜感，但必须保持化学模拟稳定。',
+    '硬约束：只能改展示文案和 6 关顺序，不能发明新反应、不能改试剂、不能改 challengeId、不能改 discoveryId、不能改成功条件。',
+    '每个 preset 必须且只能出现一次：prepCu、prepAg、prepFe、prepCo2、prepIodine、prepMn。',
+    '文案要短、像游戏关卡，不要写教学废话，不要编号说明，不要 Markdown。',
+    'route 只能是 3-4 个很短的步骤词；branch 是一个可选对照/变量提示。',
+    '必须输出 JSON 对象，不要输出代码块。',
+    'JSON 结构：{"title": string, "missions": [{"preset": string, "title": string, "family": string, "signal": string, "route": string[], "branch": string, "target": string}]}',
+    `当前需要生成第 ${episode} 组。安全模板如下：${JSON.stringify(safeTemplates)}`,
+    `本地兜底卡组如下，可在这个审美基础上微调：${JSON.stringify(fallbackDeck)}`,
+  ].join('\n')
+}
+
+async function callMissionDeckLlm(episode, fallbackDeck) {
+  const llm = resolveLlmConfig()
+  if (!llm.apiKey || !llm.model || !llm.baseUrl) return null
+
+  const messages = [
+    { role: 'system', content: buildMissionDeckInstruction(episode, fallbackDeck) },
+    { role: 'user', content: `生成 ChemLab Pro 第 ${episode} 组 6 关任务。只返回 JSON。` },
+  ]
+  const endpoint = llm.baseUrl.endsWith('/chat/completions')
+    ? llm.baseUrl
+    : `${llm.baseUrl.replace(/\/$/, '')}/chat/completions`
+  const timeoutMs = parsePositiveInteger(process.env.MISSION_LLM_TIMEOUT_MS || process.env.LLM_TIMEOUT_MS, DEFAULT_LLM_TIMEOUT_MS)
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  let response
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${llm.apiKey}`,
+      },
+      signal: controller.signal,
+      body: JSON.stringify(buildChatCompletionBody(llm, messages, {
+        temperature: 0.62,
+        maxTokens: process.env.MISSION_LLM_MAX_TOKENS || 900,
+      })),
+    })
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`Mission LLM 超时 ${Math.round(timeoutMs / 1000)}s`)
+    }
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
+
+  if (!response.ok) {
+    throw new Error(`Mission LLM HTTP ${response.status}`)
+  }
+
+  const payload = await response.json()
+  const content = payload?.choices?.[0]?.message?.content
+  const parsed = extractJsonObject(typeof content === 'string' ? content : '')
+  if (!parsed) {
+    throw new Error('Mission LLM 返回为空或不是 JSON')
+  }
+
+  const rawDeck = parsed.deck && typeof parsed.deck === 'object' ? parsed.deck : parsed
+  const normalized = normalizeGeneratedMissionDeck({
+    ...rawDeck,
+    id: `agent-${episode}-${Date.now()}`,
+    episode,
+  }, episode, 'agent')
+  if (!normalized) {
+    throw new Error('Mission LLM 关卡未通过校验')
+  }
+  return normalized
+}
+
+async function generateMissionDeck(input = {}) {
+  const episode = parsePositiveInteger(input.episode, 2)
+  const fallbackDeck = createTemplateMissionDeck(episode)
+
+  try {
+    const llmDeck = await callMissionDeckLlm(episode, fallbackDeck)
+    return llmDeck || fallbackDeck
+  } catch (error) {
+    console.warn('[mission-api] llm error:', error instanceof Error ? error.message : error)
+    return fallbackDeck
+  }
+}
+
 async function generateLavoisierResponse(input) {
   const fallback = buildFallbackResponse(input)
   try {
@@ -728,6 +1025,42 @@ export function createLavoisierServer() {
         suggestedPrompts: ['重试刚才的问题', '总结当前实验状态', '现在是否有风险？'],
         toolCalls: [],
         statusLabel: '服务错误',
+      })
+    }
+    return
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/missions/generate') {
+    const llmConfig = resolveLlmConfig()
+    const configured = Boolean(llmConfig.apiKey && llmConfig.model && llmConfig.baseUrl)
+    sendJson(res, 200, {
+      ok: true,
+      name: 'mission-generator',
+      provider: llmConfig.provider,
+      model: llmConfig.model || null,
+      statusLabel: configured ? `关卡 Agent 已配置 · ${llmConfig.provider}/${llmConfig.model}` : '关卡 Agent 未连接，使用本地模板',
+    })
+    return
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/missions/generate') {
+    try {
+      const body = await readJsonBody(req)
+      const deck = await generateMissionDeck({
+        episode: body?.episode,
+        completed: Array.isArray(body?.completed) ? body.completed : [],
+        reason: typeof body?.reason === 'string' ? body.reason : 'auto',
+      })
+      sendJson(res, 200, {
+        ok: true,
+        deck,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误'
+      sendJson(res, 500, {
+        ok: false,
+        message,
+        deck: createTemplateMissionDeck(2),
       })
     }
     return
